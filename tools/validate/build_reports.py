@@ -74,6 +74,11 @@ def main() -> None:
         "vendor_crosswalk": root / "data/review/skygame-data-1.3.4-crosswalk.jsonl",
         "vendor_item_evidence": root / "data/review/skygame-data-1.3.4-item-evidence.jsonl",
         "strict_recovery_reviews": root / "data/review/strict-listing-recovery.jsonl",
+        "catalog_universe": root / "data/review/catalog-universe.jsonl",
+        "item_identity_evidence": root / "data/review/item-evidence.jsonl",
+        "item_promotion_ledger": root / "data/review/item-promotion-ledger.jsonl",
+        "market_claim_review": root / "data/review/market-claim-review.jsonl",
+        "market_claim_gold": root / "data/review/market-claim-gold.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -98,7 +103,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.2-p2",
+        "schema_version": "3.3-p2.1",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -180,6 +185,16 @@ def main() -> None:
             "approved_strict_listing_recoveries": sum(row.get("review_status") == "approved" for row in rows["strict_recovery_reviews"]),
             "canonical_promotions": 0,
         },
+        "p2_1_review_infrastructure": {
+            "catalog_universe_rows": len(rows["catalog_universe"]),
+            "catalog_universe_reconciled": len(rows["catalog_universe"]) == 3266,
+            "identity_evidence_rows": len(rows["item_identity_evidence"]),
+            "vendor_correlated_template_candidates": sum(row.get("decision") == "vendor_correlated_template_candidate" for row in rows["item_promotion_ledger"]),
+            "identity_rejected_fail_closed": sum(row.get("decision") == "rejected_fail_closed" for row in rows["item_promotion_ledger"]),
+            "canonical_writes": sum(row.get("canonical_write") != "not_performed" for row in rows["item_promotion_ledger"]),
+            "market_claim_review_queue": len(rows["market_claim_review"]),
+            "human_gold_rows": len(rows["market_claim_gold"]),
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
             "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
@@ -187,6 +202,8 @@ def main() -> None:
             "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
+            "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
+            "市場 claim 人工金標仍為 0；20 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
         ],
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
@@ -231,16 +248,25 @@ def main() -> None:
 
 - canonical needs_review 分布為 {json.dumps(canonical_needs_review, ensure_ascii=False)}；另有類別缺口 queue {len(rows['unresolved'])} 筆、隔離物品候選 {len(rows['item_candidates'])} 筆、unmapped alias {len(rows['unmapped'])} 筆、alias conflict {len(rows['alias_conflicts'])} 筆。這些集合可能重疊，不直接相加成唯一項目數。
 - 全物品 catalog 未完成。現有 {len(rows['items'])} 筆是可追溯種子與節點目錄，不代表遊戲全部物品。
+- 已將 3,266 筆固定 vendor snapshot 全量分類；其中 {sum(row.get('decision') == 'vendor_correlated_template_candidate' for row in rows['item_promotion_ledger'])} 筆候選只有單一 vendor correlation，canonical identity 仍 unresolved，沒有寫入 canonical 或模型特徵。
 - 物品 evidence tier：{json.dumps(count(rows['items'], 'evidence_tier'), ensure_ascii=False)}；模型白名單物品 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])} 筆。needs_review、候選與衝突別名均不得進入正式 Item Vector。
 - visual reference {len(rows['visual_references'])}、真實 image evidence {len(rows['image_evidence'])}、可驗證成交 {verified_sales}；因此不宣稱圖示辨識準確率或成交價模型。
 - 季節節點的繁中正式名、免費／季卡屬性、成本與取得狀態仍有 needs_review 記錄。
 """
     write_utf8_lf(root / "reports/validation/data-quality.md", quality_md)
 
+    # The final release report is produced by release_check.py.  Advance the
+    # derived report contract before the validator reads the previous run, so
+    # a version bump is reproducible without hand-editing report numbers.
+    validation_path = root / "reports/validation/p0-validation.json"
+    previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
+    previous_validation["schema_version"] = "3.3-p2.1"
+    write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
+
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p2"
-    manifest["package_version"] = "3.2.0-p2"
+    manifest["package_id"] = "sky-valuation-v3-p21"
+    manifest["package_version"] = "3.3.0-p2.1"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -266,12 +292,21 @@ def main() -> None:
         "vendor_candidate_name_matches": sum(row.get("match_status") == "matched_candidate_name" for row in rows["vendor_crosswalk"]),
         "vendor_item_evidence_rows": len(rows["vendor_item_evidence"]),
         "approved_strict_listing_recoveries": sum(row.get("review_status") == "approved" for row in rows["strict_recovery_reviews"]),
+        "catalog_universe_rows": len(rows["catalog_universe"]),
+        "identity_evidence_rows": len(rows["item_identity_evidence"]),
+        "vendor_correlated_template_candidates": sum(row.get("decision") == "vendor_correlated_template_candidate" for row in rows["item_promotion_ledger"]),
+        "identity_rejected_fail_closed": sum(row.get("decision") == "rejected_fail_closed" for row in rows["item_promotion_ledger"]),
+        "market_claim_review_rows": len(rows["market_claim_review"]),
+        "human_gold_rows": len(rows["market_claim_gold"]),
     }
     manifest["derived_paths"] = [
         "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
         "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
         "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
         "data/modeling/item-value-table.jsonl",
+        "data/review/catalog-universe.jsonl", "data/review/catalog-universe-summary.json",
+        "data/review/item-evidence.jsonl", "data/review/item-promotion-ledger.jsonl",
+        "data/review/market-claim-review.jsonl",
         "modeling/artifacts/elastic-net-normal_listing.json", "modeling/artifacts/elastic-net-urgent_sale.json",
         "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
         "reports/coverage/catalog-coverage.json", "reports/validation/p0-validation.json",

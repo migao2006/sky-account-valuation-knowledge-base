@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/catalog-universe-summary.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "source_id", "snapshot_sha256", "vendor_item_count", "canonical_linked_count", "candidate_linked_count", "unmatched_count", "explicitly_excluded_count", "expected_count", "reconciliation_status", "notes"],
+  "properties": {
+    "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
+    "source_id": {"const": "source_skygame_data_1_3_4"},
+    "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "vendor_item_count": {"type": "integer", "minimum": 1},
+    "canonical_linked_count": {"type": "integer", "minimum": 0},
+    "candidate_linked_count": {"type": "integer", "minimum": 0},
+    "unmatched_count": {"type": "integer", "minimum": 0},
+    "explicitly_excluded_count": {"type": "integer", "minimum": 0},
+    "expected_count": {"type": "integer", "minimum": 1},
+    "reconciliation_status": {"const": "reconciled"},
+    "notes": {"type": "string", "minLength": 1}
+  }
+}

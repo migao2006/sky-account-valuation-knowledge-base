@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/item-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "candidate_item_id", "proposed_canonical_item_id", "field_path", "claim_value", "claim_hash", "source_id", "source_tier", "source_locator", "source_snapshot_hash", "evidence_role", "review_status", "reviewed_at"],
+  "properties": {
+    "evidence_id": {"type": "string", "pattern": "^item_evidence_[a-z0-9_]+$"},
+    "candidate_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "proposed_canonical_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "field_path": {"enum": ["canonical_identity", "canonical_name_en", "canonical_name_zh_tw", "item_category", "season_id", "source_type", "alias", "template_suffix_identity"]},
+    "claim_value": {"type": ["string", "null"]},
+    "claim_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
+    "source_tier": {"enum": ["official_item_specific", "official_general", "maintained_community", "secondary_reference", "unverified_template_seed"]},
+    "source_locator": {"type": "string", "minLength": 1},
+    "source_snapshot_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "evidence_role": {"enum": ["independent_identity", "independent_field", "template_seed_identity", "template_seed_field", "alias_review", "template_suffix_review"]},
+    "review_status": {"enum": ["approved", "machine_correlated"]},
+    "reviewed_at": {"type": "string", "format": "date"},
+    "notes": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["field_path", "source_tier"], "properties": {"field_path": {"const": "canonical_identity"}, "source_tier": {"const": "unverified_template_seed"}}},
+      "then": {"properties": {"evidence_role": {"const": "template_seed_identity"}}}
+    },
+    {
+      "if": {"required": ["field_path"], "properties": {"field_path": {"const": "template_suffix_identity"}}},
+      "then": {"properties": {"evidence_role": {"const": "template_suffix_review"}}}
+    }
+  ]
+}

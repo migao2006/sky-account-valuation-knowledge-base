@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/item-promotion-ledger.schema.json",
+  "description": "Deterministic item identity review result. No row performs a canonical write.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidate_item_id", "proposed_canonical_item_id", "decision", "reasons", "evidence_ids", "canonical_write", "verification_status", "model_feature_status", "unresolved_fields"],
+  "properties": {
+    "candidate_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "proposed_canonical_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "decision": {"enum": ["vendor_correlated_template_candidate", "rejected_fail_closed"]},
+    "reasons": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "evidence_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_evidence_[a-z0-9_]+$"}, "uniqueItems": true},
+    "canonical_write": {"const": "not_performed"},
+    "verification_status": {"enum": ["needs_review", "unknown"]},
+    "model_feature_status": {"const": "excluded_pending_verification"},
+    "unresolved_fields": {"type": "array", "items": {"enum": ["canonical_identity", "season_id", "acquisition", "availability", "cost", "visual_reference"]}, "uniqueItems": true}
+  }
+}

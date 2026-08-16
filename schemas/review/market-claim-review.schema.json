@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-claim-review.schema.json",
+  "description": "Anonymous queue for independent human review. It deliberately contains no listing text or proposed labels.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_id", "listing_id", "listing_text_sha256", "selection_version", "selection_bucket", "requested_fields", "review_status"],
+  "properties": {
+    "review_id": {"type": "string", "pattern": "^market_claim_review_[0-9]{4}$"},
+    "listing_id": {"type": "string", "pattern": "^listing_[0-9]{4}$"},
+    "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "selection_version": {"const": "p2.1-market-claim-stratified-20"},
+    "selection_bucket": {"type": "string", "pattern": "^market_claim_bucket_[0-9]{2}$"},
+    "requested_fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["offer_kind", "entity_kind", "server", "currency", "price_type", "price_twd", "status", "date_verified"]}
+    },
+    "review_status": {"const": "needs_human_annotation"}
+  }
+}

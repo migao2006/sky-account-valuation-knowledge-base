@@ -16,6 +16,7 @@
 
 - canonical needs_review 分布為 {"seasons": 27, "events": 13, "items": 94, "sets": 8, "aliases": 308, "availability_events": 8}；另有類別缺口 queue 39 筆、隔離物品候選 622 筆、unmapped alias 14 筆、alias conflict 1 筆。這些集合可能重疊，不直接相加成唯一項目數。
 - 全物品 catalog 未完成。現有 94 筆是可追溯種子與節點目錄，不代表遊戲全部物品。
+- 已將 3,266 筆固定 vendor snapshot 全量分類；其中 284 筆候選只有單一 vendor correlation，canonical identity 仍 unresolved，沒有寫入 canonical 或模型特徵。
 - 物品 evidence tier：{"unverified_seed": 94}；模型白名單物品 0 筆。needs_review、候選與衝突別名均不得進入正式 Item Vector。
 - visual reference 0、真實 image evidence 0、可驗證成交 0；因此不宣稱圖示辨識準確率或成交價模型。
 - 季節節點的繁中正式名、免費／季卡屬性、成本與取得狀態仍有 needs_review 記錄。

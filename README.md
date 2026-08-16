@@ -1,12 +1,14 @@
-# Sky 光遇帳號估價知識庫 v3.2 P2
+# Sky 光遇帳號估價知識庫 v3.3 P2.1
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.2 P2 在 P1 模型基礎上加入固定、可重現的第三方 Catalog 快照與欄位級 review evidence、可重算的 strict-listing 人工恢復閘門，以及同帳號／同來源／同重複群組不可互相比價的獨立性規則。所有正式工具仍只處理本機檔案，不主動連網。
+v3.3 P2.1 在 P2 基礎上把固定 vendor snapshot 的 3,266 筆資料封閉對帳成 canonical-linked、candidate-linked、unmatched 與 explicitly-excluded 四種狀態，並加入可重播的 item identity evidence、fail-closed promotion ledger，以及固定 20 筆的匿名人工雙標 review queue。所有正式工具仍只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售；唯一明示急售價格含仲，保留為 `needs_review` 而不猜測仲介費。94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
 
 P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。精確名稱比對得到 64 個 canonical 命中與 296 個 candidate 命中；candidate 命中只形成二級 `needs_review` 證據，沒有自動提升 canonical、alias 或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+
+P2.1 將 296 個 candidate template seed 與固定 vendor catalog 的 identity/name/category 做逐欄 correlation。284 筆為 `vendor_correlated_template_candidate`，12 筆因分類衝突拒絕；其餘候選沒有 vendor match。這只是單一獨立 vendor 對未驗證 template seed 的佐證，不是雙來源 canonical identity 驗證：canonical identity 本身仍 unresolved，所有列仍為 `needs_review`、不寫入 canonical、不進模型。市場 review queue 尚未產生任何人工 gold。
 
 ## 快速入口
 
@@ -50,4 +52,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.1 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。

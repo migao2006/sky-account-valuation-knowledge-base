@@ -8,7 +8,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl"
   ],
-  "input_snapshot_sha256": "8266f6bcc8bc3b806f45f27edbb52a35615854e4793728e417195a5a5ecdf07d",
+  "input_snapshot_sha256": "5ca3175b088e876549c248a4d7dc14a78c47543b4e8042f581c3305fa5faa789",
   "training": {
     "eligible_rows": 0,
     "minimum_rows": 100,
@@ -23,6 +23,12 @@
     ],
     "baseline_mae": null,
     "folds": 0
+  },
+  "publication_gate": {
+    "status": "not_evaluated",
+    "required_independent_training_clusters": 300,
+    "required_time_forward_holdout_clusters": 100,
+    "reason": "no_independent_time_forward_holdout"
   },
   "feature_schema": {
     "feature_names": [],

@@ -107,13 +107,36 @@ def _training_quality_reasons(artifact: dict[str, Any]) -> list[str]:
     folds = training.get("folds", training.get("outer_cv_folds"))
     baseline = training.get("baseline_mae", training.get("baseline_median_mae"))
     mae = _outer_mae(artifact)
-    reasons = []
+    # P2.1 has no deterministic evaluator that can replay a pinned,
+    # time-forward holdout and recompute every publication metric.  Therefore
+    # no trained envelope is publishable in this release, even if a caller
+    # self-asserts a passing publication gate.
+    reasons = ["model_publication_disabled_in_p2_1"]
     if training.get("threshold_met") is not True: reasons.append("training_threshold_not_met")
     if training.get("baseline_beaten") is not True: reasons.append("training_baseline_not_beaten")
     if not isinstance(rows, int) or not isinstance(minimum, int) or rows < minimum: reasons.append("training_minimum_rows_not_met")
     if not isinstance(groups, int) or groups < 4: reasons.append("training_independent_groups_insufficient")
     if not isinstance(folds, int) or folds < 2: reasons.append("training_grouped_outer_folds_insufficient")
     if not isinstance(baseline, (int, float)) or isinstance(baseline, bool) or mae is None or mae >= float(baseline): reasons.append("training_cv_does_not_beat_baseline")
+    publication = artifact.get("publication_gate")
+    if not isinstance(publication, dict) or publication.get("status") != "passed":
+        reasons.append("publication_gate_not_passed")
+    else:
+        if publication.get("independent_training_clusters", 0) < 300: reasons.append("publication_training_clusters_insufficient")
+        if publication.get("time_forward_holdout_clusters", 0) < 100: reasons.append("publication_holdout_clusters_insufficient")
+        if publication.get("time_forward_holdout") is not True: reasons.append("publication_holdout_not_time_forward")
+        metrics = publication.get("metrics", {})
+        checks = (
+            isinstance(metrics, dict)
+            and isinstance(metrics.get("mdape"), (int, float)) and metrics["mdape"] <= 0.20
+            and isinstance(metrics.get("p90_ape"), (int, float)) and metrics["p90_ape"] <= 0.40
+            and isinstance(metrics.get("median_baseline_mae_improvement"), (int, float)) and metrics["median_baseline_mae_improvement"] >= 0.15
+            and isinstance(metrics.get("selector_mae_improvement"), (int, float)) and metrics["selector_mae_improvement"] >= 0.10
+            and isinstance(metrics.get("prediction_interval_80_coverage"), (int, float)) and 0.75 <= metrics["prediction_interval_80_coverage"] <= 0.85
+            and isinstance(metrics.get("median_interval_width_ratio"), (int, float)) and metrics["median_interval_width_ratio"] <= 0.50
+            and isinstance(metrics.get("supported_case_rate"), (int, float)) and metrics["supported_case_rate"] >= 0.80
+        )
+        if not checks: reasons.append("publication_metrics_not_met")
     return reasons
 
 

@@ -143,6 +143,26 @@ class MigrationContractTests(unittest.TestCase):
             self.assertEqual(profile["field_evidence"][field]["evidence_state"], "conflict")
             self.assertEqual(profile["field_evidence"][field]["sources"], ["listing_text", "normalized_feature_summary"])
 
+    def test_approximate_resource_point_is_preserved_without_coercing_lower_bounds(self):
+        parsed = MIGRATE.resource_vector("白蠟約 1831、愛心近130、紅蠟12；季蠟89")
+        self.assertEqual(parsed["values"], {
+            "white_candles": 1831, "hearts": 130,
+            "red_candles": 12, "season_candles": 89,
+        })
+        self.assertEqual(parsed["claim_kinds"]["white_candles"], "approximate")
+        self.assertEqual(parsed["claim_kinds"]["hearts"], "approximate")
+        self.assertEqual(parsed["claim_kinds"]["red_candles"], "exact")
+        lower_bound = MIGRATE.resource_vector("白蠟1000以上、愛心200+")
+        self.assertIsNone(lower_bound["values"]["white_candles"])
+        self.assertIsNone(lower_bound["values"]["hearts"])
+
+    def test_approximate_resource_provenance_survives_merge(self):
+        listing = MIGRATE.resource_vector("白蠟約1831")
+        summary = MIGRATE.resource_vector("")
+        resources, evidence = MIGRATE.merge_resources(listing, summary)
+        self.assertEqual(resources["values"]["white_candles"], 1831)
+        self.assertEqual(evidence["resources.values.white_candles"]["claim_kind"], "approximate")
+
     def test_season_conflict_marks_profile_needs_review(self):
         record = {
             "listing_id": "listing_0001", "listing_text": "表演畢業",

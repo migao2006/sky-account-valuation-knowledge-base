@@ -153,6 +153,7 @@ def artifact_base(input_paths: list[Path], output: Path, price_line: str, record
                      "effective_feature_groups": len(groups), "min_effective_feature_groups": 1, "seed": 20260816,
                      "threshold_met": len(records) >= required, "baseline_beaten": False,
                      "outer_cv_mae": None, "outer_cv_folds": 0, "outer_cv_grouping": "cluster_id", "unique_clusters": 0, "group_count": 0, "baseline_median_mae": None},
+        "publication_gate": {"status": "not_evaluated", "required_independent_training_clusters": 300, "required_time_forward_holdout_clusters": 100, "reason": "no_independent_time_forward_holdout"},
         "prediction_contract": {"target": "log_price_twd", "transform": "exp", "interval_supported": False,
                                 "missing_feature_encoding": "NaN", "unknown_is_not_confirmed_missing": True},
         "model_file": None,

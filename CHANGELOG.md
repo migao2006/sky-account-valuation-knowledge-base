@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.3.0-p2.1 — 2026-08-17
+
+- 將固定 vendor snapshot 的 3,266 筆列完整對帳：64 canonical-linked、296 candidate-linked、1,398 unmatched、1,508 explicitly-excluded，沒有靜默遺失。
+- 新增 1,776 筆可重播的 template-seed/vendor correlation 記錄，以及 622 筆 fail-closed review ledger；284 筆有單一獨立 vendor correlation、338 筆拒絕，canonical identity 仍 unresolved，canonical writes 與 model promotions 都維持 0。
+- 自動 exact-match 證據明確標記為 `machine_correlated`，不冒充人工審核；season、取得、availability、成本與 visual reference 未因此升級。
+- 新增固定 20 筆匿名 market-claim 人工 review queue 與雙人獨立標註＋人工裁決契約；正式 human gold 維持 0。
+- 資源解析可保守保存「約／近」數值為 approximate claim；「以上／起／+」等下限聲稱不轉成精確值。正式嚴格市場池仍是正常刊登 3、急售 0，模型保持停用。
+
 ## 3.2.0-p2 — 2026-08-17
 
 - 固定保存 MIT 授權 `skygame-data@1.3.4` 的離線快照、來源 metadata、SHA-256 與 3,266 筆逐列 crosswalk；正式工具不含下載或網路能力。

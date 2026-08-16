@@ -20,6 +20,10 @@ from evidence import validate_evidence  # noqa: E402
 from schema_validator import OfflineSchemaValidator  # noqa: E402
 sys.path.insert(0, str(ROOT / "tools" / "normalize"))
 from build_comparables import deduplication_is_approved, predicate_hash, strict_recovery_predicates  # noqa: E402
+from build_catalog_universe import build_catalog_universe  # noqa: E402
+from build_item_evidence_bundle import build as build_item_evidence, sha as item_evidence_sha  # noqa: E402
+from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
+from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -56,6 +60,11 @@ SCHEMA_FILES = {
     "data/review/strict-listing-recovery.jsonl": "schemas/review/strict-listing-recovery.schema.json",
     "data/review/skygame-data-1.3.4-crosswalk.jsonl": "schemas/review/vendor-catalog-crosswalk.schema.json",
     "data/review/skygame-data-1.3.4-item-evidence.jsonl": "schemas/review/vendor-catalog-item-evidence.schema.json",
+    "data/review/catalog-universe.jsonl": "schemas/review/catalog-universe.schema.json",
+    "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
+    "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
+    "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
+    "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "reports/coverage/unmapped-aliases.jsonl": "schemas/reports/unmapped-coverage.schema.json",
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
@@ -73,6 +82,7 @@ JSON_SCHEMA_FILES = {
     "data/source/vendor/skygame-data-1.3.4-items.json": "schemas/knowledge/vendor-catalog-snapshot.schema.json",
     "data/source/vendor/skygame-data-1.3.4-metadata.json": "schemas/knowledge/vendor-catalog-metadata.schema.json",
     "data/review/skygame-data-1.3.4-crosswalk-summary.json": "schemas/review/vendor-catalog-summary.schema.json",
+    "data/review/catalog-universe-summary.json": "schemas/review/catalog-universe-summary.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -366,6 +376,46 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     for key, expected in expected_summary.items():
         if summary.get(key) != expected:
             errors.append(f"vendor-catalog: summary {key} mismatch expected={expected!r} actual={summary.get(key)!r}")
+    universe = read_jsonl(root / "data/review/catalog-universe.jsonl")
+    universe_summary = json.loads((root / "data/review/catalog-universe-summary.json").read_text(encoding="utf-8"))
+    try:
+        expected_universe, expected_universe_summary = build_catalog_universe(vendor_snapshot, vendor_metadata, crosswalk)
+    except ValueError as exc:
+        errors.append(f"catalog-universe: cannot reconcile snapshot/crosswalk: {exc}")
+    else:
+        if universe != expected_universe:
+            errors.append("catalog-universe: committed rows differ from deterministic snapshot/crosswalk reconciliation")
+        if universe_summary != expected_universe_summary:
+            errors.append("catalog-universe: committed summary differs from deterministic reconciliation")
+    item_evidence = read_jsonl(root / "data/review/item-evidence.jsonl")
+    expected_item_evidence = build_item_evidence(
+        list(candidates.values()), evidence_rows,
+        item_evidence_sha((root / "data/review/item-candidates.jsonl").read_bytes()),
+    )
+    if item_evidence != expected_item_evidence:
+        errors.append("item-evidence: committed rows differ from deterministic pinned-source correlation")
+    try:
+        source_records = {row["source_id"]: row for row in read_jsonl(root / "knowledge/sources/sources.jsonl")}
+        verified_item_evidence_ids = verify_replayable_sources(root, item_evidence, source_records)
+    except ValueError as exc:
+        errors.append(f"item-evidence: {exc}")
+    promotion_ledger = read_jsonl(root / "data/review/item-promotion-ledger.jsonl")
+    expected_promotions = evaluate_item_promotions(
+        list(candidates.values()), set(items), read_jsonl(root / "data/review/alias-conflicts.jsonl"),
+        item_evidence, mode="vendor_correlation", verified_evidence_ids=verified_item_evidence_ids,
+    )
+    if promotion_ledger != expected_promotions:
+        errors.append("item-promotion: committed ledger differs from deterministic fail-closed evaluation")
+    if any(row.get("canonical_write") != "not_performed" or row.get("model_feature_status") != "excluded_pending_verification" for row in promotion_ledger):
+        errors.append("item-promotion: identity-only ledger attempted canonical/model promotion")
+    market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
+    expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
+    if market_claim_queue != expected_market_claim_queue:
+        errors.append("market-claim-review: committed queue differs from deterministic fixed selection")
+    market_claim_gold = read_jsonl(root / "data/review/market-claim-gold.jsonl")
+    errors.extend(f"market-claim-gold: {issue}" for issue in validate_gold_links(market_claim_queue, market_claim_gold))
+    if market_claim_gold:
+        warnings.append("market-claim-gold contains human-reviewed rows; reviewer identities and adjudication must be audited before use")
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -514,6 +564,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             )
             if not quality_ok:
                 errors.append(f"{relative}: trained artifact does not meet quality gates")
+            publication = artifact.get("publication_gate", {})
+            if publication.get("status") != "passed" or publication.get("independent_training_clusters", 0) < 300 or publication.get("time_forward_holdout_clusters", 0) < 100 or publication.get("time_forward_holdout") is not True:
+                errors.append(f"{relative}: trained artifact has not passed the public time-forward holdout gate")
             if artifact.get("model_type") == "elastic_net":
                 contract = artifact.get("prediction_contract", {})
                 if contract.get("kind") != "additive_log_price" or not isinstance(contract.get("continuous", {}).get("means"), dict):
@@ -622,7 +675,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.2-p2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.3-p2.1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
