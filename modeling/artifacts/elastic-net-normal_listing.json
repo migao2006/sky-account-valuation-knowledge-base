@@ -8,7 +8,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-normal.jsonl"
   ],
-  "input_snapshot_sha256": "52f3f2285d6619765544eba542d7598f1808f0819580c1df3e1025dbe9dc91b8",
+  "input_snapshot_sha256": "c2eb6418f97a14461eed362b15d30cdf354de10a258b5ecd47dabc4286f2c58f",
   "training": {
     "eligible_rows": 3,
     "minimum_rows": 100,

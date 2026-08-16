@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the fixed, anonymous P2.1 market-claim human-review queue.
+"""Build the fixed, anonymous P2.2 market-claim human-review queue.
 
 This offline tool reads only the committed normalized listing file.  It writes
 listing IDs, SHA-256 digests of the existing anonymous listing text, and the
@@ -11,42 +11,43 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
-SELECTION_VERSION = "p2.1-market-claim-stratified-20"
+SELECTION_VERSION = "p2.2-market-claim-stratified-200"
 REQUESTED_FIELDS = ["offer_kind", "entity_kind", "server", "currency", "price_type", "price_twd", "status", "date_verified"]
 
-# Fixed IDs make the review sample reproducible.  Strata cover normal seller
-# listings and deliberately excluded/ambiguous market forms without writing
-# any machine suggestion into the queue itself.
-FIXED_SELECTION = [
-    ("listing_0260", "seller_international_twd"),
-    ("listing_0388", "seller_international_twd"),
-    ("listing_0708", "seller_international_twd"),
-    ("listing_0792", "seller_international_twd"),
-    ("listing_0864", "seller_unknown_identity"),
-    ("listing_0003", "buyer_budget"),
-    ("listing_0021", "service"),
-    ("listing_0013", "exchange"),
-    ("listing_0190", "multi_account"),
-    ("listing_0002", "china_server"),
-    ("listing_0480", "foreign_currency"),
-    ("listing_0028", "sold_claim"),
-    ("listing_0001", "unknown_market_claim"),
-    ("listing_0152", "multi_account"),
-    ("listing_0041", "china_server"),
-    ("listing_0510", "foreign_currency"),
-    ("listing_0039", "exchange"),
-    ("listing_0349", "multi_account"),
-    ("listing_0124", "service"),
-    ("listing_0236", "buyer_budget"),
+# These predicates are used only to make a balanced sample from the existing
+# normalized corpus.  The emitted queue contains neither a predicate name nor
+# a normalized value: reviewers see only an opaque bucket ID.  Keeping the
+# selection rules and sort order here makes the 200-row sample reproducible.
+Predicate = Callable[[dict[str, Any]], bool]
+STRATA: list[tuple[Predicate, int]] = [
+    (lambda row: row.get("server") == "china", 10),
+    (lambda row: row.get("date_verified") is True, 10),
+    (lambda row: row.get("currency") == "CNY", 10),
+    (lambda row: row.get("currency") == "RM", 10),
+    (lambda row: row.get("currency") == "HKD", 10),
+    (lambda row: row.get("currency") == "TWD", 10),
+    (lambda row: row.get("server") == "international", 10),
+    (lambda row: row.get("offer_kind") == "buyer_budget", 10),
+    (lambda row: row.get("offer_kind") == "service", 10),
+    (lambda row: row.get("offer_kind") == "exchange", 10),
+    (lambda row: row.get("entity_kind") == "multi_account", 10),
+    (lambda row: row.get("price_twd") is not None, 10),
+    (lambda row: row.get("status") in {"sold", "sold_claimed", "reported_sold"}, 10),
+    (lambda row: bool(re.search(r"綁|绑|Google|Apple|Facebook|Nintendo|Steam|PlayStation", str(row.get("listing_text", "")), re.IGNORECASE)), 10),
+    (lambda row: bool(re.search(r"季|畢業|毕业|極光|欧若拉|梵谷|梵高|大耳狗|耳狗|青鳥|青鸟|築巢|筑巢|歸巢|归巢", str(row.get("listing_text", "")))), 10),
+    (lambda row: bool(re.search(r"蠟|蜡|愛心|爱心|季蠟|季蜡|紅蠟|红蜡|红烛|白蜡", str(row.get("listing_text", "")))), 10),
+    (lambda row: row.get("price_type") == "unknown", 10),
+    (lambda row: row.get("currency") == "unknown", 10),
+    (lambda row: row.get("server") == "unknown", 10),
+    (lambda row: row.get("offer_kind") == "unknown", 10),
 ]
-OPAQUE_BUCKETS = {
-    name: f"market_claim_bucket_{index:02d}"
-    for index, name in enumerate(dict.fromkeys(name for _, name in FIXED_SELECTION), start=1)
-}
+QUEUE_SIZE = sum(quota for _, quota in STRATA)
+OPAQUE_BUCKETS = tuple(f"market_claim_bucket_{index:02d}" for index in range(1, len(STRATA) + 1))
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -61,25 +62,30 @@ def build_queue(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_id = {row.get("listing_id"): row for row in rows}
     if len(by_id) != len(rows):
         raise ValueError("normalized listing IDs must be unique")
-    if len(FIXED_SELECTION) != 20 or len({entry[0] for entry in FIXED_SELECTION}) != 20:
-        raise AssertionError("fixed review selection must contain exactly 20 unique listing IDs")
+    ordered_rows = sorted(rows, key=lambda row: str(row["listing_id"]))
+    selected_ids: set[str] = set()
     queue: list[dict[str, Any]] = []
-    for index, (listing_id, stratum) in enumerate(FIXED_SELECTION, start=1):
-        row = by_id.get(listing_id)
-        if row is None:
-            raise ValueError(f"selected listing absent from normalized source: {listing_id}")
-        text = row.get("listing_text")
-        if not isinstance(text, str) or not text:
-            raise ValueError(f"selected listing has no usable listing_text: {listing_id}")
-        queue.append({
-            "review_id": f"market_claim_review_{index:04d}",
-            "listing_id": listing_id,
-            "listing_text_sha256": text_sha256(text),
-            "selection_version": SELECTION_VERSION,
-            "selection_bucket": OPAQUE_BUCKETS[stratum],
-            "requested_fields": REQUESTED_FIELDS,
-            "review_status": "needs_human_annotation",
-        })
+    for bucket_index, ((predicate, quota), opaque_bucket) in enumerate(zip(STRATA, OPAQUE_BUCKETS), start=1):
+        candidates = [row for row in ordered_rows if row["listing_id"] not in selected_ids and predicate(row)]
+        if len(candidates) < quota:
+            raise ValueError(f"review bucket {bucket_index:02d} has {len(candidates)} unique candidates; needs {quota}")
+        for row in candidates[:quota]:
+            listing_id = row["listing_id"]
+            text = row.get("listing_text")
+            if not isinstance(text, str) or not text:
+                raise ValueError(f"selected listing has no usable listing_text: {listing_id}")
+            selected_ids.add(listing_id)
+            queue.append({
+                "review_id": f"market_claim_review_{len(queue) + 1:04d}",
+                "listing_id": listing_id,
+                "listing_text_sha256": text_sha256(text),
+                "selection_version": SELECTION_VERSION,
+                "selection_bucket": opaque_bucket,
+                "requested_fields": REQUESTED_FIELDS,
+                "review_status": "needs_human_annotation",
+            })
+    if len(queue) != QUEUE_SIZE or len(selected_ids) != QUEUE_SIZE:
+        raise AssertionError("review queue must contain exactly the configured number of unique listings")
     return queue
 
 

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/fandom-seasonal-cosmetics-snapshot.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_format", "snapshot_id", "source_id", "page_id", "page_title", "revision_id", "revision_timestamp", "extraction_policy", "seasonal_cosmetic_templates"],
+  "properties": {
+    "snapshot_format": {"const": "fandom-printable-seasonal-cosmetics-v1"},
+    "snapshot_id": {"const": "fandom_printable_seasonal_cosmetics_r107991"},
+    "source_id": {"const": "source_fandom_printable_seasonal_cosmetics_r107991"},
+    "page_id": {"const": 17690},
+    "page_title": {"const": "Sky Children of the Light Wiki:Printable Seasonal Cosmetics"},
+    "revision_id": {"const": 107991},
+    "revision_timestamp": {"const": "2026-06-13T11:43:55Z"},
+    "extraction_policy": {"const": "template_coordinates_only_no_display_name_inference"},
+    "seasonal_cosmetic_templates": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["source_item_key", "season_label", "template_subject", "template_slot", "ordinal_in_season", "source_locator"], "properties": {"source_item_key": {"type": "string", "minLength": 1}, "season_label": {"type": "string", "minLength": 1}, "template_subject": {"type": "string", "minLength": 1}, "template_slot": {"type": "string", "minLength": 1}, "ordinal_in_season": {"type": "integer", "minimum": 1}, "source_locator": {"type": "string", "pattern": "^revision:107991:season:.+:template:[1-9][0-9]*$"}}}}
+  }
+}

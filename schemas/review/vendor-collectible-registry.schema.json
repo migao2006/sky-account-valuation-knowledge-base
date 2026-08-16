@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/vendor-collectible-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_id", "snapshot_id", "source_id", "vendor_item_id", "vendor_guid", "vendor_name", "vendor_item_type", "normalized_name", "name_cluster", "link_status", "crosswalk_match_status", "canonical_item_ids", "candidate_item_ids", "review_status", "canonical_write", "model_feature_status"],
+  "properties": {
+    "registry_id": {"type": "string", "pattern": "^vendor_collectible_[A-Za-z0-9_-]+$"},
+    "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
+    "source_id": {"const": "source_skygame_data_1_3_4"},
+    "vendor_item_id": {"type": "integer", "minimum": 0},
+    "vendor_guid": {"type": "string", "minLength": 1},
+    "vendor_name": {"type": "string", "minLength": 1},
+    "vendor_item_type": {"enum": ["HairAccessory", "HeadAccessory", "Hair", "Mask", "FaceAccessory", "Necklace", "Outfit", "Shoes", "OutfitShoes", "Cape", "Held", "Furniture", "Prop", "Music", "Emote", "Stance", "Call"]},
+    "normalized_name": {"type": "string", "minLength": 1},
+    "name_cluster": {"type": "object", "additionalProperties": false, "required": ["cluster_id", "snapshot_member_count", "collectible_member_count", "vendor_item_types", "cross_type_conflict"], "properties": {"cluster_id": {"type": "string", "pattern": "^vendor_name_[a-f0-9]{20}$"}, "snapshot_member_count": {"type": "integer", "minimum": 1}, "collectible_member_count": {"type": "integer", "minimum": 1}, "vendor_item_types": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "cross_type_conflict": {"type": "boolean"}}},
+    "link_status": {"enum": ["canonical_link", "candidate_link", "unresolved"]},
+    "crosswalk_match_status": {"enum": ["matched_canonical_name", "matched_alias", "ambiguous_canonical_match", "matched_candidate_name", "ambiguous_candidate_match", "unmatched_vendor_item"]},
+    "canonical_item_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}},
+    "candidate_item_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}},
+    "review_status": {"enum": ["needs_review", "quarantined_cross_type_conflict"]},
+    "canonical_write": {"const": "not_performed"},
+    "model_feature_status": {"const": "excluded_pending_verification"}
+  }
+}

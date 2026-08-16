@@ -165,17 +165,42 @@ def item_aliases(v3_root: Path) -> dict[str, str]:
 
 
 def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
-    """Return only aliases that resolve to exactly one item or set target."""
+    """Return exact aliases that resolve to one *existing* catalog target.
+
+    This deliberately is not a fuzzy matcher.  A spelling is usable only when
+    it appears verbatim in the canonical item/set data or in the canonical
+    alias file, and its target exists in the corresponding canonical file.
+    Ambiguous spellings are omitted here and must remain in review.
+    """
     candidates: dict[str, set[tuple[str, str]]] = {}
+    item_path = v3_root / "knowledge" / "items" / "items.jsonl"
+    set_path = v3_root / "knowledge" / "sets" / "item-sets.jsonl"
+    item_ids = {row.get("item_id") for row in read_jsonl(item_path)} if item_path.exists() else set()
+    set_ids = {row.get("set_id") for row in read_jsonl(set_path)} if set_path.exists() else set()
+
+    def add(alias: Any, target_type: str, target_id: Any) -> None:
+        if not isinstance(alias, str) or len(alias.strip()) < 2:
+            return
+        if target_type == "item" and target_id not in item_ids:
+            return
+        if target_type == "set" and target_id not in set_ids:
+            return
+        candidates.setdefault(alias.casefold(), set()).add((target_type, str(target_id)))
+
+    # Canonical titles and the item-owned alias list are exact catalog aliases.
+    for row in read_jsonl(item_path) if item_path.exists() else []:
+        for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en"), *row.get("aliases", [])):
+            add(value, "item", row.get("item_id"))
+    for row in read_jsonl(set_path) if set_path.exists() else []:
+        for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en")):
+            add(value, "set", row.get("set_id"))
     path = v3_root / "knowledge" / "aliases" / "item-aliases.jsonl"
     if not path.exists():
-        return {}
+        return {alias: next(iter(targets)) for alias, targets in candidates.items() if len(targets) == 1}
     for row in read_jsonl(path):
-        target_type = row.get("target_type")
-        target_id = row.get("target_id")
-        alias = row.get("alias_text")
-        if target_type in {"item", "set"} and isinstance(target_id, str) and isinstance(alias, str) and len(alias.strip()) >= 2:
-            candidates.setdefault(alias.casefold(), set()).add((target_type, target_id))
+        target_type, target_id = row.get("target_type"), row.get("target_id")
+        if target_type in {"item", "set"}:
+            add(row.get("alias_text") or row.get("normalized_alias"), target_type, target_id)
     return {alias: next(iter(targets)) for alias, targets in candidates.items() if len(targets) == 1}
 
 
@@ -185,6 +210,75 @@ def mentioned_without_negation(text: str, alias: str) -> bool:
         if not re.search(r"(?:缺|無|无|沒有|没有|不含|未有|未擁有|未拥有).{0,4}" + re.escape(alias), context, flags=re.I):
             return True
     return False
+
+
+def longest_non_overlapping_aliases(text: str, aliases: dict[str, Any]) -> set[str]:
+    """Select longest alias occurrences globally so nested names count once."""
+    occurrences: list[tuple[int, int, str]] = []
+    for alias in aliases:
+        occurrences.extend((match.start(), match.end(), alias) for match in re.finditer(re.escape(alias), text, flags=re.I))
+    selected: list[tuple[int, int, str]] = []
+    for start, end, alias in sorted(occurrences, key=lambda row: (-(row[1] - row[0]), row[0], row[2])):
+        if any(start < chosen_end and chosen_start < end for chosen_start, chosen_end, _ in selected):
+            continue
+        selected.append((start, end, alias))
+    return {alias for _, _, alias in selected}
+
+
+def collection_claims(text: str, aliases: dict[str, tuple[str, str]], evidence_source: str) -> tuple[set[str], dict[str, dict[str, Any]]]:
+    """Extract only positive exact collection claims from one source field.
+
+    There is no safe collection-wide negative statement in this source format:
+    ``沒有 X`` must not be converted into an absent item vector unless X is a
+    uniquely resolved canonical alias.  Positive set mentions retain a
+    non-completion claim rather than inventing member ownership.
+    """
+    owned: set[str] = set()
+    set_claims: dict[str, dict[str, Any]] = {}
+    for alias in longest_non_overlapping_aliases(text, aliases):
+        target_type, target_id = aliases[alias]
+        if not mentioned_without_negation(text, alias):
+            continue
+        if target_type == "item":
+            owned.add(target_id)
+        else:
+            set_claims[target_id] = {
+                "set_id": target_id, "status": "mentioned_unverified",
+                "completion_ratio": None, "is_complete": None,
+                "owned_item_ids": [], "missing_item_ids": [],
+                "evidence_state": "text_claim", "review_status": "needs_review",
+                "evidence_sources": [evidence_source],
+            }
+    return owned, set_claims
+
+
+def merge_collection_claims(
+    listing: tuple[set[str], dict[str, dict[str, Any]]],
+    summary: tuple[set[str], dict[str, dict[str, Any]]],
+) -> tuple[set[str], list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Union positive claims and preserve field-level provenance.
+
+    A normalized feature summary is not an independent market source, but it
+    is a separate extraction input.  Union is safe for positive mentions;
+    completion and missing-member claims remain unknown.
+    """
+    listing_items, listing_sets = listing
+    summary_items, summary_sets = summary
+    owned = listing_items | summary_items
+    sources = ([] if not listing_items else ["listing_text"]) + ([] if not summary_items else ["normalized_feature_summary"])
+    set_rows: list[dict[str, Any]] = []
+    for set_id in sorted(set(listing_sets) | set(summary_sets)):
+        row = dict(listing_sets.get(set_id) or summary_sets[set_id])
+        row["evidence_sources"] = sorted(set((listing_sets.get(set_id) or {}).get("evidence_sources", []) + (summary_sets.get(set_id) or {}).get("evidence_sources", [])))
+        set_rows.append(row)
+    evidence = {
+        "collection.owned_item_ids": {"sources": sources, "evidence_state": "text_claim" if sources else "unknown"},
+        "collection.item_set_profiles": {
+            "sources": sorted({source for row in set_rows for source in row.get("evidence_sources", [])}),
+            "evidence_state": "text_claim" if set_rows else "unknown",
+        },
+    }
+    return owned, set_rows, evidence
 
 
 def season_terms(text: str) -> list[str]:
@@ -422,25 +516,38 @@ def merge_resources(
     return {"values": values, "capture_date": None, "evidence_state": overall}, evidence
 
 
-def binding_matrix(record: dict[str, Any], text: str) -> dict[str, Any]:
+def binding_matrix(record: dict[str, Any], text: str, summary: str = "") -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """Build a fail-closed binding matrix from both textual provenance fields."""
     known = {item.get("platform"): item.get("status", "unknown") for item in record.get("bindings", []) if isinstance(item, dict) and isinstance(item.get("platform"), str)}
     platforms = ["google", "apple", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter"]
     labels = {"google": r"Google|GG", "apple": r"Apple|蘋果|苹果", "facebook": r"Facebook|FB", "nintendo": r"Nintendo|任天堂", "playstation": r"PlayStation|PSN|PS", "steam": r"Steam", "huawei": r"Huawei|華為|华为", "twitter": r"Twitter|推特"}
     results = []
+    evidence_rows: dict[str, dict[str, Any]] = {}
     for platform in platforms:
-        status = known.get(platform, "unknown")
-        evidence = "text_claim" if platform in known else "unknown"
-        match = re.search(labels[platform], text, re.I)
-        if match:
-            context = text[max(0, match.start() - 8): min(len(text), match.end() + 12)]
-            if re.search(r"未綁|未绑|空綁|空绑|可綁|可绑", context): status = "available"
-            elif re.search(r"可換綁|可换绑|可改綁|可改绑", context): status = "available"
-            elif re.search(r"死綁|死绑|不出|遺失|遗失", context): status = "high_risk"
-            elif re.search(r"同出", context): status = "available"
-            elif status == "unknown": status = "mentioned_unknown"
-            evidence = "text_claim"
-        status = {"restricted": "high_risk", "included": "available", "transferable": "available", "unbound": "available"}.get(status, status)
-        results.append({"platform": platform, "status": status, "evidence_state": evidence})
+        def claim(source_text: str) -> str:
+            match = re.search(labels[platform], source_text, re.I)
+            if not match:
+                return "unknown"
+            context = source_text[max(0, match.start() - 8): min(len(source_text), match.end() + 12)]
+            if re.search(r"未綁|未绑|空綁|空绑|可綁|可绑|可換綁|可换绑|可改綁|可改绑|同出", context):
+                return "available"
+            if re.search(r"死綁|死绑|不出|遺失|遗失", context):
+                return "high_risk"
+            return "mentioned_unknown"
+
+        listing_claim, summary_claim = claim(text), claim(summary)
+        merged, provenance = merge_field_claims(
+            f"bindings.{platform}",
+            [(listing_claim, "listing_text"), (summary_claim, "normalized_feature_summary")],
+            "unknown",
+        )
+        # The normalized legacy matrix is retained only when neither textual
+        # evidence field says anything.  It has no fabricated field provenance.
+        if merged == "unknown" and provenance["evidence_state"] == "unknown":
+            merged = known.get(platform, "unknown")
+            merged = {"restricted": "high_risk", "included": "available", "transferable": "available", "unbound": "available"}.get(merged, merged)
+        evidence_rows[f"bindings.platforms.{platform}"] = provenance
+        results.append({"platform": platform, "status": merged, "evidence_state": provenance["evidence_state"]})
     risk_state = record.get("binding_details", {}).get("state", "unknown")
     risk_state = {"partial_or_unknown": "unknown", "clean_claimed": "low", "restricted": "restricted"}.get(risk_state, risk_state)
     if risk_state not in {"low", "restricted", "high_risk", "unknown"}:
@@ -448,7 +555,7 @@ def binding_matrix(record: dict[str, Any], text: str) -> dict[str, Any]:
     return {
         "platforms": results,
         "risk_state": risk_state,
-    }
+    }, evidence_rows
 
 
 def map_completion(text: str) -> dict[str, Any]:
@@ -503,23 +610,35 @@ def graduation_claims(text: str, aliases: dict[str, str]) -> list[str]:
     return sorted(result)
 
 
-def base_profile(record: dict[str, Any], account_id: str, aliases: dict[str, str], order: dict[str, int], graduation_items: dict[str, list[str]]) -> tuple[dict[str, Any], list[str]]:
-    text = str(record.get("listing_text", ""))
-    summary = "\n".join(value for value in record.get("feature_summary", []) if isinstance(value, str))
+def base_profile(
+    record: dict[str, Any], account_id: str, aliases: dict[str, str], order: dict[str, int],
+    graduation_items: dict[str, list[str]], collection_index: dict[str, tuple[str, str]] | None = None,
+) -> tuple[dict[str, Any], list[str]]:
+    content_claims_allowed = record.get("offer_kind") == "seller_listing" and record.get("entity_kind") == "single_account"
+    text = str(record.get("listing_text", "")) if content_claims_allowed else ""
+    summary = "\n".join(value for value in record.get("feature_summary", []) if isinstance(value, str)) if content_claims_allowed else ""
     listing_seasons, listing_unresolved = season_profile(text, aliases, order, "listing_text")
     summary_seasons, summary_unresolved = season_profile(summary, aliases, order, "normalized_feature_summary")
     seasons = merge_season_profiles({"listing_text": listing_seasons, "normalized_feature_summary": summary_seasons}, order)
     unresolved = list(dict.fromkeys(listing_unresolved + summary_unresolved))
-    account_type = record.get("account_type_primary", "unknown")
-    wing_state = record.get("wing_state", "unknown")
+    account_type = record.get("account_type_primary", "unknown") if content_claims_allowed else "unknown"
+    wing_state = record.get("wing_state", "unknown") if content_claims_allowed else "unknown"
     resources, resource_evidence = merge_resources(resource_vector(text), resource_vector(summary))
     maps, map_evidence = merge_map_completion(map_completion(text), map_completion(summary))
     history, history_evidence = merge_ownership_history(ownership_history(text), ownership_history(summary))
+    bindings, binding_evidence = binding_matrix(record if content_claims_allowed else {}, text, summary)
+    collection_owned, collection_sets, collection_evidence = merge_collection_claims(
+        collection_claims(text, collection_index or {}, "listing_text"),
+        collection_claims(summary, collection_index or {}, "normalized_feature_summary"),
+    )
     # Positive graduation claims may be retained from either source.  This is
     # intentionally not a completion inference; only season-profile fields
     # participate in the conflict-aware merge above.
     graduation_seasons = sorted(set(graduation_claims(text, aliases)) | set(graduation_claims(summary, aliases)))
-    has_field_conflict = any(row["evidence_state"] == "conflict" for row in (*resource_evidence.values(), *map_evidence.values(), *history_evidence.values()))
+    has_field_conflict = any(
+        row["evidence_state"] == "conflict"
+        for row in (*resource_evidence.values(), *map_evidence.values(), *history_evidence.values(), *binding_evidence.values())
+    )
     has_season_conflict = any(row["evidence_state"] == "conflict" for row in seasons)
     return ({
         "schema_version": SCHEMA_VERSION,
@@ -528,11 +647,11 @@ def base_profile(record: dict[str, Any], account_id: str, aliases: dict[str, str
         "base_account": {"account_type": account_type, "wing_state": wing_state, "special_appearance": [], "short_id": "unknown"},
         "season_profiles": seasons,
         "season_summary": season_summary(seasons, order),
-        "field_evidence": {**resource_evidence, **map_evidence, **history_evidence},
-        "collection": {"owned_item_ids": [], "item_set_profiles": [], "graduation_rewards": sorted({item for season in graduation_seasons for item in graduation_items.get(season, [])}), "graduation_reward_season_ids": graduation_seasons, "collaboration_items": [], "bundle_claim_level": "unknown"},
+        "field_evidence": {**resource_evidence, **map_evidence, **history_evidence, **binding_evidence, **collection_evidence},
+        "collection": {"owned_item_ids": sorted(collection_owned), "item_set_profiles": collection_sets, "graduation_rewards": sorted({item for season in graduation_seasons for item in graduation_items.get(season, [])}), "graduation_reward_season_ids": graduation_seasons, "collaboration_items": [], "bundle_claim_level": "unknown"},
         "map_completion": maps,
         "resources": resources,
-        "bindings": binding_matrix(record, text),
+        "bindings": bindings,
         "ownership_history": history,
         "trade_conditions": {"offer_kind": record.get("offer_kind", "unknown"), "entity_kind": record.get("entity_kind", "unknown"), "price_type": record.get("price_type", "unknown")},
         "evidence_quality": {"listing_text": record.get("evidence_quality", "unknown"), "image": "not_collected", "ocr": "not_collected"},
@@ -620,7 +739,10 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
     profiles: list[dict[str, Any]] = []
     unresolved_seasons: Counter[str] = Counter()
     for row in normalized_out:
-        profile, unresolved = base_profile(row, f"account_{row['listing_id'].split('_')[1]}", aliases, season_order, graduation_items)
+        profile, unresolved = base_profile(
+            row, f"account_{row['listing_id'].split('_')[1]}", aliases,
+            season_order, graduation_items, collection_index,
+        )
         profile["post_date"] = row.get("post_date")
         profile["date_verified"] = bool(row.get("date_verified"))
         profile["date_evidence_state"] = "verified" if profile["date_verified"] else "unknown"

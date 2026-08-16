@@ -9,7 +9,7 @@
     "review_id": {"type": "string", "pattern": "^market_claim_review_[0-9]{4}$"},
     "listing_id": {"type": "string", "pattern": "^listing_[0-9]{4}$"},
     "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
-    "selection_version": {"const": "p2.1-market-claim-stratified-20"},
+    "selection_version": {"const": "p2.2-market-claim-stratified-200"},
     "selection_bucket": {"type": "string", "pattern": "^market_claim_bucket_[0-9]{2}$"},
     "requested_fields": {
       "type": "array",

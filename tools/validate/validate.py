@@ -65,6 +65,8 @@ SCHEMA_FILES = {
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
+    "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
+    "data/review/vendor-collectible-registry.jsonl": "schemas/review/vendor-collectible-registry.schema.json",
     "reports/coverage/unmapped-aliases.jsonl": "schemas/reports/unmapped-coverage.schema.json",
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
@@ -83,6 +85,10 @@ JSON_SCHEMA_FILES = {
     "data/source/vendor/skygame-data-1.3.4-metadata.json": "schemas/knowledge/vendor-catalog-metadata.schema.json",
     "data/review/skygame-data-1.3.4-crosswalk-summary.json": "schemas/review/vendor-catalog-summary.schema.json",
     "data/review/catalog-universe-summary.json": "schemas/review/catalog-universe-summary.schema.json",
+    "data/source/vendor/fandom-seasonal-cosmetics-r107991-snapshot.json": "schemas/review/fandom-seasonal-cosmetics-snapshot.schema.json",
+    "data/source/vendor/fandom-seasonal-cosmetics-r107991-metadata.json": "schemas/review/fandom-seasonal-cosmetics-metadata.schema.json",
+    "data/review/fandom-seasonal-cosmetics-r107991-crosswalk-summary.json": "schemas/review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
+    "data/review/vendor-collectible-registry-summary.json": "schemas/review/vendor-collectible-registry-summary.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -309,6 +315,16 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     vendor_metadata = json.loads((root / "data/source/vendor/skygame-data-1.3.4-metadata.json").read_text(encoding="utf-8"))
     if vendor_metadata.get("source_id") not in sources:
         errors.append("vendor-catalog: metadata source_id is not canonical")
+
+    fandom_metadata = json.loads((root / "data/source/vendor/fandom-seasonal-cosmetics-r107991-metadata.json").read_text(encoding="utf-8"))
+    if fandom_metadata.get("source_id") not in sources:
+        errors.append("fandom-snapshot: metadata source_id is not canonical")
+    for source_id in fandom_metadata.get("not_independent_of_source_ids", []):
+        if source_id not in sources:
+            errors.append(f"fandom-snapshot: dangling related source_id={source_id}")
+    for row in read_jsonl(root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl"):
+        if row.get("source_id") != fandom_metadata.get("source_id"):
+            errors.append(f"fandom-snapshot:{row.get('crosswalk_id')}: source_id does not match metadata")
     vendor_snapshot_path = root / "data/source/vendor/skygame-data-1.3.4-items.json"
     vendor_tarball_path = root / "data/source/vendor/skygame-data-1.3.4.tgz"
     vendor_snapshot = json.loads(vendor_snapshot_path.read_text(encoding="utf-8"))
@@ -675,7 +691,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.3-p2.1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.4-p2.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

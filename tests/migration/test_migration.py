@@ -92,7 +92,7 @@ class MigrationContractTests(unittest.TestCase):
         record = {
             "listing_id": "listing_0001", "listing_text": "表演畢業",
             "feature_summary": ["表演季卡"], "account_type_primary": "unknown",
-            "wing_state": "unknown", "offer_kind": "unknown", "entity_kind": "unknown",
+            "wing_state": "unknown", "offer_kind": "seller_listing", "entity_kind": "single_account",
             "price_type": "unknown", "evidence_quality": "unknown", "bindings": [],
         }
         profile, unresolved = MIGRATE.base_profile(
@@ -113,7 +113,7 @@ class MigrationContractTests(unittest.TestCase):
             "listing_id": "listing_0001", "listing_text": "未完整列出帳號特徵",
             "feature_summary": ["白蠟 50、全圖畢業、二級斗、二手"],
             "account_type_primary": "unknown", "wing_state": "unknown",
-            "offer_kind": "unknown", "entity_kind": "unknown", "price_type": "unknown",
+            "offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "unknown",
             "evidence_quality": "unknown", "bindings": [],
         }
         profile, _ = MIGRATE.base_profile(record, "account_0001", {}, {}, {})
@@ -129,7 +129,7 @@ class MigrationContractTests(unittest.TestCase):
             "listing_id": "listing_0001", "listing_text": "白蠟 10、全圖畢業、一手",
             "feature_summary": ["白蠟 20、幾乎全圖畢、二手"],
             "account_type_primary": "unknown", "wing_state": "unknown",
-            "offer_kind": "unknown", "entity_kind": "unknown", "price_type": "unknown",
+            "offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "unknown",
             "evidence_quality": "unknown", "bindings": [],
         }
         profile, _ = MIGRATE.base_profile(record, "account_0001", {}, {}, {})
@@ -167,7 +167,7 @@ class MigrationContractTests(unittest.TestCase):
         record = {
             "listing_id": "listing_0001", "listing_text": "表演畢業",
             "feature_summary": ["表演半畢"], "account_type_primary": "unknown",
-            "wing_state": "unknown", "offer_kind": "unknown", "entity_kind": "unknown",
+            "wing_state": "unknown", "offer_kind": "seller_listing", "entity_kind": "single_account",
             "price_type": "unknown", "evidence_quality": "unknown", "bindings": [],
         }
         profile, _ = MIGRATE.base_profile(
@@ -182,6 +182,56 @@ class MigrationContractTests(unittest.TestCase):
         profiles, unresolved = MIGRATE.season_profile("凜冬畢業", aliases, {})
         self.assertEqual(profiles, [])
         self.assertEqual(unresolved, ["凜冬"])
+
+    def test_collection_claims_require_exact_unambiguous_aliases_and_keep_provenance(self):
+        aliases = {
+            "正式斗篷": ("item", "item_formal_cape"),
+            # An alias index is expected to have removed ambiguous spellings;
+            # this unmatched near-spelling must never create an item ID.
+        }
+        listing = MIGRATE.collection_claims("含正式斗篷，不含近似斗篷", aliases, "listing_text")
+        summary = MIGRATE.collection_claims("正式斗篷", aliases, "normalized_feature_summary")
+        owned, set_rows, evidence = MIGRATE.merge_collection_claims(listing, summary)
+        self.assertEqual(owned, {"item_formal_cape"})
+        self.assertEqual(set_rows, [])
+        self.assertEqual(evidence["collection.owned_item_ids"], {
+            "sources": ["listing_text", "normalized_feature_summary"], "evidence_state": "text_claim",
+        })
+
+    def test_nested_short_alias_does_not_double_count_a_long_item_name(self):
+        aliases = {
+            "九色鹿角": ("item", "item_nine_colored_deer_antlers"),
+            "鹿角": ("item", "item_days_feast_reindeer_antlers"),
+        }
+        owned, _ = MIGRATE.collection_claims("只有九色鹿角", aliases, "listing_text")
+        self.assertEqual(owned, {"item_nine_colored_deer_antlers"})
+
+    def test_buyer_requested_item_is_not_migrated_as_owned(self):
+        record = {
+            "listing_id": "listing_0015", "listing_text": "收號需求，希望有蝙蝠斗與九色鹿畢業禮",
+            "feature_summary": ["希望有蝙蝠斗與九色鹿畢業禮"], "offer_kind": "buyer_budget", "entity_kind": "single_account",
+            "account_type_primary": "unknown", "wing_state": "unknown", "price_type": "unknown",
+            "evidence_quality": "unknown", "bindings": [],
+        }
+        profile, _ = MIGRATE.base_profile(
+            record, "account_0015", {"九色鹿": "season_nine_colored_deer"}, {"season_nine_colored_deer": 1},
+            {"season_nine_colored_deer": ["item_nine_colored_deer_ultimate"]},
+            {"蝙蝠斗": ("item", "item_days_mischief_bat_cape")},
+        )
+        self.assertEqual(profile["collection"]["owned_item_ids"], [])
+        self.assertEqual(profile["collection"]["graduation_reward_season_ids"], [])
+        self.assertEqual(profile["season_profiles"], [])
+        self.assertEqual(profile["base_account"]["account_type"], "unknown")
+        self.assertEqual(profile["field_evidence"]["collection.owned_item_ids"]["evidence_state"], "unknown")
+
+    def test_binding_claims_from_sources_conflict_fail_closed(self):
+        bindings, evidence = MIGRATE.binding_matrix(
+            {"bindings": [], "binding_details": {}}, "Google 可綁", "GG 死綁"
+        )
+        google = next(row for row in bindings["platforms"] if row["platform"] == "google")
+        self.assertEqual(google["status"], "unknown")
+        self.assertEqual(google["evidence_state"], "conflict")
+        self.assertEqual(evidence["bindings.platforms.google"]["sources"], ["listing_text", "normalized_feature_summary"])
 
     def test_cjk_phrase_matching_does_not_depend_on_word_boundaries(self):
         self.assertTrue(MIGRATE.mentioned_without_negation("含TGC斗篷與白蠟", "TGC"))

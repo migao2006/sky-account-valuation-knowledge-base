@@ -8,7 +8,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl"
   ],
-  "input_snapshot_sha256": "5ca3175b088e876549c248a4d7dc14a78c47543b4e8042f581c3305fa5faa789",
+  "input_snapshot_sha256": "abc9b57c07ab6d14b00c06ca2a955697b095f22c0250e50a0e64b9af7eb7d578",
   "training": {
     "eligible_rows": 0,
     "minimum_rows": 100,

@@ -143,6 +143,8 @@ def main() -> None:
     catalog_universe = [json.loads(line) for line in (root / "data/review/catalog-universe.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     market_claim_review = [json.loads(line) for line in (root / "data/review/market-claim-review.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     market_claim_gold = [json.loads(line) for line in (root / "data/review/market-claim-gold.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    vendor_registry = [json.loads(line) for line in (root / "data/review/vendor-collectible-registry.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     checks = {
         "schema_and_integrity": integrity["valid"],
         "unit_tests": test_success,
@@ -159,7 +161,9 @@ def main() -> None:
         "p2_vendor_evidence_fail_closed": coverage.get("p2_evidence", {}).get("candidate_field_evidence_rows") == 296 and coverage.get("p2_evidence", {}).get("canonical_promotions") == 0,
         "p2_1_catalog_universe_reconciled": len(catalog_universe) == 3266 and coverage.get("p2_1_review_infrastructure", {}).get("catalog_universe_reconciled") is True,
         "p2_1_vendor_correlation_fail_closed": len(item_promotions) == 622 and sum(row.get("decision") == "vendor_correlated_template_candidate" for row in item_promotions) == 284 and all(row.get("canonical_write") == "not_performed" and row.get("model_feature_status") == "excluded_pending_verification" and "canonical_identity" in row.get("unresolved_fields", []) for row in item_promotions if row.get("decision") == "vendor_correlated_template_candidate"),
-        "p2_1_human_gold_not_fabricated": len(market_claim_review) == 20 and not market_claim_gold,
+        "p2_1_human_gold_not_fabricated": len(market_claim_review) == 200 and not market_claim_gold,
+        "p2_2_vendor_registry_fail_closed": len(vendor_registry) == 1758 and sum(row.get("link_status") == "canonical_link" for row in vendor_registry) == 64 and sum(row.get("link_status") == "candidate_link" for row in vendor_registry) == 296 and sum(row.get("link_status") == "unresolved" for row in vendor_registry) == 1398 and not any(row.get("model_feature_status") == "eligible" or row.get("canonical_write") != "not_performed" for row in vendor_registry),
+        "p2_2_fandom_same_lineage_only": len(fandom_crosswalk) == 700 and sum(row.get("match_status") == "season_mapped_candidate_linked" for row in fandom_crosswalk) == 579 and all(row.get("source_independence") == "not_independent_same_fandom_wiki" and row.get("promotion_effect") == "none" for row in fandom_crosswalk),
         "formal_models_fail_closed": all(row.get("status") == "insufficient_training_data" for row in model_artifacts),
         "item_values_fail_closed": len(item_values) == len(items) == 94 and all(row.get("status") == "insufficient_support" and row.get("mean_conditional_attribution") is None for row in item_values),
         "no_model_eligible_items": not any(row.get("model_feature_status") == "eligible" for row in items),
@@ -169,7 +173,7 @@ def main() -> None:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.3-p2.1", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "3.4-p2.2", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,
