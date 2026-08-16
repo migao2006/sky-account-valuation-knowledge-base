@@ -72,6 +72,12 @@ def basic_reasons(row: dict[str, Any]) -> tuple[str, list[str]]:
     # histories instead carry the seller/single-account contract above.
     if row.get("mixed_price") is True or row.get("is_mixed_price") is True:
         reasons.append("mixed_price")
+    semantic_review = row.get("price_semantic_review")
+    if isinstance(semantic_review, dict) and semantic_review.get("brokerage_included") is True:
+        # The displayed amount covers an account plus brokerage.  Do not guess
+        # a fee or subtract one; retain the price-line semantics in the ledger
+        # and require offline review before any model training use.
+        reasons.append("brokerage_included_price")
     if line == "unknown":
         reasons.append("price_type_not_training_line")
     return line, reasons
@@ -119,7 +125,8 @@ def clean(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[s
     for row in rows:
         line, reasons = basic_reasons(row)
         if reasons:
-            ledger.append(exclusion(row, line, reasons))
+            disposition = "needs_review" if "brokerage_included_price" in reasons else "excluded"
+            ledger.append(exclusion(row, line, reasons, disposition))
         else:
             candidates.append((row, line))
 

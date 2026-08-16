@@ -1,6 +1,6 @@
 {
-  "schema_version": "3.1-p1",
-  "as_of_date": "2026-08-16",
+  "schema_version": "3.2-p2",
+  "as_of_date": "2026-08-17",
   "catalog_claim": "partial_verified_catalog",
   "full_item_catalog_complete": false,
   "counts": {
@@ -11,10 +11,10 @@
     "sets": 8,
     "aliases": 322,
     "availability_events": 12,
-    "sources": 24,
+    "sources": 25,
     "visual_references": 0,
     "unresolved": 39,
-    "unmapped": 13,
+    "unmapped": 14,
     "item_candidates": 622,
     "alias_conflicts": 1
   },
@@ -31,7 +31,7 @@
     "unresolved_queue_records": 39,
     "item_candidate_records": 622,
     "alias_conflict_records": 1,
-    "unmapped_terms": 13,
+    "unmapped_terms": 14,
     "overlap_note": "各欄分開計數，可能描述同一知識缺口，不直接相加為唯一項目數。"
   },
   "item_coverage": {
@@ -112,21 +112,22 @@
   },
   "source_coverage": {
     "by_type": {
+      "community_database": 1,
       "community_wiki": 16,
       "official_news": 4,
       "official_support": 1,
       "thatgamecompany": 3
     },
     "official_source_records": 8,
-    "community_or_other_source_records": 16
+    "community_or_other_source_records": 17
   },
   "market_migration": {
     "source_listings": 1022,
     "normalized_listings": 1022,
     "account_profiles": 1022,
-    "curated_histories": 102,
-    "comparable_histories": 102,
-    "comparable_accounts": 102,
+    "curated_histories": 103,
+    "comparable_histories": 103,
+    "comparable_accounts": 103,
     "unmigrated_histories": 0,
     "verified_normalized_dates": 28,
     "verified_history_dates_repaired": 5,
@@ -141,16 +142,26 @@
     "model_eligible_items": 0,
     "clean_normal_rows": 3,
     "clean_urgent_rows": 0,
-    "excluded_or_review_rows": 99,
+    "excluded_or_review_rows": 100,
     "item_value_rows": 94,
     "eligible_item_value_rows": 0,
     "model_status": "insufficient_training_data"
+  },
+  "p2_evidence": {
+    "vendor_snapshot_items": 3266,
+    "vendor_crosswalk_rows": 3266,
+    "canonical_exact_name_matches": 64,
+    "candidate_exact_name_matches": 296,
+    "candidate_field_evidence_rows": 296,
+    "approved_strict_listing_recoveries": 1,
+    "canonical_promotions": 0
   },
   "known_limitations": [
     "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
     "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
-    "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。"
+    "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
+    "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。"
   ]
 }

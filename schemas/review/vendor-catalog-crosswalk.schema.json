@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/vendor-catalog-crosswalk.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "source_id", "vendor_item_id", "vendor_guid", "vendor_name", "vendor_item_type", "canonical_item_ids", "candidate_item_ids", "match_status", "match_methods", "review_status"],
+  "properties": {
+    "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
+    "source_id": {"const": "source_skygame_data_1_3_4"},
+    "vendor_item_id": {"type": "integer", "minimum": 0},
+    "vendor_guid": {"type": "string", "minLength": 1},
+    "vendor_name": {"type": "string", "minLength": 1},
+    "vendor_item_type": {"type": "string", "minLength": 1},
+    "canonical_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "match_status": {"enum": ["matched_canonical_name", "matched_alias", "ambiguous_canonical_match", "matched_candidate_name", "ambiguous_candidate_match", "unmatched_vendor_item", "excluded_non_collectible"]},
+    "match_methods": {"type": "array", "items": {"enum": ["canonical_name", "embedded_alias", "alias", "candidate_name"]}, "uniqueItems": true},
+    "review_status": {"enum": ["needs_review", "not_required"]}
+  }
+}

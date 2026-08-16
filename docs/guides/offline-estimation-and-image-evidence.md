@@ -1,4 +1,4 @@
-# 離線估價與圖片證據指南（v3.1 P1）
+# 離線估價與圖片證據指南（v3.2 P2）
 
 ## 估價輸入
 
@@ -14,13 +14,13 @@
 
 輸出的 `price_type` 使用 `normal_listing`、`urgent_sale`、`last_public_price`、`verified_sale` 或 `unknown`。價格欄位仍是市場觀察，不代表成交；`verified_sale` 僅能使用符合資料契約的可驗證成交資料，已售聲稱不得升級為 verified sale。`unknown` 不會被當成相同，也不會被當成已確認缺少；已確認不同與資料未知會分別列在 `major_differences` 和 `unconfirmed_dimensions`。
 
-正式市場資料目前只有三筆同時確認 TWD 與國際服，因此估價適用範圍有限，不能代表完整市場。
+正式市場資料目前只有三筆正常刊登同時確認 TWD 與國際服；唯一急售觀察含仲，保留為 `needs_review`，不能代表可訓練的帳號單價。因此估價適用範圍有限，不能代表完整市場。
 
 ## 圖片證據
 
 圖片功能目前只是 evidence contract，不是 OCR 或物品圖示辨識引擎。一張圖片以 SHA-256 識別，可標示其角色、語言、拍攝日和衣櫃拍攝完整度。文字 OCR 與物品圖示辨識是不同的證據欄位；OCR 文本不保存到正式知識庫。圖示辨識若日後完成，必須寫入 canonical `item_*` ID、標準化 bounding box、信心與審核狀態。
 
-相同圖片、同頁重複與圖像重疊以 `image_sha256`、`page_group_id`、`duplicate_of_image_sha256`、`overlaps_detection_ids` 記錄。P1 沒有將圖片變成自動辨識能力，也沒有足夠真實標註視覺資料可宣稱辨識準確率；全物品、visual references 與圖片 evidence 尚未完成。文案 Item Vector 是離線字典解析，不是 OCR 或圖片模型。
+相同圖片、同頁重複與圖像重疊以 `image_sha256`、`page_group_id`、`duplicate_of_image_sha256`、`overlaps_detection_ids` 記錄。P2 沒有將圖片變成自動辨識能力，也沒有足夠真實標註視覺資料可宣稱辨識準確率；全物品、visual references 與圖片 evidence 尚未完成。文案 Item Vector 是離線字典解析，不是 OCR 或圖片模型。
 
 ## 網路與研究邊界
 

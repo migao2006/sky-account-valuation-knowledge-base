@@ -8,7 +8,7 @@ HASH_EXCLUSIONS = frozenset({"manifest.json", "reports/validation/p0-validation.
 EXCLUDED_PARTS = frozenset({".git", "__pycache__", "staging"})
 BINARY_SUFFIXES = frozenset({
     ".7z", ".avif", ".gif", ".gz", ".ico", ".jpeg", ".jpg", ".mp3", ".mp4",
-    ".pdf", ".png", ".pyc", ".rar", ".webm", ".webp", ".woff", ".woff2", ".zip",
+    ".pdf", ".png", ".pyc", ".rar", ".tgz", ".webm", ".webp", ".woff", ".woff2", ".zip",
 })
 
 

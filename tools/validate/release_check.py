@@ -147,11 +147,12 @@ def main() -> None:
         "required_directory_structure": required_top <= top_dirs and "staging" not in top_dirs,
         "no_cache_or_staging_residue": not residue and not any(path.is_dir() for path in root.rglob("staging")),
         "migration_1022": migration["source_listings"] == migration["normalized_listings"] == 1022,
-        "histories_102": migration["migrated_histories"] == 102 and migration["not_migrated_histories"] == 0,
+        "legacy_histories_102_plus_one_reviewed_recovery": migration["migrated_histories"] == 102 and migration["not_migrated_histories"] == 0 and coverage["market_migration"]["curated_histories"] == 103,
         "verified_sales_remain_zero": coverage["market_migration"]["verified_completed_sales"] == 0,
         "catalog_claim_is_partial": coverage["full_item_catalog_complete"] is False,
         "model_vectors_1022": len(vectors) == 1022,
         "strict_model_price_lines_3_and_0": len(clean_normal) == 3 and len(clean_urgent) == 0,
+        "p2_vendor_evidence_fail_closed": coverage.get("p2_evidence", {}).get("candidate_field_evidence_rows") == 296 and coverage.get("p2_evidence", {}).get("canonical_promotions") == 0,
         "formal_models_fail_closed": all(row.get("status") == "insufficient_training_data" for row in model_artifacts),
         "item_values_fail_closed": len(item_values) == len(items) == 94 and all(row.get("status") == "insufficient_support" and row.get("mean_conditional_attribution") is None for row in item_values),
         "no_model_eligible_items": not any(row.get("model_feature_status") == "eligible" for row in items),
@@ -161,7 +162,7 @@ def main() -> None:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.1-p1", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "3.2-p2", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

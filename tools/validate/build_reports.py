@@ -11,7 +11,7 @@ from typing import Any
 
 from release_files import HASH_EXCLUSIONS, release_files
 
-BUILT_AT = "2026-08-16T20:00:00+08:00"
+BUILT_AT = "2026-08-17T00:00:00+08:00"
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -71,6 +71,9 @@ def main() -> None:
         "clean_urgent": root / "data/modeling/price-cleaned-urgent.jsonl",
         "model_exclusions": root / "data/modeling/model-exclusions.jsonl",
         "item_value_table": root / "data/modeling/item-value-table.jsonl",
+        "vendor_crosswalk": root / "data/review/skygame-data-1.3.4-crosswalk.jsonl",
+        "vendor_item_evidence": root / "data/review/skygame-data-1.3.4-item-evidence.jsonl",
+        "strict_recovery_reviews": root / "data/review/strict-listing-recovery.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -95,8 +98,8 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.1-p1",
-        "as_of_date": "2026-08-16",
+        "schema_version": "3.2-p2",
+        "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
         "counts": {name: len(rows[name]) for name in (
@@ -168,12 +171,22 @@ def main() -> None:
             "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
             "model_status": "insufficient_training_data",
         },
+        "p2_evidence": {
+            "vendor_snapshot_items": 3266,
+            "vendor_crosswalk_rows": len(rows["vendor_crosswalk"]),
+            "canonical_exact_name_matches": sum(row.get("match_status") == "matched_canonical_name" for row in rows["vendor_crosswalk"]),
+            "candidate_exact_name_matches": sum(row.get("match_status") == "matched_candidate_name" for row in rows["vendor_crosswalk"]),
+            "candidate_field_evidence_rows": len(rows["vendor_item_evidence"]),
+            "approved_strict_listing_recoveries": sum(row.get("review_status") == "approved" for row in rows["strict_recovery_reviews"]),
+            "canonical_promotions": 0,
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
             "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
             "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
+            "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
         ],
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
@@ -186,8 +199,8 @@ def main() -> None:
 - 原始 ZIP：`{inventory['source_zip']}`，SHA-256 `{inventory['source_zip_sha256']}`；本次未改寫。
 - 原始 ZIP 檔案：{inventory['source_file_count']}；盤點分類為 migrate {inventory['counts']['migrate']}、replace {inventory['counts']['replace']}、remove {inventory['counts']['remove']}、keep {inventory['counts']['keep']}。
 - 71 個舊批次共遷移 {len(rows['source_listings'])} 筆匿名來源列，正規化 {len(rows['normalized_listings'])} 筆，建立 {len(rows['account_profiles'])} 筆帳號 profile。
-- 既有 102 筆可比歷程已遷移 {len(rows['curated_histories'])} 筆；無法遷移 {migration['not_migrated_histories']} 筆。
-- 102 筆歷程已與 profile 合併成 {len(rows['comparable_accounts'])} 筆多維可比帳號；其中 {sum(bool(row.get('collection', {}).get('owned_item_ids')) for row in rows['account_profiles'])} 個 profile 有保守文字映射物品，{sum(bool(row.get('collection', {}).get('item_set_profiles')) for row in rows['account_profiles'])} 個有套組聲稱；模糊詞未映射。
+- 既有 102 筆 legacy 可比歷程已全部遷移；另有 {len(rows['curated_histories']) - migration['migrated_histories']} 筆 normalized listing 經明示人工 review 與可重算 predicate hash 恢復，正式歷程共 {len(rows['curated_histories'])} 筆；無法遷移 {migration['not_migrated_histories']} 筆。
+- {len(rows['curated_histories'])} 筆歷程已與 profile 合併成 {len(rows['comparable_accounts'])} 筆多維可比帳號；其中 {sum(bool(row.get('collection', {}).get('owned_item_ids')) for row in rows['account_profiles'])} 個 profile 有保守文字映射物品，{sum(bool(row.get('collection', {}).get('item_set_profiles')) for row in rows['account_profiles'])} 個有套組聲稱；模糊詞未映射。
 - 正規化資料有 {migration['verified_dates_in_normalized']} 筆可驗證貼文日期；其中 {migration['verified_dates_repaired_in_histories']} 筆舊可比歷程已回接實際日期。
 - 未映射季節詞 {migration['unmapped_season_terms']}；未映射物品詞 {migration['unmapped_item_terms']}，均在 review／coverage 檔中保留。
 - 可驗證成交價仍為 {verified_sales} 筆；重構沒有把已售聲稱或最後公開價升級成成交。
@@ -205,7 +218,7 @@ def main() -> None:
 ## 已確認
 
 - 季節 {len(rows['seasons'])}、活動 {len(rows['events'])}、物品 {len(rows['items'])}、套組 {len(rows['sets'])}、別名 {len(rows['aliases'])}、來源 {len(rows['sources'])}。
-- 1,022 筆來源與正規化資料、102 筆歷程均已遷移；`date_verified=true` 必須同時存在有效貼文日期。
+- 1,022 筆來源與正規化資料、102 筆 legacy 歷程均已遷移，另有 1 筆明示覆核恢復歷程；`date_verified=true` 必須同時存在有效貼文日期。
 - 季節／活動／物品／套組／來源／別名使用唯一 canonical ID，跨檔參照由離線驗證器檢查。
 - 大耳狗／耳狗映射至同一套組；歸巢與築巢是不同季節；極光／歐若拉、梵谷／梵高各自映射到單一季節 ID。
 - 估價相似度總分 100，季節 22、物品與套組 20，另含帳型、地圖、收藏、資源、綁定、任次、日期與證據品質；沒有單品固定加價。
@@ -226,8 +239,9 @@ def main() -> None:
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p1"
-    manifest["package_version"] = "3.1.0-p1"
+    manifest["package_id"] = "sky-valuation-v3-p2"
+    manifest["package_version"] = "3.2.0-p2"
+    manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
         "items": len(rows["items"]), "sets": len(rows["sets"]), "aliases": len(rows["aliases"]),
@@ -248,6 +262,10 @@ def main() -> None:
         "model_exclusion_rows": len(rows["model_exclusions"]),
         "item_value_rows": len(rows["item_value_table"]),
         "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
+        "vendor_snapshot_items": 3266,
+        "vendor_candidate_name_matches": sum(row.get("match_status") == "matched_candidate_name" for row in rows["vendor_crosswalk"]),
+        "vendor_item_evidence_rows": len(rows["vendor_item_evidence"]),
+        "approved_strict_listing_recoveries": sum(row.get("review_status") == "approved" for row in rows["strict_recovery_reviews"]),
     }
     manifest["derived_paths"] = [
         "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",

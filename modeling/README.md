@@ -33,7 +33,7 @@ python modeling/train_xgboost.py --input data/modeling/account-item-vectors.json
 python modeling/evaluate.py --artifact modeling/artifacts/elastic-net-normal_listing.json
 ```
 
-Formal P1 data has 3 normal-listing rows, 0 urgent-sale rows, and 0
+Formal P2 data has 3 normal-listing rows, 0 urgent-sale rows, and 0
 model-eligible canonical items. Both trainers therefore publish only
 `insufficient_training_data`; the 94-row Item Value Table is entirely
 `insufficient_support` and contains no numerical item attribution.

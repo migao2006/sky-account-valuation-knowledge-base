@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/strict-listing-recovery.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recovery_review_id", "listing_id", "review_status", "predicate_version", "predicate_hash", "predicates", "reviewed_facts", "deduplication", "reason", "reviewed_at"],
+  "properties": {
+    "recovery_review_id": {"type": "string", "pattern": "^strict_listing_recovery_[a-z0-9_]+$"},
+    "listing_id": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"},
+    "review_status": {"enum": ["approved", "rejected", "needs_review"]},
+    "predicate_version": {"const": "strict_normalized_listing_recovery_v1"},
+    "predicate_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "predicates": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "reviewed_facts": {"type": "object", "additionalProperties": false, "required": ["listing_id", "account_id", "normalized_legacy_key", "price_twd", "price_type", "status", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "exclusion_reason", "duplicate_cluster_id", "source_layer", "legacy_history_match"], "properties": {"listing_id": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"}, "normalized_legacy_key": {"type": "string", "minLength": 1}, "price_twd": {"type": ["number", "null"]}, "price_type": {"type": "string"}, "status": {"type": "string"}, "currency": {"type": "string"}, "currency_verified": {"type": "boolean"}, "server": {"type": "string"}, "server_verified": {"type": "boolean"}, "offer_kind": {"type": "string"}, "entity_kind": {"type": "string"}, "exclusion_reason": {"type": ["string", "null"]}, "duplicate_cluster_id": {"type": ["string", "null"]}, "source_layer": {"const": "data/normalized/listings.jsonl"}, "legacy_history_match": {"const": "none"}}},
+    "deduplication": {"type": "object", "additionalProperties": false, "required": ["method", "result", "evidence", "reviewed_at"], "properties": {"method": {"const": "manual_listing_lineage_review_v1"}, "result": {"enum": ["no_known_duplicate", "duplicate_found", "unknown"]}, "evidence": {"type": "string", "minLength": 1}, "reviewed_at": {"type": "string", "format": "date"}}},
+    "reason": {"type": "string", "minLength": 1},
+    "reviewed_at": {"type": "string", "format": "date"}
+  },
+  "allOf": [{"if": {"properties": {"review_status": {"const": "approved"}}}, "then": {"properties": {"reviewed_facts": {"properties": {"price_twd": {"type": "number", "exclusiveMinimum": 0}, "price_type": {"enum": ["asking", "normal_listing"]}, "status": {"const": "active"}, "currency": {"const": "TWD"}, "currency_verified": {"const": true}, "server": {"const": "international"}, "server_verified": {"const": true}, "offer_kind": {"const": "seller_listing"}, "entity_kind": {"const": "single_account"}, "exclusion_reason": {"type": "string", "maxLength": 0}, "duplicate_cluster_id": {"type": "null"}}}, "deduplication": {"properties": {"result": {"const": "no_known_duplicate"}}}}}}]
+}

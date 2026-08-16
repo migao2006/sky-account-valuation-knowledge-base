@@ -1,5 +1,15 @@
 # 變更紀錄
 
+## 3.2.0-p2 — 2026-08-17
+
+- 固定保存 MIT 授權 `skygame-data@1.3.4` 的離線快照、來源 metadata、SHA-256 與 3,266 筆逐列 crosswalk；正式工具不含下載或網路能力。
+- 64 個 vendor 名稱精確命中 canonical，296 個精確命中 candidate；296 筆欄位級 evidence 全為 `needs_review`，沒有自動升級 canonical 或模型物品特徵。
+- 新增完整知識庫、文案解析、市場標籤、圖片與精準估價的可量測完成契約，避免把 schema 通過誤稱內容完整或模型精準。
+- 以明示 review 決策、strict predicates 與 predicate hash 恢復 `listing_0792`，正式歷程成為 102 legacy + 1 reviewed recovery；`listing_0864` 仍因交易型態未知與既有排除理由拒絕。
+- 明示「急售」不再混入正常 asking 線；唯一急售列又明示含仲，保留 urgent 語意但以 `brokerage_included_price` 進 `needs_review`，不猜測仲介費。正式清洗結果為正常刊登 3、可訓練急售 0、排除或待審 100，四個模型仍為 `insufficient_training_data`。
+- 可比選樣新增同帳號、來源 listing 重疊與重複群組排除，避免 self-comparable 或重貼洩漏。
+- 季節與 feature summary 改為欄位級來源合併；衝突保持 unknown/conflict，「凜冬」進 review 而不猜測 canonical season。
+
 ## 3.1.0-p1 — 2026-08-16
 
 - 新增 1,022 筆三態 Item Vector；未提及物品保持 unknown，待審核物品不得進正式模型特徵。

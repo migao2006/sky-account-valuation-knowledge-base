@@ -18,6 +18,42 @@ from typing import Any, Iterable
 
 
 SCHEMA_VERSION = "3.0-p0"
+
+
+def normalize_history_price_type(legacy_price_type: str, listing_text: str) -> str:
+    """Separate explicit urgent listings from ordinary asking prices.
+
+    A listed amount is still an asking price, but an explicit ``急售`` claim
+    changes the market line.  This is a deterministic text fact, not an
+    inferred discount or transaction outcome.
+    """
+    mapped = {
+        "asking": "asking", "reduced": "reduced", "instant": "instant",
+        "instant_price": "instant", "quick_sale": "urgent_sale",
+        "buyout": "normal_listing", "sold_explicit": "sold_claim",
+        "sold_last_ask": "sold_claim",
+    }.get(str(legacy_price_type), "unknown")
+    if mapped in {"asking", "normal_listing"} and "急售" in str(listing_text):
+        return "urgent_sale"
+    return mapped
+
+
+def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] | None:
+    """Gate brokerage-inclusive observations without guessing the fee amount.
+
+    The marker ``含仲`` means the public amount includes brokerage.  It remains
+    an urgent observation when the text explicitly says so, but may not enter
+    a model training line until its brokerage treatment is reviewed offline.
+    """
+    if "含仲" not in str(listing_text):
+        return None
+    return {
+        "urgency": "urgent_sale" if price_type == "urgent_sale" else "unknown",
+        "brokerage_included": True,
+        "evidence_state": "text_claim",
+        "review_status": "needs_review",
+        "reason_codes": ["brokerage_included_price"],
+    }
 FORBIDDEN_KEYS = {
     "source_group_id", "source_group_name", "source_post_key", "post_url",
     "profile_url", "author", "author_name", "uid", "group_id", "locator",
@@ -26,7 +62,7 @@ SEASON_RE = re.compile(
     r"感恩|追光|歸屬|归属|音韻|音韵|魔法|聖島|圣岛|預言|预言|夢想|梦想|重組|重组|"
     r"小王子|風行|风行|深淵|深渊|表演|破曉|破晓|歐若拉|欧若拉|極光|极光|追憶|追忆|"
     r"緬懷|缅怀|夜行|拾光|九色鹿|築巢|筑巢|巢穴|二重奏|姆明|彩染|遷徙|迁徙|"
-    r"青鳥|青鸟|雙星|双星|織光|织光|狂歡|狂欢|梵高|梵谷|梵谷季|歸巢|归巢"
+    r"青鳥|青鸟|雙星|双星|織光|织光|狂歡|狂欢|梵高|梵谷|梵谷季|歸巢|归巢|凜冬|凛冬"
 )
 
 
@@ -45,7 +81,7 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def pseudo(prefix: str, legacy_value: str) -> str:
@@ -155,7 +191,19 @@ def season_terms(text: str) -> list[str]:
     return list(dict.fromkeys(match.group(0) for match in SEASON_RE.finditer(text)))
 
 
-def season_profile(text: str, aliases: dict[str, str], order: dict[str, int]) -> tuple[list[dict[str, Any]], list[str]]:
+def season_profile(
+    text: str,
+    aliases: dict[str, str],
+    order: dict[str, int],
+    evidence_source: str = "listing_text",
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Extract season claims from one evidence field only.
+
+    ``feature_summary`` is an editorial normalization of listing text, not an
+    independent source of truth.  It is deliberately parsed separately and
+    combined by :func:`merge_season_profiles` so disagreement remains visible
+    as a conflict instead of silently overriding the listing wording.
+    """
     matches = [match for match in SEASON_RE.finditer(text)]
     profiles_by_id: dict[str, dict[str, Any]] = {}
     unresolved: list[str] = []
@@ -163,7 +211,9 @@ def season_profile(text: str, aliases: dict[str, str], order: dict[str, int]) ->
     positions: list[tuple[re.Match[str], str]] = []
     for match in matches:
         term = match.group(0)
-        season_id = aliases.get(term.casefold())
+        # 「凜冬」 is an ambiguous player term.  It must enter the review queue,
+        # even if a future catalog happens to contain the spelling as an alias.
+        season_id = None if term in {"凜冬", "凛冬"} else aliases.get(term.casefold())
         if not season_id:
             unresolved.append(term)
             continue
@@ -176,7 +226,7 @@ def season_profile(text: str, aliases: dict[str, str], order: dict[str, int]) ->
             "season_id": season_id, "status": status, "completion_ratio": None,
             "pass_owned": "unknown", "ultimate_reward_owned": "unknown",
             "owned_item_ids": [], "missing_item_ids": [], "evidence_state": evidence_state,
-            "evidence_sources": ["listing_text"] if evidence_state != "unknown" else [],
+            "evidence_sources": [f"status:{evidence_source}"] if evidence_state != "unknown" else [],
             "capture_date": None, "review_status": "needs_review",
         }
 
@@ -189,6 +239,10 @@ def season_profile(text: str, aliases: dict[str, str], order: dict[str, int]) ->
         profile = make_profile(season_id, status)
         if re.search(rf"{escaped}.{{0,5}}(?:季卡|有卡|卡有)|(?:季卡|有卡).{{0,5}}{escaped}", text):
             profile["pass_owned"] = "yes"
+            profile["evidence_sources"].append(f"pass_owned:{evidence_source}")
+        elif re.search(rf"{escaped}.{{0,5}}(?:無卡|无卡)|(?:無卡|无卡).{{0,5}}{escaped}", text):
+            profile["pass_owned"] = "no"
+            profile["evidence_sources"].append(f"pass_owned:{evidence_source}")
         profiles_by_id[season_id] = profile
 
     by_order = {value: key for key, value in order.items()}
@@ -217,6 +271,66 @@ def season_profile(text: str, aliases: dict[str, str], order: dict[str, int]) ->
 
     profiles = sorted(profiles_by_id.values(), key=lambda row: order.get(row["season_id"], 10_000))
     return profiles, list(dict.fromkeys(unresolved))
+
+
+def _merge_status(values: list[str]) -> tuple[str, bool]:
+    """Merge only compatible season claims; conflicts fail closed to unknown."""
+    known = [value for value in values if value != "unknown"]
+    if not known:
+        return "unknown", False
+    distinct = set(known)
+    # A bare season mention means ownership but says nothing about completion.
+    # It is compatible with a more specific complete or partial claim.
+    specific = distinct - {"owned_not_complete"}
+    if len(specific) > 1:
+        return "unknown", True
+    if specific:
+        return next(iter(specific)), False
+    return "owned_not_complete", False
+
+
+def _merge_enum(values: list[str]) -> tuple[str, bool]:
+    known = [value for value in values if value != "unknown"]
+    if not known:
+        return "unknown", False
+    return (known[0], False) if len(set(known)) == 1 else ("unknown", True)
+
+
+def merge_season_profiles(
+    profiles_by_source: dict[str, list[dict[str, Any]]], order: dict[str, int]
+) -> list[dict[str, Any]]:
+    """Merge field claims without treating missing data as agreement.
+
+    The schema has one evidence-state per season profile, so field-level source
+    provenance is retained in ``evidence_sources`` using stable
+    ``field:source`` tokens.  A conflict in either structured field marks the
+    profile conflict/needs-review and clears only that field to ``unknown``.
+    """
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for rows in profiles_by_source.values():
+        for row in rows:
+            grouped.setdefault(row["season_id"], []).append(row)
+    merged: list[dict[str, Any]] = []
+    for season_id, rows in grouped.items():
+        status, status_conflict = _merge_status([str(row.get("status", "unknown")) for row in rows])
+        pass_owned, pass_conflict = _merge_enum([str(row.get("pass_owned", "unknown")) for row in rows])
+        ultimate, ultimate_conflict = _merge_enum([str(row.get("ultimate_reward_owned", "unknown")) for row in rows])
+        sources = sorted({source for row in rows for source in row.get("evidence_sources", []) if isinstance(source, str)})
+        conflict = status_conflict or pass_conflict or ultimate_conflict
+        merged.append({
+            "season_id": season_id,
+            "status": status,
+            "completion_ratio": None,
+            "pass_owned": pass_owned,
+            "ultimate_reward_owned": ultimate,
+            "owned_item_ids": [],
+            "missing_item_ids": [],
+            "evidence_state": "conflict" if conflict else "text_claim" if sources else "unknown",
+            "evidence_sources": sources,
+            "capture_date": None,
+            "review_status": "needs_review",
+        })
+    return sorted(merged, key=lambda row: order.get(row["season_id"], 10_000))
 
 
 def season_summary(profiles: list[dict[str, Any]], order: dict[str, int]) -> dict[str, Any]:
@@ -253,6 +367,45 @@ def resource_vector(text: str) -> dict[str, Any]:
     return {"values": values, "capture_date": None, "evidence_state": "text_claim" if any(v is not None for v in values.values()) else "unknown"}
 
 
+def merge_field_claims(
+    field: str, claims: list[tuple[Any, str]], unknown: Any
+) -> tuple[Any, dict[str, Any]]:
+    """Merge scalar claims without allowing a missing claim to win.
+
+    Values from listing text and its normalized summary are independent
+    extraction inputs.  Equal known values retain both sources; different
+    known values become ``unknown`` and an explicit conflict.  This helper is
+    intentionally unsuitable for market identity/price fields, which the
+    migration never derives from feature summaries.
+    """
+    known = [(value, source) for value, source in claims if value != unknown]
+    sources = sorted({source for _, source in known})
+    if not known:
+        return unknown, {"sources": [], "evidence_state": "unknown"}
+    values = {value for value, _ in known}
+    if len(values) > 1:
+        return unknown, {"sources": sources, "evidence_state": "conflict"}
+    return known[0][0], {"sources": sources, "evidence_state": "text_claim"}
+
+
+def merge_resources(
+    listing: dict[str, Any], summary: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    values: dict[str, Any] = {}
+    evidence: dict[str, dict[str, Any]] = {}
+    for key in ("white_candles", "hearts", "red_candles", "season_candles"):
+        value, provenance = merge_field_claims(
+            f"resources.values.{key}",
+            [(listing["values"].get(key), "listing_text"), (summary["values"].get(key), "normalized_feature_summary")],
+            None,
+        )
+        values[key] = value
+        evidence[f"resources.values.{key}"] = provenance
+    states = {row["evidence_state"] for row in evidence.values()}
+    overall = "conflict" if "conflict" in states else "text_claim" if "text_claim" in states else "unknown"
+    return {"values": values, "capture_date": None, "evidence_state": overall}, evidence
+
+
 def binding_matrix(record: dict[str, Any], text: str) -> dict[str, Any]:
     known = {item.get("platform"): item.get("status", "unknown") for item in record.get("bindings", []) if isinstance(item, dict) and isinstance(item.get("platform"), str)}
     platforms = ["google", "apple", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter"]
@@ -283,9 +436,28 @@ def binding_matrix(record: dict[str, Any], text: str) -> dict[str, Any]:
 
 
 def map_completion(text: str) -> dict[str, Any]:
-    standard = "complete" if re.search(r"(?:全圖|全图|全地圖|全地图).{0,3}(?:畢|毕)", text) else "partial" if re.search(r"(?:幾乎|几乎|近|大部分).{0,4}(?:全圖|全图|地圖|地图).{0,3}(?:畢|毕)", text) else "unknown"
+    standard = "partial" if re.search(r"(?:幾乎|几乎|近|大部分).{0,4}(?:全圖|全图|地圖|地图).{0,3}(?:畢|毕)", text) else "complete" if re.search(r"(?:全圖|全图|全地圖|全地图).{0,3}(?:畢|毕)", text) else "unknown"
     second = "complete" if re.search(r"(?:全二級斗|全二级斗|二級斗全|二级斗全)", text) else "partial" if re.search(r"二級斗|二级斗", text) else "unknown"
     return {"standard_maps": standard, "second_tier_capes": second, "evidence_state": "text_claim" if standard != "unknown" or second != "unknown" else "unknown"}
+
+
+def merge_map_completion(
+    listing: dict[str, Any], summary: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    fields = ("standard_maps", "second_tier_capes")
+    values: dict[str, Any] = {}
+    evidence: dict[str, dict[str, Any]] = {}
+    for key in fields:
+        value, provenance = merge_field_claims(
+            f"map_completion.{key}",
+            [(listing.get(key), "listing_text"), (summary.get(key), "normalized_feature_summary")],
+            "unknown",
+        )
+        values[key] = value
+        evidence[f"map_completion.{key}"] = provenance
+    states = {row["evidence_state"] for row in evidence.values()}
+    values["evidence_state"] = "conflict" if "conflict" in states else "text_claim" if "text_claim" in states else "unknown"
+    return values, evidence
 
 
 def ownership_history(text: str) -> str:
@@ -293,6 +465,17 @@ def ownership_history(text: str) -> str:
     if re.search(r"二手|前號主|前号主", text): return "second_owner"
     if re.search(r"一手|自創|自创", text): return "first_owner"
     return "unknown"
+
+
+def merge_ownership_history(
+    listing: str, summary: str
+) -> tuple[str, dict[str, dict[str, Any]]]:
+    value, provenance = merge_field_claims(
+        "ownership_history",
+        [(listing, "listing_text"), (summary, "normalized_feature_summary")],
+        "unknown",
+    )
+    return value, {"ownership_history": provenance}
 
 
 def graduation_claims(text: str, aliases: dict[str, str]) -> list[str]:
@@ -306,10 +489,22 @@ def graduation_claims(text: str, aliases: dict[str, str]) -> list[str]:
 
 def base_profile(record: dict[str, Any], account_id: str, aliases: dict[str, str], order: dict[str, int], graduation_items: dict[str, list[str]]) -> tuple[dict[str, Any], list[str]]:
     text = str(record.get("listing_text", ""))
-    seasons, unresolved = season_profile(text, aliases, order)
+    summary = "\n".join(value for value in record.get("feature_summary", []) if isinstance(value, str))
+    listing_seasons, listing_unresolved = season_profile(text, aliases, order, "listing_text")
+    summary_seasons, summary_unresolved = season_profile(summary, aliases, order, "normalized_feature_summary")
+    seasons = merge_season_profiles({"listing_text": listing_seasons, "normalized_feature_summary": summary_seasons}, order)
+    unresolved = list(dict.fromkeys(listing_unresolved + summary_unresolved))
     account_type = record.get("account_type_primary", "unknown")
     wing_state = record.get("wing_state", "unknown")
-    graduation_seasons = graduation_claims(text, aliases)
+    resources, resource_evidence = merge_resources(resource_vector(text), resource_vector(summary))
+    maps, map_evidence = merge_map_completion(map_completion(text), map_completion(summary))
+    history, history_evidence = merge_ownership_history(ownership_history(text), ownership_history(summary))
+    # Positive graduation claims may be retained from either source.  This is
+    # intentionally not a completion inference; only season-profile fields
+    # participate in the conflict-aware merge above.
+    graduation_seasons = sorted(set(graduation_claims(text, aliases)) | set(graduation_claims(summary, aliases)))
+    has_field_conflict = any(row["evidence_state"] == "conflict" for row in (*resource_evidence.values(), *map_evidence.values(), *history_evidence.values()))
+    has_season_conflict = any(row["evidence_state"] == "conflict" for row in seasons)
     return ({
         "schema_version": SCHEMA_VERSION,
         "account_id": account_id,
@@ -317,14 +512,15 @@ def base_profile(record: dict[str, Any], account_id: str, aliases: dict[str, str
         "base_account": {"account_type": account_type, "wing_state": wing_state, "special_appearance": [], "short_id": "unknown"},
         "season_profiles": seasons,
         "season_summary": season_summary(seasons, order),
+        "field_evidence": {**resource_evidence, **map_evidence, **history_evidence},
         "collection": {"owned_item_ids": [], "item_set_profiles": [], "graduation_rewards": sorted({item for season in graduation_seasons for item in graduation_items.get(season, [])}), "graduation_reward_season_ids": graduation_seasons, "collaboration_items": [], "bundle_claim_level": "unknown"},
-        "map_completion": map_completion(text),
-        "resources": resource_vector(text),
+        "map_completion": maps,
+        "resources": resources,
         "bindings": binding_matrix(record, text),
-        "ownership_history": ownership_history(text),
+        "ownership_history": history,
         "trade_conditions": {"offer_kind": record.get("offer_kind", "unknown"), "entity_kind": record.get("entity_kind", "unknown"), "price_type": record.get("price_type", "unknown")},
         "evidence_quality": {"listing_text": record.get("evidence_quality", "unknown"), "image": "not_collected", "ocr": "not_collected"},
-        "review_status": "needs_review" if unresolved else "unknown",
+        "review_status": "needs_review" if unresolved or has_field_conflict or has_season_conflict else "unknown",
     }, unresolved)
 
 
@@ -433,10 +629,10 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             continue
         sold_claimed = history.get("status") in {"sold", "sold_claimed", "reported_sold"} or history.get("price_type") in {"sold_explicit", "sold_last_ask"}
         legacy_price_type = str(history.get("price_type", "unknown"))
-        price_type = {"asking": "asking", "reduced": "reduced", "instant": "instant", "instant_price": "instant", "quick_sale": "urgent_sale", "buyout": "normal_listing", "sold_explicit": "sold_claim", "sold_last_ask": "sold_claim"}.get(legacy_price_type, "unknown")
+        price_type = normalize_history_price_type(legacy_price_type, primary.get("listing_text", ""))
         legacy_status = str(history.get("status", "unknown"))
         status = {"sold": "sold_claimed", "sold_claimed": "sold_claimed", "reported_sold": "sold_claimed", "active": "active"}.get(legacy_status, "unknown")
-        history_out.append({
+        history_row = {
             "schema_version": SCHEMA_VERSION,
             "history_id": f"history_{history_id.split('-')[-1]}",
             "legacy_key": pseudo("legacy_history", history_id),
@@ -465,7 +661,11 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
                 "completed_sale_price_twd": None,
                 "verified": False,
             },
-        })
+        }
+        semantic_review = price_semantic_review(str(primary.get("listing_text", "")), price_type)
+        if semantic_review is not None:
+            history_row["price_semantic_review"] = semantic_review
+        history_out.append(history_row)
         if history.get("entity_kind") == "single_account":
             profile = profiles[int(source_ids[0].split("_")[1]) - 1]
             evidence_text = " ".join(

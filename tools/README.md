@@ -1,4 +1,4 @@
-# 離線工具（v3.1 P1）
+# 離線工具（v3.2 P2）
 
 核心工具採 Python 3 標準函式庫，只處理本機 JSON／JSONL。`modeling/` 是獨立鎖版的可選科學運算環境；它也不含下載、HTTP、排程或背景能力。
 
@@ -32,13 +32,13 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 
 輸出的 `price_type` 只使用正規化值：`normal_listing`、`urgent_sale`、`last_public_price`、`verified_sale` 或 `unknown`。已售聲稱不是 verified sale；未知資料不補值。相似度說明會將已確認不同的 `major_differences` 與資料未知的 `unconfirmed_dimensions` 分開，`unknown` 不會匹配 `unknown`。
 
-正式市場資料目前只有三筆同時確認 TWD 與國際服，估價適用範圍有限。這一版不擴充全物品資料、不新增市場資料、不加入回測、校準或自動資料更新。
+正式市場資料目前只有三筆正常刊登同時確認 TWD 與國際服；唯一急售觀察含仲，保留為 `needs_review`，不猜測或扣除仲介費。估價適用範圍有限。這一版新增固定 vendor catalog 的 review evidence 與一筆明示覆核恢復歷程，但不把二級來源自動升級 canonical，也不加入回測、校準或自動資料更新。
 
-## P1 模型資料流
+## P2 模型資料流
 
 `parse_item_vectors.py` 會為每個帳號與每個 canonical item 產生 `owned`、`confirmed_missing` 或 `unknown`；未提及永遠是 unknown。`clean_prices.py` 只保留已驗證 TWD、international、seller listing、single account，並將正常刊登與急售分開。
 
-正式結果為 1,022 個向量、3 筆正常刊登、0 筆急售、99 筆排除／待審。模型門檻未達時，`model_estimator.py` 回傳 `insufficient_training_data`，不輸出模型價格；既有 comparable estimator 仍可作保守 fallback。
+正式結果為 1,022 個向量、3 筆正常刊登、0 筆可訓練急售、100 筆排除／待審。模型門檻未達時，`model_estimator.py` 回傳 `insufficient_training_data`，不輸出模型價格；既有 comparable estimator 仍可作保守 fallback。
 
 ## 網路與圖片邊界
 
