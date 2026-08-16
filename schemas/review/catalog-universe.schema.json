@@ -3,7 +3,7 @@
   "$id": "review/catalog-universe.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["universe_id", "snapshot_id", "source_id", "snapshot_sha256", "vendor_item_id", "vendor_guid", "vendor_name", "vendor_item_type", "vendor_item_subtype", "vendor_item_group", "classification", "crosswalk_match_status", "canonical_item_ids", "candidate_item_ids", "review_status"],
+  "required": ["universe_id", "snapshot_id", "source_id", "snapshot_sha256", "vendor_item_id", "vendor_guid", "vendor_name", "vendor_item_type", "vendor_item_subtype", "vendor_item_group", "classification", "crosswalk_match_status", "scope_disposition", "disposition_reason", "evidence_basis", "canonical_item_ids", "candidate_item_ids", "review_status"],
   "properties": {
     "universe_id": {"type": "string", "pattern": "^catalog_vendor_[A-Za-z0-9_-]+$"},
     "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
@@ -17,8 +17,11 @@
     "vendor_item_group": {"type": ["string", "null"]},
     "classification": {"enum": ["canonical_linked", "candidate_linked", "unmatched", "explicitly_excluded"]},
     "crosswalk_match_status": {"enum": ["matched_canonical_name", "matched_alias", "ambiguous_canonical_match", "matched_candidate_name", "ambiguous_candidate_match", "unmatched_vendor_item", "excluded_non_collectible"]},
+    "scope_disposition": {"enum": ["collectible_item", "progression_unlock", "consumable_effect", "quest_record", "vendor_special_needs_scope_review"]},
+    "disposition_reason": {"enum": ["vendor_type_not_type_only_excluded", "vendor_type_wingbuff_requires_scope_review", "vendor_type_spell_requires_scope_review", "vendor_type_quest_requires_scope_review", "vendor_type_special_requires_scope_review"]},
+    "evidence_basis": {"enum": ["pinned_vendor_snapshot_and_crosswalk", "pinned_vendor_snapshot_type"]},
     "canonical_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
     "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
-    "review_status": {"enum": ["needs_review", "not_required"]}
+    "review_status": {"const": "needs_review"}
   }
 }

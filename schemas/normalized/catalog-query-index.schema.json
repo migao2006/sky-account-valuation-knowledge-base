@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "normalized/catalog-query-index.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query_entity_type", "query_entity_id", "truth_level", "verification_status", "source_ids", "lookup_keys", "ambiguous_lookup_keys", "has_lookup_key_collision", "canonical_item_ids", "candidate_item_ids", "source_snapshot_sha256", "resolution_eligibility", "review_status", "model_feature_status"],
+  "properties": {
+    "query_entity_type": {"enum": ["canonical_item", "review_candidate", "source_reference"]},
+    "query_entity_id": {"type": "string", "pattern": "^(item_[a-z0-9_]+|reference_identity_[a-f0-9]{32})$"},
+    "truth_level": {"enum": ["canonical_knowledge", "review_candidate", "source_snapshot_observation"]},
+    "verification_status": {"enum": ["verified", "needs_review", "unverified"]},
+    "source_ids": {"type": "array", "items": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "uniqueItems": true},
+    "lookup_keys": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "ambiguous_lookup_keys": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "has_lookup_key_collision": {"type": "boolean"},
+    "canonical_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "source_snapshot_sha256": {"type": ["string", "null"], "pattern": "^[A-F0-9]{64}$"},
+    "resolution_eligibility": {"enum": ["canonical_resolved", "review_only"]},
+    "review_status": {"enum": ["approved", "needs_review", "quarantined"]},
+    "model_feature_status": {"const": "excluded_pending_verification"}
+  },
+  "allOf": [
+    {"if": {"properties": {"query_entity_type": {"const": "canonical_item"}}}, "then": {"properties": {"truth_level": {"const": "canonical_knowledge"}, "source_snapshot_sha256": {"const": null}}}},
+    {"if": {"properties": {"query_entity_type": {"const": "review_candidate"}}}, "then": {"properties": {"truth_level": {"const": "review_candidate"}, "source_snapshot_sha256": {"const": null}}}},
+    {"if": {"properties": {"query_entity_type": {"const": "source_reference"}}}, "then": {"properties": {"truth_level": {"const": "source_snapshot_observation"}, "verification_status": {"const": "unverified"}}}}
+  ]
+}

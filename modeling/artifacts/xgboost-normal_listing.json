@@ -5,9 +5,12 @@
   "price_line": "normal_listing",
   "input_snapshot_paths": [
     "data/modeling/account-item-vectors.jsonl",
-    "data/modeling/price-cleaned-normal.jsonl"
+    "data/modeling/price-cleaned-normal.jsonl",
+    "knowledge/aliases/item-aliases.jsonl",
+    "knowledge/items/items.jsonl",
+    "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "C2EB6418F97A14461EED362B15D30CDF354DE10A258B5ECD47DABC4286F2C58F",
+  "input_snapshot_sha256": "98E826FFB484D21E1EEC25B30FF20424086D66F84FC2087CD9D9749CDBECE1DA",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -21,6 +24,11 @@
       "bindings.platforms.facebook.evidence_state=text_claim",
       "bindings.platforms.facebook.status=__unknown__",
       "bindings.platforms.facebook.status=mentioned_unknown",
+      "bindings.platforms.game_center.evidence_state=__unknown__",
+      "bindings.platforms.game_center.evidence_state=text_claim",
+      "bindings.platforms.game_center.status=__unknown__",
+      "bindings.platforms.game_center.status=high_risk",
+      "bindings.platforms.game_center.status=mentioned_unknown",
       "bindings.platforms.google.evidence_state=__unknown__",
       "bindings.platforms.google.evidence_state=text_claim",
       "bindings.platforms.google.status=__unknown__",
@@ -38,30 +46,6 @@
       "bindings.risk_state=__unknown__",
       "bindings.risk_state=restricted",
       "collection.graduation_reward_season_ids.__empty__",
-      "item_sets.set_aurora_iap.completion_ratio",
-      "item_sets.set_aurora_iap.is_complete",
-      "item_sets.set_aurora_iap.member_count",
-      "item_sets.set_cinnamoroll_popup_cafe_iap.completion_ratio",
-      "item_sets.set_cinnamoroll_popup_cafe_iap.is_complete",
-      "item_sets.set_cinnamoroll_popup_cafe_iap.member_count",
-      "item_sets.set_days_feast_white_fuzzy.completion_ratio",
-      "item_sets.set_days_feast_white_fuzzy.is_complete",
-      "item_sets.set_days_feast_white_fuzzy.member_count",
-      "item_sets.set_days_mischief_bat.completion_ratio",
-      "item_sets.set_days_mischief_bat.is_complete",
-      "item_sets.set_days_mischief_bat.member_count",
-      "item_sets.set_little_prince_iap.completion_ratio",
-      "item_sets.set_little_prince_iap.is_complete",
-      "item_sets.set_little_prince_iap.member_count",
-      "item_sets.set_moomin_iap.completion_ratio",
-      "item_sets.set_moomin_iap.is_complete",
-      "item_sets.set_moomin_iap.member_count",
-      "item_sets.set_nine_colored_deer_iap.completion_ratio",
-      "item_sets.set_nine_colored_deer_iap.is_complete",
-      "item_sets.set_nine_colored_deer_iap.member_count",
-      "item_sets.set_nintendo_starter_pack.completion_ratio",
-      "item_sets.set_nintendo_starter_pack.is_complete",
-      "item_sets.set_nintendo_starter_pack.member_count",
       "map_completion.evidence_state=__unknown__",
       "map_completion.second_tier_capes=__unknown__",
       "map_completion.standard_maps=__unknown__",
@@ -217,7 +201,6 @@
       "base_account",
       "bindings",
       "collection",
-      "item_sets",
       "map_completion",
       "ownership_history",
       "resources",
@@ -228,7 +211,7 @@
     "records": 3,
     "total_eligible_records": 3,
     "min_required_records": 300,
-    "effective_feature_groups": 8,
+    "effective_feature_groups": 7,
     "min_effective_feature_groups": 1,
     "seed": 20260816,
     "threshold_met": false,
@@ -258,5 +241,14 @@
     "method": "xgboost_pred_contribs_and_pred_interactions",
     "unit": "log_price_twd",
     "conditional_attribution_only": true
+  },
+  "catalog_provenance": {
+    "canonical_item_ids_sha256": "548A6549150A9A8C36CB41700A4747547A6426CAE7984634AD379A318101FA4B",
+    "pinned_catalog_paths": [
+      "knowledge/items/items.jsonl",
+      "knowledge/aliases/item-aliases.jsonl",
+      "knowledge/sets/item-sets.jsonl"
+    ],
+    "pinned_catalog_sha256": "14286188390936F1B55CF3D93EB6DB4258EBFDA72A38DA62D471B0144FE6CA21"
   }
 }

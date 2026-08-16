@@ -15,6 +15,17 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+REPOSITORY_SOURCE = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_SOURCE) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_SOURCE))
+from tools.modeling.catalog_provenance import (  # noqa: E402
+    CatalogProvenanceError,
+    PINNED_CATALOG_PATHS,
+    catalog_provenance,
+    model_eligible_item_ids,
+    validate_vector_catalog_provenance,
+)
+
 SEED = 1729
 SCHEMA_VERSION = "3.1-p1"
 METADATA_KEYS = {
@@ -52,7 +63,12 @@ def input_snapshot(vector_path: Path, prices_path: Path | None) -> tuple[list[st
     """Hash a path-independent ordered list of input file hashes."""
     root = repository_root(vector_path)
     entries = []
-    for path in (vector_path, prices_path):
+    candidate_paths = [path for path in (vector_path, prices_path) if path]
+    # Formal artifacts bind directly to every catalog file used to interpret
+    # the vector.  Never rely on the vector's own provenance indirectly.
+    if all((root / relative).is_file() for relative in PINNED_CATALOG_PATHS):
+        candidate_paths.extend(root / relative for relative in PINNED_CATALOG_PATHS)
+    for path in candidate_paths:
         if path and path.is_file():
             rel = path.resolve().relative_to(root).as_posix()
             entries.append((rel, hashlib.sha256(path.read_bytes()).hexdigest()))
@@ -64,6 +80,29 @@ def input_snapshot(vector_path: Path, prices_path: Path | None) -> tuple[list[st
         digest.update(file_hash.encode("ascii"))
         digest.update(b"\n")
     return [relative for relative, _ in entries], digest.hexdigest()
+
+
+def formal_catalog_binding(vector_path: Path) -> tuple[Path | None, dict | None, set[str] | None]:
+    """Validate formal vectors against the exact local canonical catalog.
+
+    Unit fixtures outside a catalog checkout intentionally remain usable.  Once
+    an input belongs to a repository with all pinned catalog paths, however,
+    missing/stale/forged vector provenance is a hard error rather than a
+    best-effort feature extraction.
+    """
+    try:
+        root = repository_root(vector_path)
+    except ModelingInputError:
+        return None, None, None
+    if not all((root / relative).is_file() for relative in PINNED_CATALOG_PATHS):
+        return None, None, None
+    try:
+        binding = catalog_provenance(root)
+        for row in (json.loads(text) for text in vector_path.read_text(encoding="utf-8").splitlines() if text.strip()):
+            validate_vector_catalog_provenance(row, root)
+        return root, binding, model_eligible_item_ids(root)
+    except (CatalogProvenanceError, json.JSONDecodeError) as exc:
+        raise ModelingInputError(str(exc)) from exc
 
 
 def _flatten(value, prefix=""):
@@ -132,6 +171,17 @@ def _without_item_identities(value):
                 "graduation_rewards", "collaboration_items", "event_limited_items",
             } or (str(key).startswith("item_") and key != "item_sets"):
                 continue
+            # A set aggregate may only be modeled after the vector builder has
+            # proven every required member canonical, model-eligible and
+            # explicitly known.  Audit-only / sensitivity sets must not leak
+            # through their completion counters or set-scoped identifiers.
+            if key == "item_sets":
+                if not isinstance(entry, list):
+                    continue
+                eligible_sets = [set_row for set_row in entry if isinstance(set_row, dict) and set_row.get("model_feature") is True]
+                if eligible_sets:
+                    kept[key] = _without_item_identities(eligible_sets)
+                continue
             sanitized = _without_item_identities(entry)
             if sanitized is not _DROP_ITEM_IDENTITY:
                 kept[key] = sanitized
@@ -139,7 +189,7 @@ def _without_item_identities(value):
     return value
 
 
-def feature_mapping(row: dict) -> dict:
+def feature_mapping(row: dict, eligible_item_ids: set[str] | None = None) -> dict:
     raw = row.get("feature_vector", row.get("features", row.get("feature_groups")))
     if raw is None:
         raw = {key: value for key, value in row.items() if key not in METADATA_KEYS}
@@ -152,10 +202,15 @@ def feature_mapping(row: dict) -> dict:
     # Only catalog-approved item states are formal model features.  A vector's
     # sensitivity-only / review candidates remain deliberately out of training.
     for state in row.get("item_states", []):
-        if isinstance(state, dict) and state.get("model_feature") is True and state.get("review_status") == "approved":
-            item_id = state.get("item_id")
-            if isinstance(item_id, str):
-                result[f"items.{item_id}"] = state.get("state", "unknown")
+        if not isinstance(state, dict):
+            raise ModelingInputError("invalid_item_state")
+        item_id = state.get("item_id")
+        if state.get("model_feature") is True:
+            if not isinstance(item_id, str) or eligible_item_ids is None or item_id not in eligible_item_ids:
+                raise ModelingInputError(f"item_not_in_model_eligible_catalog:{item_id}")
+            if state.get("review_status") != "approved":
+                raise ModelingInputError(f"item_model_feature_not_approved:{item_id}")
+            result[f"items.{item_id}"] = state.get("state", "unknown")
     return result
 
 
@@ -181,7 +236,7 @@ def load_price_map(path: Path, price_line: str):
     return prices
 
 
-def load_rows(path: Path, price_line: str, prices_path: Path | None = None):
+def load_rows(path: Path, price_line: str, prices_path: Path | None = None, eligible_item_ids: set[str] | None = None):
     rows, rejected = [], []
     price_map = load_price_map(prices_path, price_line)
     for line_number, text in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -199,7 +254,7 @@ def load_rows(path: Path, price_line: str, prices_path: Path | None = None):
             if not isinstance(price, (int, float)) or isinstance(price, bool) or price <= 0:
                 rejected.append({"line": line_number, "reason": "invalid_or_missing_positive_twd_price"})
                 continue
-            features = feature_mapping(row)
+            features = feature_mapping(row, eligible_item_ids)
             if not features:
                 rejected.append({"line": line_number, "reason": "empty_feature_vector"})
                 continue
@@ -430,8 +485,8 @@ def portable_predict_log(prediction_contract: dict, features: dict) -> float:
     return total
 
 
-def insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, reason):
-    return {
+def insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, reason, catalog_binding=None):
+    artifact = {
         "schema_version": SCHEMA_VERSION,
         "status": "insufficient_training_data",
         "price_line": price_line,
@@ -447,18 +502,22 @@ def insufficient_artifact(price_line, source_paths, source_hash, groups, minimum
         "limitations": [reason],
         "artifact": None,
     }
+    if catalog_binding is not None:
+        artifact["catalog_provenance"] = catalog_binding
+    return artifact
 
 
 def train(input_path: Path, price_line: str, prices_path: Path | None = None):
+    _, catalog_binding, eligible_item_ids = formal_catalog_binding(input_path)
     source_paths, source_hash = input_snapshot(input_path, prices_path)
     dependency = dependency_error()
     if dependency:
-        return {**insufficient_artifact(price_line, source_paths, source_hash, 0, 100, [], [], dependency), "status": "dependency_unavailable"}
-    rows, rejected = load_rows(input_path, price_line, prices_path)
+        return {**insufficient_artifact(price_line, source_paths, source_hash, 0, 100, [], [], dependency, catalog_binding), "status": "dependency_unavailable"}
+    rows, rejected = load_rows(input_path, price_line, prices_path, eligible_item_ids)
     groups = feature_group_count(rows)
     minimum = minimum_rows(groups)
     if len(rows) < minimum:
-        return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, "fewer_than_minimum_training_rows")
+        return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, "fewer_than_minimum_training_rows", catalog_binding)
     numeric, categorical = classify_columns(rows)
     X = _frame(rows, numeric, categorical)
     import numpy as np
@@ -468,13 +527,13 @@ def train(input_path: Path, price_line: str, prices_path: Path | None = None):
         errors, baseline_errors, folds = nested_cv(X, y, group_ids, numeric, categorical)
         mae, baseline = float(statistics.mean(errors)), float(statistics.mean(baseline_errors))
         if not math.isfinite(mae) or mae >= baseline:
-            return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, "model_does_not_beat_grouped_median_baseline")
+            return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, "model_does_not_beat_grouped_median_baseline", catalog_binding)
         pipe = _fit_with_inner_groups(X, y, group_ids, numeric, categorical)
     except (ValueError, ModelingInputError) as exc:
-        return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, str(exc))
+        return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, str(exc), catalog_binding)
     feature_names = list(pipe.named_steps["preprocess"].get_feature_names_out())
     model_export = _export_plain_json_model(pipe, numeric, categorical)
-    return {
+    artifact = {
         "schema_version": SCHEMA_VERSION,
         "status": "trained",
         "price_line": price_line,
@@ -490,6 +549,9 @@ def train(input_path: Path, price_line: str, prices_path: Path | None = None):
         "limitations": [],
         "artifact": {"serialization": "plain_json", "model": model_export},
     }
+    if catalog_binding is not None:
+        artifact["catalog_provenance"] = catalog_binding
+    return artifact
 
 
 def main(argv=None):

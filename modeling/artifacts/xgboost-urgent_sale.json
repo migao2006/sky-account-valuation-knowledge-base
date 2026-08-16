@@ -5,9 +5,12 @@
   "price_line": "urgent_sale",
   "input_snapshot_paths": [
     "data/modeling/account-item-vectors.jsonl",
-    "data/modeling/price-cleaned-urgent.jsonl"
+    "data/modeling/price-cleaned-urgent.jsonl",
+    "knowledge/aliases/item-aliases.jsonl",
+    "knowledge/items/items.jsonl",
+    "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "ABC9B57C07AB6D14B00C06CA2A955697B095F22C0250E50A0E64B9AF7EB7D578",
+  "input_snapshot_sha256": "F3333EE61BF4B101DB4D2BD0CEE47C19559BCE68EE1FEA820D7BA4AC20AC7CB1",
   "feature_schema": {
     "version": "1",
     "feature_names": [],
@@ -47,5 +50,14 @@
     "method": "xgboost_pred_contribs_and_pred_interactions",
     "unit": "log_price_twd",
     "conditional_attribution_only": true
+  },
+  "catalog_provenance": {
+    "canonical_item_ids_sha256": "548A6549150A9A8C36CB41700A4747547A6426CAE7984634AD379A318101FA4B",
+    "pinned_catalog_paths": [
+      "knowledge/items/items.jsonl",
+      "knowledge/aliases/item-aliases.jsonl",
+      "knowledge/sets/item-sets.jsonl"
+    ],
+    "pinned_catalog_sha256": "14286188390936F1B55CF3D93EB6DB4258EBFDA72A38DA62D471B0144FE6CA21"
   }
 }

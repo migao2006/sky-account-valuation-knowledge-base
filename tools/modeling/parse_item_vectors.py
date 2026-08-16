@@ -9,11 +9,16 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from tools.modeling.catalog_provenance import catalog_provenance  # noqa: E402
+
 STATES = {"owned", "confirmed_missing", "unknown"}
 NEGATION_PREFIXES = ("沒有", "没有", "未有", "無", "无", "不含", "不包括", "缺少", "缺", "未擁有", "未拥有")
 
@@ -31,13 +36,20 @@ def load_catalog(root: Path = ROOT) -> tuple[dict[str, dict[str, Any]], dict[str
     items = {row["item_id"]: row for row in _rows(root / "knowledge/items/items.jsonl")}
     aliases: dict[str, set[str]] = defaultdict(set)
     for item_id, item in items.items():
-        for value in [item.get("canonical_name_zh_tw"), item.get("canonical_name_en"), *item.get("aliases", [])]:
+        for value in [item.get("canonical_name_zh_tw"), item.get("canonical_name_en")]:
             if isinstance(value, str) and len(normalize_text(value)) >= 2:
+                aliases[normalize_text(value)].add(item_id)
+        for value in item.get("aliases", []):
+            if isinstance(value, str) and len(normalize_text(value)) >= 2 and (
+                item.get("verification_status") == "verified" or len(normalize_text(value)) >= 3
+            ):
                 aliases[normalize_text(value)].add(item_id)
     for row in _rows(root / "knowledge/aliases/item-aliases.jsonl"):
         if row.get("target_type") == "item" and row.get("target_id") in items:
             value = row.get("normalized_alias") or row.get("alias_text")
-            if isinstance(value, str) and len(normalize_text(value)) >= 2:
+            if isinstance(value, str) and len(normalize_text(value)) >= 2 and (
+                items[row["target_id"]].get("verification_status") == "verified" or len(normalize_text(value)) >= 3
+            ):
                 aliases[normalize_text(value)].add(row["target_id"])
     # Ambiguous spelling never identifies an item automatically.
     return items, {token: ids for token, ids in aliases.items() if len(ids) == 1}
@@ -116,6 +128,41 @@ def _item_state(item_id: str, item: dict[str, Any], owned: set[str], missing: se
             "conflict": conflict, "review_status": "approved" if status == "verified" else "needs_review" if status == "needs_review" else "unknown"}
 
 
+def _set_profile(set_id: str, set_data: dict[str, Any], item_states: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Return an auditable, fail-closed aggregate for one canonical set.
+
+    A set ratio is a derived model feature, not a substitute for unobserved
+    member state.  It is therefore available only when every *required*
+    member is a canonical, model-eligible item and every required member has
+    an explicit owned or confirmed-missing state.  Optional members are never
+    used to infer completion.  Sets with no required members are descriptive
+    only and cannot produce a completion feature.
+    """
+    required_ids = sorted({item_id for item_id in set_data.get("required_item_ids", []) if isinstance(item_id, str)})
+    state_by_id = {item_id: item_states.get(item_id) for item_id in required_ids}
+    owned_ids = sorted(item_id for item_id, state in state_by_id.items() if state and state["state"] == "owned")
+    missing_ids = sorted(item_id for item_id, state in state_by_id.items() if state and state["state"] == "confirmed_missing")
+    known_ids = sorted(item_id for item_id, state in state_by_id.items() if state and state["state"] in {"owned", "confirmed_missing"})
+    all_required_eligible = bool(required_ids) and all(
+        state is not None and state["model_feature"] is True and state["review_status"] == "approved"
+        for state in state_by_id.values()
+    )
+    all_required_known = len(known_ids) == len(required_ids)
+    model_feature = all_required_eligible and all_required_known
+    return {
+        "set_id": set_id,
+        # These IDs are audit evidence only.  Training must consult
+        # ``model_feature`` before using any set-level aggregate.
+        "owned_item_ids": owned_ids,
+        "confirmed_missing_item_ids": missing_ids,
+        "member_count": len(required_ids),
+        "known_member_count": len(known_ids),
+        "completion_ratio": (len(owned_ids) / len(required_ids)) if model_feature else None,
+        "is_complete": (len(owned_ids) == len(required_ids)) if model_feature else None,
+        "model_feature": model_feature,
+    }
+
+
 def build_vector(profile: dict[str, Any], listing: dict[str, Any], items: dict[str, dict[str, Any]], aliases: dict[str, set[str]], root: Path = ROOT) -> dict[str, Any]:
     owned, missing = _profile_item_states(profile)
     text_claims_allowed = listing.get("offer_kind") == "seller_listing" and listing.get("entity_kind") == "single_account"
@@ -134,11 +181,10 @@ def build_vector(profile: dict[str, Any], listing: dict[str, Any], items: dict[s
     item_states = [_item_state(item_id, items[item_id], owned, missing, text_matches) for item_id in sorted(items)]
     collection = profile.get("collection") if isinstance(profile.get("collection"), dict) else {}
     sets = {row["set_id"]: row for row in _rows(root / "knowledge/sets/item-sets.jsonl")}
+    item_states_by_id = {row["item_id"]: row for row in item_states}
     set_profiles = []
     for set_id, set_data in sorted(sets.items()):
-        member_ids = set(set_data.get("required_item_ids", [])) | set(set_data.get("optional_item_ids", []))
-        owned_members = sorted(member_ids & {row["item_id"] for row in item_states if row["state"] == "owned"})
-        set_profiles.append({"set_id": set_id, "owned_item_ids": owned_members, "member_count": len(member_ids), "completion_ratio": (len(owned_members) / len(member_ids)) if member_ids else None, "is_complete": bool(member_ids) and len(owned_members) == len(member_ids)})
+        set_profiles.append(_set_profile(set_id, set_data, item_states_by_id))
     feature_groups = {
         "season_profiles": profile.get("season_profiles", []),
         "item_sets": set_profiles,
@@ -149,7 +195,7 @@ def build_vector(profile: dict[str, Any], listing: dict[str, Any], items: dict[s
         "bindings": profile.get("bindings", {}),
         "ownership_history": profile.get("ownership_history", "unknown"),
     }
-    return {"schema_version": "3.1-p1", "vector_id": "vector_" + profile["account_id"], "account_id": profile["account_id"], "source_listing_ids": profile["source_listing_ids"], "item_states": item_states, "feature_groups": feature_groups,
+    return {"schema_version": "3.1-p1", "vector_id": "vector_" + profile["account_id"], "account_id": profile["account_id"], "source_listing_ids": profile["source_listing_ids"], "catalog_provenance": catalog_provenance(root), "item_states": item_states, "feature_groups": feature_groups,
             "parser_summary": {"method": "offline_alias_rules_v1", "catalog_item_count": len(items), "approved_item_count": sum(row["model_feature"] for row in item_states), "needs_review_item_count": sum(row["sensitivity_feature"] for row in item_states), "text_matched_item_count": len(text_matches), "listing_text_matched_item_count": sum("listing_text" in row["matched_sources"] for row in item_states), "feature_summary_matched_item_count": sum("normalized_feature_summary" in row["matched_sources"] for row in item_states), "profile_owned_item_count": len(owned), "profile_missing_item_count": len(missing), "conflict_item_count": sum(row["conflict"] for row in item_states)},
             "review_status": "needs_review" if any(row["review_status"] != "approved" for row in item_states) else "approved"}
 

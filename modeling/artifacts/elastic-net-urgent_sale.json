@@ -6,9 +6,12 @@
   "random_seed": 1729,
   "input_snapshot_paths": [
     "data/modeling/account-item-vectors.jsonl",
-    "data/modeling/price-cleaned-urgent.jsonl"
+    "data/modeling/price-cleaned-urgent.jsonl",
+    "knowledge/aliases/item-aliases.jsonl",
+    "knowledge/items/items.jsonl",
+    "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "abc9b57c07ab6d14b00c06ca2a955697b095f22c0250e50a0e64b9af7eb7d578",
+  "input_snapshot_sha256": "f3333ee61bf4b101db4d2bd0cee47c19559bce68ee1fea820d7ba4ac20ac7cb1",
   "training": {
     "eligible_rows": 0,
     "minimum_rows": 100,
@@ -48,5 +51,14 @@
   "limitations": [
     "fewer_than_minimum_training_rows"
   ],
-  "artifact": null
+  "artifact": null,
+  "catalog_provenance": {
+    "canonical_item_ids_sha256": "548A6549150A9A8C36CB41700A4747547A6426CAE7984634AD379A318101FA4B",
+    "pinned_catalog_paths": [
+      "knowledge/items/items.jsonl",
+      "knowledge/aliases/item-aliases.jsonl",
+      "knowledge/sets/item-sets.jsonl"
+    ],
+    "pinned_catalog_sha256": "14286188390936F1B55CF3D93EB6DB4258EBFDA72A38DA62D471B0144FE6CA21"
+  }
 }

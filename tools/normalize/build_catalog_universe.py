@@ -25,6 +25,67 @@ CLASSIFICATION_BY_CROSSWALK = {
     "excluded_non_collectible": "explicitly_excluded",
 }
 
+# `classification` remains the legacy reconciliation bucket so existing coverage
+# counts stay comparable.  It is *not* a proof that a vendor type is outside the
+# account-item scope.  `scope_disposition` is the auditable, row-level decision
+# record and deliberately keeps type-only exclusions in human review.
+SCOPE_BY_VENDOR_TYPE = {
+    "WingBuff": (
+        "progression_unlock",
+        "vendor_type_wingbuff_requires_scope_review",
+        "pinned_vendor_snapshot_type",
+    ),
+    "Spell": (
+        "consumable_effect",
+        "vendor_type_spell_requires_scope_review",
+        "pinned_vendor_snapshot_type",
+    ),
+    "Quest": (
+        "quest_record",
+        "vendor_type_quest_requires_scope_review",
+        "pinned_vendor_snapshot_type",
+    ),
+    "Special": (
+        "vendor_special_needs_scope_review",
+        "vendor_type_special_requires_scope_review",
+        "pinned_vendor_snapshot_type",
+    ),
+}
+
+
+def scope_disposition(vendor_item_type: str) -> tuple[str, str, str]:
+    """Return the explicit scope account for one vendor row.
+
+    The pinned source exposes type labels but does not contain a repository
+    scope decision.  Therefore each non-collectible-looking type remains
+    `needs_review`; in particular WingBuff and Spell are never silently marked
+    `not_required` just because of their type.
+    """
+    return SCOPE_BY_VENDOR_TYPE.get(
+        vendor_item_type,
+        (
+            "collectible_item",
+            "vendor_type_not_type_only_excluded",
+            "pinned_vendor_snapshot_and_crosswalk",
+        ),
+    )
+
+
+def validate_scope_accounting(rows: list[dict[str, Any]]) -> None:
+    """Reject output that loses the reason/evidence for an excluded row."""
+    required = {"scope_disposition", "disposition_reason", "evidence_basis", "review_status"}
+    for row in rows:
+        missing = required - set(row)
+        if missing:
+            raise ValueError(f"scope accounting missing {sorted(missing)!r} for {row.get('universe_id')!r}")
+        if row["classification"] == "explicitly_excluded":
+            if row["scope_disposition"] == "collectible_item":
+                raise ValueError(f"excluded row lacks a non-collectible scope disposition: {row['universe_id']!r}")
+            if not row["disposition_reason"] or not row["evidence_basis"]:
+                raise ValueError(f"excluded row lacks disposition reason/evidence: {row['universe_id']!r}")
+            if row["review_status"] != "needs_review":
+                raise ValueError(f"type-only excluded row is not reviewable: {row['universe_id']!r}")
+
 
 def canonical_json(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
@@ -76,6 +137,7 @@ def build_catalog_universe(snapshot: dict[str, Any], metadata: dict[str, Any], c
             raise ValueError(f"candidate link is not unique for {pair!r}")
         if classification in {"unmatched", "explicitly_excluded"} and (canonical_ids or candidate_ids):
             raise ValueError(f"non-linked classification has targets for {pair!r}")
+        disposition, disposition_reason, evidence_basis = scope_disposition(vendor["type"])
         rows.append({
             "universe_id": f"catalog_vendor_{vendor['guid']}",
             "snapshot_id": metadata["snapshot_id"],
@@ -89,11 +151,19 @@ def build_catalog_universe(snapshot: dict[str, Any], metadata: dict[str, Any], c
             "vendor_item_group": vendor.get("group"),
             "classification": classification,
             "crosswalk_match_status": status,
+            "scope_disposition": disposition,
+            "disposition_reason": disposition_reason,
+            "evidence_basis": evidence_basis,
             "canonical_item_ids": canonical_ids,
             "candidate_item_ids": candidate_ids,
-            "review_status": linked.get("review_status"),
+            # The prior crosswalk's `not_required` was a type-only shortcut.
+            # Scope is not confirmed by that source, so output remains reviewable.
+            "review_status": "needs_review",
         })
     counts = collections.Counter(row["classification"] for row in rows)
+    validate_scope_accounting(rows)
+    type_counts = collections.Counter(row["vendor_item_type"] for row in rows)
+    disposition_counts = collections.Counter(row["scope_disposition"] for row in rows)
     expected = sum(counts[key] for key in ("canonical_linked", "candidate_linked", "unmatched", "explicitly_excluded"))
     if expected != len(rows):
         raise AssertionError("catalog universe accounting is not closed")
@@ -106,9 +176,15 @@ def build_catalog_universe(snapshot: dict[str, Any], metadata: dict[str, Any], c
         "candidate_linked_count": counts["candidate_linked"],
         "unmatched_count": counts["unmatched"],
         "explicitly_excluded_count": counts["explicitly_excluded"],
+        "vendor_item_type_counts": dict(sorted(type_counts.items())),
+        "scope_disposition_counts": dict(sorted(disposition_counts.items())),
+        "needs_scope_review_count": sum(
+            disposition_counts[name]
+            for name in ("progression_unlock", "consumable_effect", "quest_record", "vendor_special_needs_scope_review")
+        ),
         "expected_count": expected,
         "reconciliation_status": "reconciled",
-        "notes": "Each pinned vendor snapshot item has exactly one reconciliation classification. Candidate links remain review evidence and no canonical promotion is performed.",
+        "notes": "Each pinned vendor snapshot item has exactly one legacy reconciliation classification and one auditable scope disposition. Vendor type alone is not a completed scope decision: progression unlocks, consumable effects, quest records, and Special rows remain needs_review. Candidate links remain review evidence and no canonical promotion is performed.",
     }
     return rows, summary
 

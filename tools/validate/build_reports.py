@@ -83,6 +83,7 @@ def main() -> None:
         "market_near_miss_evidence": root / "data/review/market-near-miss-approved-evidence.jsonl",
         "fandom_crosswalk": root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl",
         "source_scoped_item_identities": root / "data/normalized/source-scoped-item-identities.jsonl",
+        "catalog_query_index": root / "data/normalized/catalog-query-index.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -107,7 +108,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.5-p2.3",
+        "schema_version": "3.6-p2.4",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -216,6 +217,14 @@ def main() -> None:
             "market_near_miss_review_rows": len(rows["market_near_miss_review"]),
             "market_near_miss_approved_evidence_rows": len(rows["market_near_miss_evidence"]),
         },
+        "p2_4_catalog_resolution": {
+            "query_index_rows": len(rows["catalog_query_index"]),
+            "canonical_rows": sum(row.get("query_entity_type") == "canonical_item" for row in rows["catalog_query_index"]),
+            "candidate_rows": sum(row.get("query_entity_type") == "review_candidate" for row in rows["catalog_query_index"]),
+            "source_reference_rows": sum(row.get("query_entity_type") == "source_reference" for row in rows["catalog_query_index"]),
+            "canonical_resolved_eligible_rows": sum(row.get("resolution_eligibility") == "canonical_resolved" for row in rows["catalog_query_index"]),
+            "catalog_scope_needs_review_rows": sum(row.get("scope_disposition") != "collectible_item" for row in rows["catalog_universe"]),
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
             "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
@@ -227,7 +236,10 @@ def main() -> None:
             "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
             "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
             "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-            "P2.3 另列出 22 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
+            f"P2.4 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
+            "P2.4 提供 2,474 筆離線 Catalog 查詢索引，仍嚴格區分 canonical、候選與來源觀測；目前 canonical resolved/model eligible 仍為 0。",
+            "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
+            "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。",
         ],
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
@@ -284,13 +296,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "3.5-p2.3"
+    previous_validation["schema_version"] = "3.6-p2.4"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p23"
-    manifest["package_version"] = "3.5.0-p2.3"
+    manifest["package_id"] = "sky-valuation-v3-p24"
+    manifest["package_version"] = "3.6.0-p2.4"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -328,6 +340,8 @@ def main() -> None:
         "source_scoped_identity_unresolved": sum(row.get("link_status") == "unresolved" for row in rows["source_scoped_item_identities"]),
         "fandom_template_records": len(rows["fandom_crosswalk"]),
         "fandom_candidate_links": sum(row.get("match_status") == "season_mapped_candidate_linked" for row in rows["fandom_crosswalk"]),
+        "catalog_query_index_rows": len(rows["catalog_query_index"]),
+        "catalog_scope_needs_review_rows": sum(row.get("scope_disposition") != "collectible_item" for row in rows["catalog_universe"]),
     }
     manifest["derived_paths"] = [
         "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
@@ -340,6 +354,7 @@ def main() -> None:
         "data/review/market-near-miss-field-review.jsonl",
         "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl",
         "data/normalized/source-scoped-item-identities.jsonl", "data/normalized/source-scoped-item-identities-summary.json",
+        "data/normalized/catalog-query-index.jsonl", "data/normalized/catalog-query-index-summary.json",
         "modeling/artifacts/elastic-net-normal_listing.json", "modeling/artifacts/elastic-net-urgent_sale.json",
         "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
         "reports/coverage/catalog-coverage.json", "reports/validation/p0-validation.json",

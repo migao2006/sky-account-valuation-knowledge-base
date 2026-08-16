@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.5-p2.3",
+  "schema_version": "3.6-p2.4",
   "offline_only": true,
   "valid": true,
   "checks": {
@@ -20,23 +20,26 @@
     "p2_1_vendor_correlation_fail_closed": true,
     "p2_1_human_gold_not_fabricated": true,
     "p2_3_source_scoped_identities_fail_closed": true,
-    "p2_3_near_miss_evidence_not_fabricated": true,
+    "p2_4_near_miss_evidence_not_fabricated": true,
+    "p2_4_catalog_query_truth_layers": true,
+    "p2_4_catalog_scope_is_auditable": true,
+    "p2_4_unknown_sets_not_model_features": true,
     "p2_2_fandom_same_lineage_only": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
     "no_model_eligible_items": true
   },
-  "schema_records_checked": 17958,
+  "schema_records_checked": 20428,
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 175,
+    "run": 203,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 215,
+    "hashed_files": 229,
     "mismatches": []
   },
   "release_residue": [],
@@ -90,6 +93,9 @@
     "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-    "P2.3 另列出 22 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。"
+    "P2.4 保留 18 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
+    "P2.4 提供 2,474 筆離線 Catalog 查詢索引，仍嚴格區分 canonical、候選與來源觀測；目前 canonical resolved/model eligible 仍為 0。",
+    "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
+    "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
   ]
 }

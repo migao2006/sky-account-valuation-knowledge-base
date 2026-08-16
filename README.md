@@ -1,14 +1,14 @@
-# Sky 光遇帳號估價知識庫 v3.5 P2.3
+# Sky 光遇帳號估價知識庫 v3.6 P2.4
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.5 P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一的 source-scoped identity 層，保存名稱碰撞與跨類型衝突，但不冒充 canonical item；另建立 22 筆匿名 market near-miss evidence queue，approved evidence 維持 0。所有正式工具仍只處理本機檔案，不主動連網。
+v3.6 P2.4 在既有 1,758 筆 source-scoped identity 上建立 2,474 筆離線 Catalog 查詢索引，嚴格分開 94 筆 canonical、622 筆 review candidate 與 1,758 筆來源觀測；目前可直接解析為 verified canonical 的列仍為 0。所有正式工具仍只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售；唯一明示急售價格含仲，保留為 `needs_review` 而不猜測仲介費。94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
 
 P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。精確名稱比對得到 64 個 canonical 命中與 296 個 candidate 命中；candidate 命中只形成二級 `needs_review` 證據，沒有自動提升 canonical、alias 或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
-P2.3 的 source-scoped identity layer 有 64 筆 canonical relation、296 筆 candidate relation、1,398 筆 unresolved；它描述一份固定來源快照中的身分，不代表 1,758 個已確認物品。Fandom fixed revision 與既有 printable seed 同屬同一社群 Wiki lineage，因此只有可重播性，獨立證據數仍為 0。所有列禁止 promotion、不進模型；市場 review 與 near-miss queue 仍未產生任何 approved evidence 或人工 gold。
+P2.4 也修正 Item Vector 的套組三態：任何 required 成員未知或尚未達 model eligibility 時，套組比例與完整旗標維持 `null`，不再把缺資料寫成 0%／不完整。每筆 vector 與模型 artifact 都綁定 canonical item、alias、set 的 Catalog provenance；Catalog 變更但未重建時會 fail closed。3,266 筆 vendor 列均有逐列 scope disposition，但其中 1,508 筆仍需範圍審查，不能據此宣稱全物品完成。
 
 ## 快速入口
 
@@ -52,4 +52,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.3 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.4 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
