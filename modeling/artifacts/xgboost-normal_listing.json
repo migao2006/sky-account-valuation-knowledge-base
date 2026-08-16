@@ -10,7 +10,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "AD5FDE07DD7D46B42241436C183AC8E6EEC0A19AE103BD0E7E1924AEDA5E4161",
+  "input_snapshot_sha256": "19D0F34E079FEA2D9770FFB7EBA64B8E106A09CBD17213DF6652EC4A535AB4D2",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -250,6 +250,6 @@
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "3174A61A106B49B11BBFC2C91773179447AFE636A59B7DAAE56B09872B732F51"
+    "pinned_catalog_sha256": "6B59CDB8D3A5F54CC3F4991C31892ABAA7D32A787DFD58C41DB1D9B1B16DCC76"
   }
 }

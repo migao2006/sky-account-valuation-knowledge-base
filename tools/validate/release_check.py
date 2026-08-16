@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "validate"))
 from validate import validate  # noqa: E402
 from release_files import HASH_EXCLUSIONS, lf_violations, release_files  # noqa: E402
+from canonical_evidence_registry import load_registry, validate_registry  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -182,9 +183,6 @@ def main() -> None:
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
     vendor_item_evidence = [json.loads(line) for line in (root / "data/review/skygame-data-1.3.4-item-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    nintendo_evidence = [json.loads(line) for line in (root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    aurora_evidence = [json.loads(line) for line in (root / "data/review/aurora-faq968-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    journey_evidence = [json.loads(line) for line in (root / "data/review/journey-pack-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     canonical_item_ids = {row["item_id"] for row in items}
     candidate_item_ids = {row["candidate_item_id"] for row in item_candidates}
     source_reference_ids = {row["reference_identity_id"] for row in reference_identities}
@@ -194,15 +192,14 @@ def main() -> None:
     }
     verified_item_ids = {row["item_id"] for row in items if row.get("verification_status") == "verified"}
     resolved_query_ids = {row["query_entity_id"] for row in catalog_query_index if row.get("resolution_eligibility") == "canonical_resolved"}
-    nintendo_cohort = {
-        "item_nintendo_blue_cape", "item_nintendo_red_cape",
-        "item_nintendo_hair", "item_nintendo_vessel_flute",
-    }
-    aurora_cohort = {
-        "item_aurora_voice", "item_aurora_wings", "item_aurora_cure_for_me_mask",
-        "item_aurora_cure_for_me_outfit", "item_aurora_to_the_love_outfit", "item_aurora_giving_in_cape",
-    }
-    journey_cohort = {"item_journey_pack_cape", "item_journey_hair", "item_journey_mask"}
+    set_rows = [json.loads(line) for line in (root / "knowledge/sets/item-sets.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    source_rows = [json.loads(line) for line in (root / "knowledge/sources/sources.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    registry_problems, registry_ledgers = validate_registry(
+        root, {row["item_id"]: row for row in items}, {row["set_id"]: row for row in set_rows}, {row["source_id"]: row for row in source_rows},
+    )
+    registry_rows = load_registry(root)
+    release_cohorts = [row for row in registry_rows if row.get("release_required") is True]
+    registry_counts = {cohort_id: len(ledger) for cohort_id, ledger in sorted(registry_ledgers.items())}
     checks = {
         "schema_and_integrity": integrity["valid"],
         "unit_tests": test_success,
@@ -234,9 +231,8 @@ def main() -> None:
         "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == len(source_reference_ids) and all(row.get("link_status") in {"canonical_link", "candidate_link", "unresolved"} and row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
         "p2_4_near_miss_evidence_integrity": len({row.get("review_id") for row in market_near_miss_review}) == len(market_near_miss_review),
         "p2_5_catalog_query_truth_layers": len(catalog_query_index) == len(canonical_item_ids) + len(candidate_item_ids) + len(source_reference_ids) and len({row.get("query_entity_id") for row in catalog_query_index}) == len(catalog_query_index) and query_ids_by_type["canonical_item"] == canonical_item_ids and query_ids_by_type["review_candidate"] == candidate_item_ids and query_ids_by_type["source_reference"] == source_reference_ids and resolved_query_ids == verified_item_ids and catalog_query_summary.get("canonical_item_count") == len(canonical_item_ids) and catalog_query_summary.get("review_candidate_count") == len(candidate_item_ids) and catalog_query_summary.get("source_reference_count") == len(source_reference_ids) and catalog_query_summary.get("query_row_count") == len(catalog_query_index),
-        "p2_5_nintendo_identity_evidence_replayed": nintendo_cohort <= verified_item_ids and len(nintendo_evidence) == 18 and {row.get("target_id") for row in nintendo_evidence if row.get("target_type") == "item"} == nintendo_cohort and all(row.get("review_status") == "approved" for row in nintendo_evidence),
-        "p2_6_aurora_identity_evidence_replayed": aurora_cohort <= verified_item_ids and len(aurora_evidence) == 33 and aurora_cohort <= {row.get("target_id") for row in aurora_evidence} and all(row.get("review_status") == "approved" for row in aurora_evidence),
-        "p2_7_journey_identity_evidence_replayed": journey_cohort <= verified_item_ids and len(journey_evidence) == 16 and journey_cohort <= {row.get("target_id") for row in journey_evidence} and all(row.get("review_status") == "approved" for row in journey_evidence),
+        "canonical_evidence_registry_replayed": not registry_problems and bool(release_cohorts) and all(row.get("cohort_id") in registry_ledgers for row in release_cohorts),
+        "canonical_evidence_registry_reported": coverage.get("p2_7_verified_identity_slice", {}).get("verified_cohorts") == registry_counts,
         "p2_4_catalog_scope_is_auditable": bool(catalog_universe) and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe),
         "p2_4_unknown_sets_not_model_features": all(all(set_row.get("model_feature") is False and set_row.get("completion_ratio") is None and set_row.get("is_complete") is None for set_row in vector.get("feature_groups", {}).get("item_sets", [])) for vector in vectors),
         "p2_2_fandom_same_lineage_only": len(fandom_crosswalk) == 700 and sum(row.get("match_status") == "season_mapped_candidate_linked" for row in fandom_crosswalk) == 579 and all(row.get("source_independence") == "not_independent_same_fandom_wiki" and row.get("promotion_effect") == "none" for row in fandom_crosswalk),
@@ -249,7 +245,7 @@ def main() -> None:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.9-p2.7", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.0-p2.8", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

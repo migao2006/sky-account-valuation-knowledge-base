@@ -15,7 +15,7 @@ crosswalk links, and collision quarantine state.  `canonical_link` and
 python tools/normalize/build_source_scoped_item_identities.py --root .
 ```
 
-The P2.7 summary records 72 canonical relations, 296 candidate relations,
+The P2.8 summary records 74 canonical relations, 296 candidate relations,
 1,393 unresolved observations, and 26 quarantined cross-type observations.
 It does not assert 1,758 canonical game items or make any catalog/model
 promotion; the counts are rebuilt rather than treated as permanent constants.

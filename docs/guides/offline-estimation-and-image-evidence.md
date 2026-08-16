@@ -1,4 +1,4 @@
-# 離線估價與圖片證據指南（v3.9 P2.7）
+# 離線估價與圖片證據指南（v4.0 P2.8）
 
 ## 估價輸入
 
@@ -20,7 +20,7 @@
 
 圖片功能目前只是 evidence contract，不是 OCR 或物品圖示辨識引擎。一張圖片以 SHA-256 識別，可標示其角色、語言、拍攝日和衣櫃拍攝完整度。文字 OCR 與物品圖示辨識是不同的證據欄位；OCR 文本不保存到正式知識庫。圖示辨識若日後完成，必須寫入 canonical `item_*` ID、標準化 bounding box、信心與審核狀態。
 
-相同圖片、同頁重複與圖像重疊以 `image_sha256`、`page_group_id`、`duplicate_of_image_sha256`、`overlaps_detection_ids` 記錄。P2.7 仍只有來源文字描述，沒有 Journey 圖片資產、OCR 或圖示辨識結果，也沒有足夠真實標註資料可宣稱辨識準確率。文案 Item Vector 是離線字典解析，不是 OCR 或圖片模型。
+相同圖片、同頁重複與圖像重疊以 `image_sha256`、`page_group_id`、`duplicate_of_image_sha256`、`overlaps_detection_ids` 記錄。P2.8 仍只有來源文字描述，沒有 Moomintroll／Journey 圖片資產、OCR 或圖示辨識結果，也沒有足夠真實標註資料可宣稱辨識準確率。文案 Item Vector 是離線字典解析，不是 OCR 或圖片模型。
 
 ## 網路與研究邊界
 

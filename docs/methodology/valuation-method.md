@@ -1,6 +1,6 @@
-# 估價方法（v3.9 P2.7）
+# 估價方法（v4.0 P2.8）
 
-P2.7 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 不會自動成為 canonical 或模型物品特徵；十三件已驗證 Nintendo／AURORA／Journey identity 也因建模欄位與持有證據不足而維持模型排除。`winged_or_unspecified` 仍是 unknown，不因共享 fallback 值獲得帳型分數。
+P2.8 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 不會自動成為 canonical 或模型物品特徵；十五件已驗證 Nintendo／AURORA／Journey／Moomintroll identity 也因建模欄位與持有證據不足而維持模型排除。`winged_or_unspecified` 仍是 unknown，不因共享 fallback 值獲得帳型分數。
 
 ## 輸入與正規化
 
@@ -13,6 +13,8 @@ P2.7 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解�
 先排除服務、收購、混價、多帳、同帳號、來源 listing 重疊及同重複群組資料，再依單帳、相容帳型家族、伺服器／幣別證據及價格型態分池。輸入已明示 TWD／國際服時，幣別或伺服器未知或不相符的案例不會進入同一價格池。相似度總分 100：帳型 15、季節 22、物品與套組 20、地圖 10、收藏結構 8、資源 7、綁定 6、任次 4、日期 5、證據 3。
 
 collection 維度是下列集合的聯集：graduation rewards、collaboration items、bundles 與 event-limited items；任何一類即使為空，也不能遮蔽其他已知集合。季節矩陣、已映射物品、套組聲稱、資源與逐平台綁定是實際評分欄位，不是輸出裝飾。文字只提到套組但未證明完整時只形成 `mentioned_unverified`，不得升級為完整套組。
+
+資源數值也受欄位來源約束：若 `field_evidence.resources.values.<key>.claim_kind` 為 `approximate`，該值只可供人工閱讀，估價器不把它當作數值相似度或有效內容維度。明確 `exact` 數值與未附此欄位來源的既有合法結構化輸入仍可比較。
 
 未知資料不會得到相同分數：`unknown` 不匹配 `unknown`，也不表示已確認缺少。輸出中的 `major_differences` 只列已確認不同，`unconfirmed_dimensions` 只列資料未知或無法確認的維度；同一維度不得同時出現在兩者。
 

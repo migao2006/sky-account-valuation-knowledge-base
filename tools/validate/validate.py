@@ -33,9 +33,7 @@ from build_item_evidence_bundle import build as build_item_evidence, sha as item
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
 from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
-from apply_aurora_faq968_cohort import verify as verify_aurora_faq968  # noqa: E402
-from apply_journey_pack_cohort import verify as verify_journey_pack  # noqa: E402
-from apply_nintendo_starter_pack import verify as verify_nintendo_starter_pack  # noqa: E402
+from canonical_evidence_registry import load_registry, validate_registry  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
 CANONICAL_FILES = {
@@ -76,9 +74,7 @@ SCHEMA_FILES = {
     "data/review/catalog-universe.jsonl": "schemas/review/catalog-universe.schema.json",
     "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
-    "data/review/nintendo-starter-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
-    "data/review/aurora-faq968-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
-    "data/review/journey-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
+    "data/review/canonical-evidence-cohorts.jsonl": "schemas/review/canonical-evidence-cohort.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
@@ -112,6 +108,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-823-nintendo-starter-pack.json": "schemas/knowledge/official-item-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-968-aurora-remaining-iap.json": "schemas/knowledge/aurora-faq-968-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1308-journey-pack.json": "schemas/knowledge/journey-pack-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1356-moomintroll-accessory-set.json": "schemas/knowledge/moomintroll-accessory-set-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -152,7 +149,7 @@ def validate_canonical_field_evidence(
     problems: list[str] = []
     seen: set[str] = set()
     item_fields = {
-        "canonical_name_en", "identity_description", "item_category", "source_type",
+        "canonical_name_en", "identity_description", "item_category", "vendor_item_type", "source_type",
         "set_membership", "availability_status", "availability_history", "original_cost",
         "original_currency", "first_release_date", "free_or_premium",
         "permanent_account_item", "collaboration", "visual_reference",
@@ -280,6 +277,12 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     records_by_path: dict[Path, list[dict[str, Any]]] = {}
     schema_validator = OfflineSchemaValidator(root / "schemas")
     schema_checked = 0
+    cohort_schema_files = {
+        str(row["evidence_path"]): "schemas/review/canonical-item-field-evidence.schema.json"
+        for row in load_registry(root)
+        if isinstance(row.get("evidence_path"), str) and (root / row["evidence_path"]).is_file()
+    }
+    schema_files = {**SCHEMA_FILES, **cohort_schema_files}
     actual_formal_json = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
@@ -290,12 +293,12 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         and "fixtures" not in path.parts
         and "__pycache__" not in path.parts
     }
-    declared_formal_json = set(SCHEMA_FILES) | set(JSON_SCHEMA_FILES)
+    declared_formal_json = set(schema_files) | set(JSON_SCHEMA_FILES)
     for rel in sorted(actual_formal_json - declared_formal_json):
         errors.append(f"formal JSON/JSONL has no schema mapping: {rel}")
     for rel in sorted(declared_formal_json - actual_formal_json):
         errors.append(f"schema mapping points to missing formal data: {rel}")
-    for rel, schema_rel in SCHEMA_FILES.items():
+    for rel, schema_rel in schema_files.items():
         path = root / rel
         if rel in REQUIRED_FORMAL_JSONL and not path.exists():
             errors.append(f"required formal JSONL missing: {rel}")
@@ -559,18 +562,10 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if any(row.get("canonical_write") != "not_performed" or row.get("model_feature_status") != "excluded_pending_verification" for row in promotion_ledger):
         errors.append("item-promotion: identity-only ledger attempted canonical/model promotion")
     source_records = {row["source_id"]: row for row in read_jsonl(root / "knowledge/sources/sources.jsonl")}
-    evidence_groups = [
-        ("nintendo", read_jsonl(root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl")),
-        ("aurora-faq968", read_jsonl(root / "data/review/aurora-faq968-canonical-evidence.jsonl")),
-        ("journey-pack", read_jsonl(root / "data/review/journey-pack-canonical-evidence.jsonl")),
-    ]
+    registry_problems, registry_evidence = validate_registry(root, items, sets, source_records)
+    errors.extend(registry_problems)
+    evidence_groups = list(registry_evidence.items())
     errors.extend(validate_canonical_field_evidence(evidence_groups, items, sets, source_records))
-    for problem in verify_nintendo_starter_pack(root):
-        errors.append(f"nintendo-starter-pack: {problem}")
-    for problem in verify_aurora_faq968(root):
-        errors.append(f"aurora-faq968: {problem}")
-    for problem in verify_journey_pack(root):
-        errors.append(f"journey-pack: {problem}")
     market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
     expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if market_claim_queue != expected_market_claim_queue:
@@ -892,7 +887,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.9-p2.7", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.0-p2.8", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

@@ -1,12 +1,12 @@
-# Sky 光遇帳號估價知識庫 v3.9 P2.7
+# Sky 光遇帳號估價知識庫 v4.0 P2.8
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.9 P2.7 以可重播 Journey Pack 官方摘要與固定 vendor snapshot 新增 Journey Hair、Journey Mask，並驗證 Journey Cape，形成三件封閉套組。Catalog 查詢索引仍嚴格分開 canonical、review candidate 與來源觀測；未證實的目前供應、永久性、正式繁中名與視覺身份仍為 unknown。所有正式工具只處理本機檔案，不主動連網。
+v4.0 P2.8 新增 Moomintroll Accessory Set 的可重播官方摘要與固定 vendor identity，確認耳、尾兩件及歷史套組價格，但不把歷史檔期冒充目前供應。Canonical evidence cohort 改由受 schema 約束的 registry 發現並逐一呼叫白名單 verifier，不再為每個 cohort 在發布鏈硬編路徑與筆數。Catalog 查詢索引仍嚴格分開 canonical、review candidate 與來源觀測；未證實的目前供應、永久性、正式繁中名與視覺身份仍為 unknown。所有正式工具只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售。98 個 canonical item 中 13 筆 identity 已驗證、85 筆仍待審；因取得狀態、辨識 token、永久性及持有觀測等建模證據仍不足，正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
-P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P2.7 重建後的 relation 仍只是來源觀測關係，不會自動提升 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P2.8 重建後的 relation 仍只是來源觀測關係，不會自動提升 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
 P2.4 也修正 Item Vector 的套組三態：任何 required 成員未知或尚未達 model eligibility 時，套組比例與完整旗標維持 `null`，不再把缺資料寫成 0%／不完整。每筆 vector 與模型 artifact 都綁定 canonical item、alias、set 的 Catalog provenance；Catalog 變更但未重建時會 fail closed。3,266 筆 vendor 列均有逐列 scope disposition，但其中 1,508 筆仍需範圍審查，不能據此宣稱全物品完成。
 
@@ -52,4 +52,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.7 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.8 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。

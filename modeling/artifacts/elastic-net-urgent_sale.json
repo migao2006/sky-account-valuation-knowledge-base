@@ -11,7 +11,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "995cf6c2409ee18e232493b8d4a7bbcb50cdac44458384b8b154f9626c0b550e",
+  "input_snapshot_sha256": "97082ef10bd2b1870598d6ba335e9978fbde7047bb61cacde15c1767000d5ac6",
   "training": {
     "eligible_rows": 0,
     "minimum_rows": 100,
@@ -59,6 +59,6 @@
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "3174A61A106B49B11BBFC2C91773179447AFE636A59B7DAAE56B09872B732F51"
+    "pinned_catalog_sha256": "6B59CDB8D3A5F54CC3F4991C31892ABAA7D32A787DFD58C41DB1D9B1B16DCC76"
   }
 }

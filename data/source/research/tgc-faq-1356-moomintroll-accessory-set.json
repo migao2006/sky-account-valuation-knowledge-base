@@ -1,0 +1,21 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1356_moomintroll_accessory_set_2026_08_17",
+  "source_id":"source_tgc_faq_1356_moomintroll_accessory_set",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1356/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1356's historical Moomintroll Accessory Set name, stated USD pack price, two included accessory descriptions, and Season of Moomin date window. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "pack_description_en":"Moomintroll Accessory Set",
+    "included_component_descriptions_en":{"item_moomin_ears":"ear accessory","item_moomin_tail":"tail accessory"},
+    "included_component_values":["ear accessory","tail accessory"],
+    "historical_price_usd":11.99,
+    "historical_window_start_date":"2024-10-14",
+    "historical_window_end_date":"2024-12-29"
+  },
+  "non_claims":[
+    "This historical FAQ statement does not establish current storefront availability, a return policy, or permanent-account property.",
+    "The FAQ does not provide vendor-aligned exact component titles, individual item prices, image assets, or formal Traditional Chinese names.",
+    "The pack price is not allocated to individual items."
+  ]
+}
