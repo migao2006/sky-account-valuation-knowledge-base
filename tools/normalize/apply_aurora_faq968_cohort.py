@@ -25,6 +25,8 @@ ITEMS=(
  ("item_aurora_giving_in_cape",1559,"Giving In Cape","cape","remaining_seasonal_iap","original_cost",14.99,"2022-12-08"),
 )
 IAP_IDS={"item_aurora_voice","item_aurora_wings","item_aurora_to_the_love_outfit","item_aurora_giving_in_cape"}
+def registry_contract()->dict[str,object]:
+ return {"cohort_id":"canonical_cohort_aurora_faq968","evidence_path":"data/review/aurora-faq968-canonical-evidence.jsonl","snapshot_paths":[OFFICIAL_PATH,SECONDARY_PATH],"source_ids":[SECONDARY_SOURCE,OFFICIAL_SOURCE],"target_item_ids":sorted(item_id for item_id,*_rest in ITEMS),"target_set_ids":[SET_ID]}
 class AuroraEvidenceError(ValueError): pass
 def sha(v:bytes|str)->str:
  if isinstance(v,str): v=v.encode()

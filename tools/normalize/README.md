@@ -120,3 +120,15 @@ and model eligibility remain unknown or excluded.
 ```powershell
 python tools/normalize/apply_journey_pack_cohort.py --root .
 ```
+
+`apply_moomintroll_accessory_set_cohort.py` replays the bounded FAQ 1356
+Moomintroll Accessory Set cohort. It requires the separately registered
+official source lineage, validates fixed source bytes and JSON pointers, and
+records the $11.99 amount only as a historical set-level price. Its two 2024
+limited-window records do not assert present availability; individual costs
+remain `bundle_only`, while permanent ownership, formal Traditional Chinese
+names, visual identity, and model eligibility remain unknown or excluded.
+
+```powershell
+python tools/normalize/apply_moomintroll_accessory_set_cohort.py --root .
+```

@@ -10,6 +10,8 @@ python tools/estimate/estimate.py input-account.json data/comparables/accounts.j
 
 幣別、伺服器與價格型態是硬分池。只有至少三筆 hard-pool 相容、具有效價格、達最低 40 分相似度且各有至少三個有效內容維度的案例，才會輸出價格區間；否則回傳 `insufficient_comparables` 與 `range_twd: null`，並列出 hard-pool、品質與整體不足原因。未知資料不會視為相同，已確認不同與未確認維度會分開輸出。
 
+資源的數值相似度會讀取欄位來源：`field_evidence.resources.values.<key>.claim_kind: approximate` 表示約數，該資源一律不計入數值相似度或有效內容維度；`exact` 與沒有欄位來源的既有結構化輸入仍可比較。
+
 目標帳號的 `trade_conditions` 必須明確為 `offer_kind: seller_listing` 與 `entity_kind: single_account`。買方預算、服務、交換、套組及未知交易型態不會借用單帳賣方價格池。
 
 `model_estimator.py` 是 P1 的離線模型入口，讀取同一個結構化帳號 JSON，並只接受通過資料快照、分組交叉驗證、baseline 與模型雜湊門檻的 artifact。物品模型欄位使用可選的 `item_states` 三態向量；只有 catalog 核准且帳號證據已覆核的狀態可成為正式物品特徵。未提供的 item state 保持 unknown。正式 P1 僅有 3 筆正常刊登、0 筆急售，四個 artifact 皆停用，因此模型入口會回傳資料不足，而不是產生模型價格。

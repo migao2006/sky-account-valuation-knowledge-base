@@ -356,6 +356,30 @@ class EstimatorRulesTest(unittest.TestCase):
                 self.assertEqual(result["dimensions"]["account_type"], 0.0)
                 self.assertFalse(result["known_dimensions"]["account_type"])
 
+    def test_formal_history_0068_approximate_resources_are_not_numeric_evidence(self):
+        rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        approximate = next(row for row in rows if row["history_id"] == "history_0068")
+        target = {
+            "resources": {"values": dict(approximate["resources"]["values"])},
+            "field_evidence": {
+                f"resources.values.{key}": {"claim_kind": "exact"}
+                for key in approximate["resources"]["values"]
+            },
+        }
+        result = score(target, approximate)
+        self.assertEqual(result["dimensions"]["resources"], 0.0)
+        self.assertFalse(result["known_dimensions"]["resources"])
+
+    def test_explicit_exact_resources_remain_numeric_similarity_evidence(self):
+        values = {"white_candles": 100, "hearts": 20, "red_candles": 3, "season_candles": 5}
+        evidence = {f"resources.values.{key}": {"claim_kind": "exact"} for key in values}
+        result = score(
+            {"resources": {"values": values}, "field_evidence": evidence},
+            {"resources": {"values": dict(values)}, "field_evidence": dict(evidence)},
+        )
+        self.assertEqual(result["dimensions"]["resources"], WEIGHTS["resources"])
+        self.assertTrue(result["known_dimensions"]["resources"])
+
     def test_confirmed_differences_are_not_reported_as_unknown(self):
         comparable = dict(self.rows[0])
         comparable["ownership_generation"] = "second_hand"

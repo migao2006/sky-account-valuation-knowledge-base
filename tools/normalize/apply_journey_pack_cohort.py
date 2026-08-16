@@ -12,6 +12,9 @@ OFFICIAL_SNAPSHOT_SHA256="DA8FF3F2A492B922A1BC61C60206920398676A294419CA682130FE
 AS_OF="2026-08-17"; SET_ID="set_journey_pack"; AVAILABILITY_ID="availability_journey_pack"
 ITEMS=(("item_journey_pack_cape",1948,"Journey Cape","cape"),("item_journey_hair",1949,"Journey Hair","hair"),("item_journey_mask",1947,"Journey Mask","mask"))
 
+def registry_contract()->dict[str,object]:
+ return {"cohort_id":"canonical_cohort_journey_pack","evidence_path":"data/review/journey-pack-canonical-evidence.jsonl","snapshot_paths":[OFFICIAL_PATH,SECONDARY_PATH],"source_ids":[SECONDARY_SOURCE,OFFICIAL_SOURCE],"target_item_ids":sorted(item_id for item_id,*_rest in ITEMS),"target_set_ids":[SET_ID]}
+
 class JourneyEvidenceError(ValueError): pass
 def sha(v:bytes|str)->str:
  if isinstance(v,str): v=v.encode()

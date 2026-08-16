@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.0.0-p2.8 — 2026-08-17
+
+- 新增 Moomintroll Accessory Set 兩件可重播官方／獨立 vendor identity cohort；套組兩件均為 required，歷史價格只保存 USD 11.99。
+- 目前供應、回歸政策、永久性、正式繁中名、視覺身份與單件價格仍為 unknown／`bundle_only`，兩件仍排除模型。
+- Canonical evidence cohort 改由 schema registry、受限 verifier allowlist 與實際 ledger targets 動態驗證；發布鏈不再逐 cohort 硬編路徑或 row count。
+- Vendor crosswalk 重建為 74 canonical relation、296 candidate relation、1,388 unresolved；query index 為 2,478 筆、verified canonical resolution 15、model eligible 0。
+- 估價器會尊重資源欄位 provenance：`approximate` 數值不再提供精確相似度分數或有效內容維度；正式三筆價格仍不足，估價維持 `insufficient_comparables`。
+
 ## 3.9.0-p2.7 — 2026-08-17
 
 - 新增 Journey Pack 三件可重播官方／獨立 vendor identity cohort；新增 Journey Hair、Journey Mask，並驗證 Journey Cape 與三件套組。

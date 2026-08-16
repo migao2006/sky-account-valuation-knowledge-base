@@ -24,6 +24,7 @@ PRICE_TYPES = {"normal_listing", "urgent_sale", "last_public_price", "verified_s
 HARD_PRICE_TYPES = {"normal_listing", "urgent_sale", "last_public_price", "verified_sale"}
 MIN_SIMILARITY_SCORE = 40.0
 MIN_EFFECTIVE_CONTENT_DIMENSIONS = 3
+RESOURCE_KEYS = ("white_candles", "hearts", "red_candles", "season_candles")
 
 
 class _InternalProfile(dict[str, Any]):
@@ -128,6 +129,24 @@ def _number(row: dict[str, Any], *names: str) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     return None
+
+
+def _resource_number(row: dict[str, Any], key: str) -> float | None:
+    """Return a numeric resource only when its provenance permits comparison.
+
+    A listing claim such as "about 1,800 candles" may be normalized into a
+    convenient numeric value for review, but it is not an exact measurement.
+    Treat it as unknown to the estimator.  Legacy/structured inputs without
+    field-level provenance retain their established numeric behavior, while an
+    explicit ``claim_kind: exact`` remains eligible for numeric comparison.
+    """
+    evidence = row.get("field_evidence", {})
+    if isinstance(evidence, dict):
+        claim = evidence.get(f"resources.values.{key}")
+        if isinstance(claim, dict) and claim.get("claim_kind") == "approximate":
+            return None
+    resources = row.get("resources", row)
+    return _number(resources, key) if isinstance(resources, dict) else None
 
 
 def _level_similarity(a: Any, b: Any) -> float:
@@ -260,11 +279,9 @@ def _season_similarity(account: dict[str, Any], comparable: dict[str, Any]) -> f
 
 
 def _resource_similarity(account: dict[str, Any], comparable: dict[str, Any]) -> float:
-    keys = ("white_candles", "hearts", "red_candles", "season_candles")
-    left, right = account.get("resources", account), comparable.get("resources", comparable)
     parts = []
-    for key in keys:
-        a, b = _number(left, key), _number(right, key)
+    for key in RESOURCE_KEYS:
+        a, b = _resource_number(account, key), _resource_number(comparable, key)
         if a is not None and b is not None:
             parts.append(1.0 - min(abs(a - b) / max(a, b, 1), 1.0))
     if parts:
@@ -308,8 +325,10 @@ def _map_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:
 
 
 def _resources_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:
-    left, right = account.get("resources", account), comparable.get("resources", comparable)
-    return isinstance(left, dict) and isinstance(right, dict) and any(_number(left, key) is not None and _number(right, key) is not None for key in ("white_candles", "hearts", "red_candles", "season_candles"))
+    return any(
+        _resource_number(account, key) is not None and _resource_number(comparable, key) is not None
+        for key in RESOURCE_KEYS
+    )
 
 
 def _bindings_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:

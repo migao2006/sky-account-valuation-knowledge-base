@@ -40,6 +40,17 @@ OFFICIAL_DESCRIPTIONS = {
 }
 
 
+def registry_contract() -> dict[str, object]:
+    return {
+        "cohort_id": "canonical_cohort_nintendo_starter_pack",
+        "evidence_path": "data/review/nintendo-starter-pack-canonical-evidence.jsonl",
+        "snapshot_paths": [OFFICIAL_PATH, SECONDARY_PATH],
+        "source_ids": [SECONDARY_SOURCE, OFFICIAL_SOURCE],
+        "target_item_ids": sorted(item_id for item_id, *_rest in ITEMS),
+        "target_set_ids": [SET_ID],
+    }
+
+
 class NintendoEvidenceError(ValueError):
     pass
 
