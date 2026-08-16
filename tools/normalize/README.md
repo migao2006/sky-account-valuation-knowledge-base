@@ -78,3 +78,9 @@ identity confirmation: canonical identity stays unresolved and the ledger
 keeps `verification_status=needs_review` and
 `model_feature_status=excluded_pending_verification`; season, acquisition,
 availability, cost and visual-reference fields remain unresolved.
+
+`build_catalog_query_index.py` derives a query index over the 94 canonical
+items, 622 review candidates, and 1,758 source-scoped references. It verifies
+the pinned snapshot bytes and all target IDs, keeps truth levels separate, and
+does not duplicate or promote the canonical item master. The index is only
+offline lookup/review support; it is never ownership proof or a model feature.

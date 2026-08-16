@@ -1,6 +1,6 @@
 # Market near-miss field evidence
 
-P2.3 provides a deterministic offline queue for a limited human field-evidence
+P2.4 provides a deterministic offline queue for a limited human field-evidence
 review. It selects only anonymous normalized listings that are already a
 seller listing, a single account, a positive TWD price with verified TWD, have
 no editorial exclusion or known duplicate cluster, and miss exactly one

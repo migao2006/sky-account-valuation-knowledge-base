@@ -15,12 +15,20 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from tools.modeling.catalog_provenance import (  # noqa: E402
+    CatalogProvenanceError,
+    catalog_provenance,
+    validate_artifact_catalog_provenance,
+    validate_vector_catalog_provenance,
+)
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
 from evidence import validate_evidence  # noqa: E402
 from schema_validator import OfflineSchemaValidator  # noqa: E402
 sys.path.insert(0, str(ROOT / "tools" / "normalize"))
 from build_comparables import deduplication_is_approved, predicate_hash, strict_recovery_predicates  # noqa: E402
 from build_catalog_universe import build_catalog_universe  # noqa: E402
+from build_catalog_query_index import build_catalog_query_index  # noqa: E402
 from build_item_evidence_bundle import build as build_item_evidence, sha as item_evidence_sha  # noqa: E402
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
@@ -71,6 +79,7 @@ SCHEMA_FILES = {
     "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
     "data/normalized/source-scoped-item-identities.jsonl": "schemas/normalized/source-scoped-item-identity.schema.json",
+    "data/normalized/catalog-query-index.jsonl": "schemas/normalized/catalog-query-index.schema.json",
     "reports/coverage/unmapped-aliases.jsonl": "schemas/reports/unmapped-coverage.schema.json",
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
@@ -93,6 +102,7 @@ JSON_SCHEMA_FILES = {
     "data/source/vendor/fandom-seasonal-cosmetics-r107991-metadata.json": "schemas/review/fandom-seasonal-cosmetics-metadata.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk-summary.json": "schemas/review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
     "data/normalized/source-scoped-item-identities-summary.json": "schemas/normalized/source-scoped-item-identities-summary.schema.json",
+    "data/normalized/catalog-query-index-summary.json": "schemas/normalized/catalog-query-index-summary.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -438,6 +448,21 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             errors.append("catalog-universe: committed rows differ from deterministic snapshot/crosswalk reconciliation")
         if universe_summary != expected_universe_summary:
             errors.append("catalog-universe: committed summary differs from deterministic reconciliation")
+    query_index = read_jsonl(root / "data/normalized/catalog-query-index.jsonl")
+    query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
+    try:
+        expected_query_index, expected_query_summary = build_catalog_query_index(
+            list(items.values()), read_jsonl(root / "knowledge/aliases/item-aliases.jsonl"),
+            list(candidates.values()), read_jsonl(root / "data/normalized/source-scoped-item-identities.jsonl"),
+            root / "data/source/vendor/skygame-data-1.3.4-items.json", vendor_metadata,
+        )
+    except ValueError as exc:
+        errors.append(f"catalog-query-index: cannot rebuild: {exc}")
+    else:
+        if query_index != expected_query_index:
+            errors.append("catalog-query-index: committed rows differ from deterministic rebuild")
+        if query_summary != expected_query_summary:
+            errors.append("catalog-query-index: committed summary differs from deterministic rebuild")
     item_evidence = read_jsonl(root / "data/review/item-evidence.jsonl")
     expected_item_evidence = build_item_evidence(
         list(candidates.values()), evidence_rows,
@@ -533,12 +558,22 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     # Modeling vectors are derived from the complete canonical item catalog.
     # A vector must not silently turn a missing mention into confirmed absence.
     vector_rows = read_jsonl(root / "data/modeling/account-item-vectors.jsonl")
+    try:
+        expected_catalog_provenance = catalog_provenance(root)
+    except CatalogProvenanceError as exc:
+        errors.append(f"item-vector: cannot build catalog provenance: {exc}")
+        expected_catalog_provenance = None
     vectors_by_account: dict[str, dict[str, Any]] = {}
     for vector in vector_rows:
         account_id = vector.get("account_id", "unknown")
         if account_id in vectors_by_account:
             errors.append(f"item-vector: duplicate account_id={account_id}")
         vectors_by_account[account_id] = vector
+        if expected_catalog_provenance is not None:
+            try:
+                validate_vector_catalog_provenance(vector, root)
+            except CatalogProvenanceError as exc:
+                errors.append(f"item-vector:{account_id}: {exc}")
         if vector.get("vector_id") != f"vector_{account_id}":
             errors.append(f"item-vector:{account_id}: invalid vector_id")
         state_rows = vector.get("item_states", [])
@@ -593,6 +628,11 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     ):
         artifact_path = root / relative
         artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        if expected_catalog_provenance is not None:
+            try:
+                validate_artifact_catalog_provenance(artifact, root)
+            except CatalogProvenanceError as exc:
+                errors.append(f"{relative}: {exc}")
         digest = hashlib.sha256()
         snapshot_valid = True
         for snapshot in sorted(artifact.get("input_snapshot_paths", [])):
@@ -738,7 +778,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.5-p2.3", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.6-p2.4", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

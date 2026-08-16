@@ -1,9 +1,12 @@
 import json
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 from tools.modeling.parse_item_vectors import build_vector, build_vectors
+from tools.modeling.catalog_provenance import catalog_provenance
 from tools.validate.schema_validator import OfflineSchemaValidator
 
 
@@ -21,6 +24,35 @@ class ItemVectorTests(unittest.TestCase):
         profile["collection"]["owned_item_ids"] = list(owned)
         profile["season_profiles"] = [{"owned_item_ids": [], "missing_item_ids": list(missing)}]
         return build_vector(profile, {"listing_text": text, "offer_kind": "seller_listing", "entity_kind": "single_account"}, self.items, self.aliases, ROOT)
+
+    def _set_root(self, required_item_ids, optional_item_ids=()):
+        temporary = tempfile.TemporaryDirectory(prefix="sky-item-vector-set-", dir=ROOT.parent)
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        set_path = root / "knowledge/sets/item-sets.jsonl"
+        set_path.parent.mkdir(parents=True)
+        # The vector contract pins the full canonical catalog.  Fixtures keep
+        # the production item/alias bytes while replacing only set membership.
+        for relative in ("knowledge/items/items.jsonl", "knowledge/aliases/item-aliases.jsonl"):
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, destination)
+        set_path.write_text(json.dumps({
+            "set_id": "set_fixture", "required_item_ids": list(required_item_ids),
+            "optional_item_ids": list(optional_item_ids),
+        }) + "\n", encoding="utf-8")
+        return root
+
+    def _set_profile(self, root, text="", owned=(), missing=(), items=None):
+        profile = json.loads(json.dumps(self.profile))
+        profile["collection"]["owned_item_ids"] = list(owned)
+        profile["season_profiles"] = [{"owned_item_ids": [], "missing_item_ids": list(missing)}]
+        vector = build_vector(
+            profile,
+            {"listing_text": text, "offer_kind": "seller_listing", "entity_kind": "single_account"},
+            items or self.items, self.aliases, root,
+        )
+        return vector["feature_groups"]["item_sets"][0]
 
     def test_absent_item_is_unknown_not_missing(self):
         vector = self._vector("普通帳號")
@@ -86,13 +118,60 @@ class ItemVectorTests(unittest.TestCase):
         self.assertEqual(state["evidence_state"], "conflict")
         self.assertTrue(state["conflict"])
 
+    def test_set_unknown_required_member_never_becomes_zero_or_false(self):
+        root = self._set_root(["item_verified_cape", "item_review_mask"])
+        item_set = self._set_profile(root, owned=["item_verified_cape"])
+        self.assertEqual(item_set["owned_item_ids"], ["item_verified_cape"])
+        self.assertEqual(item_set["confirmed_missing_item_ids"], [])
+        self.assertEqual(item_set["member_count"], 2)
+        self.assertEqual(item_set["known_member_count"], 1)
+        self.assertIsNone(item_set["completion_ratio"])
+        self.assertIsNone(item_set["is_complete"])
+        self.assertFalse(item_set["model_feature"])
+
+    def test_set_complete_and_partial_are_calculated_only_for_known_eligible_members(self):
+        items = {
+            "item_verified_cape": self.items["item_verified_cape"],
+            "item_verified_mask": {"item_id": "item_verified_mask", "canonical_name_zh_tw": "驗證面具", "canonical_name_en": "Verified Mask", "aliases": [], "verification_status": "verified"},
+        }
+        root = self._set_root(["item_verified_cape", "item_verified_mask"], optional_item_ids=["item_review_mask"])
+        partial = self._set_profile(root, owned=["item_verified_cape"], missing=["item_verified_mask"], items=items)
+        self.assertEqual(partial["owned_item_ids"], ["item_verified_cape"])
+        self.assertEqual(partial["confirmed_missing_item_ids"], ["item_verified_mask"])
+        self.assertEqual(partial["known_member_count"], 2)
+        self.assertEqual(partial["completion_ratio"], 0.5)
+        self.assertFalse(partial["is_complete"])
+        self.assertTrue(partial["model_feature"])
+        complete = self._set_profile(root, owned=["item_verified_cape", "item_verified_mask"], items=items)
+        self.assertEqual(complete["completion_ratio"], 1.0)
+        self.assertTrue(complete["is_complete"])
+        self.assertTrue(complete["model_feature"])
+
+    def test_set_without_required_members_is_descriptive_only(self):
+        root = self._set_root([], optional_item_ids=["item_verified_cape"])
+        item_set = self._set_profile(root, owned=["item_verified_cape"])
+        self.assertEqual(item_set["member_count"], 0)
+        self.assertEqual(item_set["known_member_count"], 0)
+        self.assertIsNone(item_set["completion_ratio"])
+        self.assertIsNone(item_set["is_complete"])
+        self.assertFalse(item_set["model_feature"])
+
     def test_real_data_build_is_deterministic_and_schema_valid(self):
         first, second = build_vectors(ROOT), build_vectors(ROOT)
         self.assertEqual(first, second)
-        self.assertEqual(len(first), 1022)
+        self.assertGreaterEqual(len(first), 926)
+        self.assertEqual(len(first), len((ROOT / "data/normalized/account-profiles.jsonl").read_text(encoding="utf-8").splitlines()))
         validator = OfflineSchemaValidator(ROOT / "schemas")
         self.assertEqual(validator.validate(first[0], ROOT / "schemas/modeling/item-vector.schema.json"), [])
+        self.assertEqual(first[0]["catalog_provenance"], catalog_provenance(ROOT))
         self.assertEqual(len(first[0]["item_states"]), len(self._catalog_ids()))
+        # Current formal accounts do not have a fully canonical, model-eligible
+        # required set; aggregate zero/false must therefore never be emitted.
+        for vector in first:
+            for item_set in vector["feature_groups"]["item_sets"]:
+                if not item_set["model_feature"]:
+                    self.assertIsNone(item_set["completion_ratio"])
+                    self.assertIsNone(item_set["is_complete"])
 
     def test_p22_provenance_fields_are_required_by_schema(self):
         vector = build_vectors(ROOT)[0]
@@ -104,6 +183,9 @@ class ItemVectorTests(unittest.TestCase):
         missing_counter = json.loads(json.dumps(vector))
         missing_counter["parser_summary"].pop("feature_summary_matched_item_count")
         self.assertTrue(validator.validate(missing_counter, schema))
+        missing_catalog = json.loads(json.dumps(vector))
+        missing_catalog.pop("catalog_provenance")
+        self.assertTrue(validator.validate(missing_catalog, schema))
 
     def test_formal_buyer_requests_do_not_become_owned_content(self):
         vectors = {row["account_id"]: row for row in build_vectors(ROOT)}

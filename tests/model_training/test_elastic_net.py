@@ -140,9 +140,29 @@ class ElasticNetModelingTest(unittest.TestCase):
         self.assertNotIn("item_moomin_ears", serialized)
         self.assertNotIn("item_days_mischief_bat_cape", serialized)
         self.assertFalse(any(key.startswith("items.item_") for key in mapped))
-        # Set-level completion is a safe aggregate: it records no member identity.
-        self.assertIn("item_sets.set_moomin_iap.completion_ratio", mapped)
-        self.assertIn("item_sets.set_moomin_iap.member_count", mapped)
+        # Legacy aggregate rows have no explicit eligibility verdict, so they
+        # are fail-closed.  Regenerated rows may expose only model_feature=true
+        # sets after every required member is canonical and explicitly known.
+        self.assertFalse(any(key.startswith("item_sets.") for key in mapped))
+
+    def test_ineligible_set_aggregate_is_not_a_training_feature(self):
+        mapped = feature_mapping({"feature_vector": {"item_sets": [
+            {
+                "set_id": "set_sensitive", "owned_item_ids": ["item_unverified"],
+                "confirmed_missing_item_ids": [], "member_count": 1,
+                "known_member_count": 1, "completion_ratio": 1.0,
+                "is_complete": True, "model_feature": False,
+            },
+            {
+                "set_id": "set_verified", "owned_item_ids": ["item_verified"],
+                "confirmed_missing_item_ids": [], "member_count": 1,
+                "known_member_count": 1, "completion_ratio": 1.0,
+                "is_complete": True, "model_feature": True,
+            },
+        ]}})
+        self.assertFalse(any(key.startswith("item_sets.set_sensitive.") for key in mapped))
+        self.assertIn("item_sets.set_verified.completion_ratio", mapped)
+        self.assertNotIn("item_unverified", json.dumps(mapped, sort_keys=True))
 
 
 if __name__ == "__main__":

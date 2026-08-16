@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "normalize"))
 
-from build_catalog_universe import build_catalog_universe
+from build_catalog_universe import build_catalog_universe, validate_scope_accounting
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -31,6 +31,16 @@ class CatalogUniverseTests(unittest.TestCase):
         self.assertEqual(summary["expected_count"], sum(counts.values()))
         self.assertEqual(summary["vendor_item_count"], len(snapshot))
         self.assertEqual(summary["reconciliation_status"], "reconciled")
+        self.assertEqual(summary["scope_disposition_counts"], {
+            "collectible_item": 1758,
+            "consumable_effect": 34,
+            "progression_unlock": 141,
+            "quest_record": 155,
+            "vendor_special_needs_scope_review": 1178,
+        })
+        self.assertEqual(summary["needs_scope_review_count"], 1508)
+        self.assertEqual(sum(summary["vendor_item_type_counts"].values()), len(snapshot))
+        self.assertEqual(sum(summary["scope_disposition_counts"].values()), len(snapshot))
         for row in universe:
             if row["classification"] == "canonical_linked":
                 self.assertEqual(len(row["canonical_item_ids"]), 1)
@@ -41,6 +51,15 @@ class CatalogUniverseTests(unittest.TestCase):
             else:
                 self.assertEqual(row["canonical_item_ids"], [])
                 self.assertEqual(row["candidate_item_ids"], [])
+            self.assertTrue(row["disposition_reason"])
+            self.assertTrue(row["evidence_basis"])
+            self.assertEqual(row["review_status"], "needs_review")
+        excluded = [row for row in universe if row["classification"] == "explicitly_excluded"]
+        self.assertEqual(len(excluded), 1508)
+        self.assertEqual(sum(row["scope_disposition"] == "progression_unlock" for row in excluded), 141)
+        self.assertEqual(sum(row["scope_disposition"] == "consumable_effect" for row in excluded), 34)
+        self.assertEqual(sum(row["scope_disposition"] == "quest_record" for row in excluded), 155)
+        self.assertEqual(sum(row["scope_disposition"] == "vendor_special_needs_scope_review" for row in excluded), 1178)
 
     def test_rebuild_is_deterministic(self):
         command = [sys.executable, "tools/normalize/build_catalog_universe.py", "--root", str(ROOT)]
@@ -61,6 +80,27 @@ class CatalogUniverseTests(unittest.TestCase):
         duplicate = {"snapshot_id": metadata["snapshot_id"], "source_id": metadata["source_id"], "vendor_item_id": 1, "vendor_guid": "one", "vendor_name": "Cape", "vendor_item_type": "Cape", "canonical_item_ids": ["item_cape"], "candidate_item_ids": [], "match_status": "matched_canonical_name", "review_status": "needs_review"}
         with self.assertRaisesRegex(ValueError, "duplicate vendor pair"):
             build_catalog_universe(snapshot, metadata, [duplicate, duplicate])
+
+    def test_excluded_row_without_disposition_reason_is_rejected(self):
+        row = {
+            "universe_id": "catalog_vendor_one",
+            "classification": "explicitly_excluded",
+            "scope_disposition": "progression_unlock",
+            "disposition_reason": "vendor_type_wingbuff_requires_scope_review",
+            "evidence_basis": "pinned_vendor_snapshot_type",
+            "review_status": "needs_review",
+        }
+        row.pop("disposition_reason")
+        with self.assertRaisesRegex(ValueError, "scope accounting missing"):
+            validate_scope_accounting([row])
+
+    def test_type_only_exclusions_remain_reviewable(self):
+        rows = [
+            {"universe_id": "catalog_vendor_wing", "classification": "explicitly_excluded", "scope_disposition": "progression_unlock", "disposition_reason": "x", "evidence_basis": "x", "review_status": "not_required"},
+            {"universe_id": "catalog_vendor_spell", "classification": "explicitly_excluded", "scope_disposition": "consumable_effect", "disposition_reason": "x", "evidence_basis": "x", "review_status": "not_required"},
+        ]
+        with self.assertRaisesRegex(ValueError, "not reviewable"):
+            validate_scope_accounting(rows)
 
 
 if __name__ == "__main__":

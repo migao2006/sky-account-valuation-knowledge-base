@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "input/catalog-resolution.schema.json",
+  "type": "object", "additionalProperties": false, "required": ["catalog_claims"],
+  "properties": {"catalog_claims": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["claim_id", "query_entity_id", "state", "evidence_state"], "properties": {"claim_id": {"type": "string", "pattern": "^claim_[a-z0-9_]+$"}, "query_entity_id": {"type": "string", "pattern": "^(item_[a-z0-9_]+|reference_identity_[a-f0-9]{32})$"}, "state": {"enum": ["owned", "confirmed_missing", "unknown"]}, "evidence_state": {"enum": ["structured_claim", "unknown"]}}}}}
+}

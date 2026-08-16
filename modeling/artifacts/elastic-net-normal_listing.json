@@ -6,13 +6,16 @@
   "random_seed": 1729,
   "input_snapshot_paths": [
     "data/modeling/account-item-vectors.jsonl",
-    "data/modeling/price-cleaned-normal.jsonl"
+    "data/modeling/price-cleaned-normal.jsonl",
+    "knowledge/aliases/item-aliases.jsonl",
+    "knowledge/items/items.jsonl",
+    "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "c2eb6418f97a14461eed362b15d30cdf354de10a258b5ecd47dabc4286f2c58f",
+  "input_snapshot_sha256": "98e826ffb484d21e1eec25b30ff20424086d66f84fc2087cd9d9749cdbece1da",
   "training": {
     "eligible_rows": 3,
     "minimum_rows": 100,
-    "feature_group_count": 8,
+    "feature_group_count": 7,
     "group_count": 3,
     "threshold_met": false,
     "baseline_beaten": false,
@@ -48,5 +51,14 @@
   "limitations": [
     "fewer_than_minimum_training_rows"
   ],
-  "artifact": null
+  "artifact": null,
+  "catalog_provenance": {
+    "canonical_item_ids_sha256": "548A6549150A9A8C36CB41700A4747547A6426CAE7984634AD379A318101FA4B",
+    "pinned_catalog_paths": [
+      "knowledge/items/items.jsonl",
+      "knowledge/aliases/item-aliases.jsonl",
+      "knowledge/sets/item-sets.jsonl"
+    ],
+    "pinned_catalog_sha256": "14286188390936F1B55CF3D93EB6DB4258EBFDA72A38DA62D471B0144FE6CA21"
+  }
 }

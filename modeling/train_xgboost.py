@@ -18,7 +18,8 @@ from typing import Any
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from modeling.train_elastic_net import ModelingInputError, feature_mapping, input_snapshot, load_price_map, repository_root
+from modeling.train_elastic_net import ModelingInputError, feature_mapping, formal_catalog_binding, input_snapshot, load_price_map, repository_root
+from tools.modeling.catalog_provenance import CatalogProvenanceError, model_eligible_item_ids
 
 PRICE_LINES = {"normal_listing", "urgent_sale"}
 
@@ -48,15 +49,9 @@ def load_model_eligible_items(input_path: Path) -> set[str]:
     """Read the canonical item whitelist associated with a repository input."""
     try:
         root = repository_root(input_path)
-        catalog = read_jsonl(root / "knowledge/items/items.jsonl")
-    except (ModelingInputError, OSError, json.JSONDecodeError):
+        return model_eligible_item_ids(root)
+    except (ModelingInputError, CatalogProvenanceError, OSError, json.JSONDecodeError):
         return set()
-    return {
-        row["item_id"] for row in catalog
-        if isinstance(row.get("item_id"), str)
-        and row.get("verification_status") == "verified"
-        and row.get("model_feature_status") == "eligible"
-    }
 
 
 def flatten_vector(record: dict[str, Any], eligible_item_ids: set[str] | None = None) -> tuple[dict[str, float], dict[str, str]]:
@@ -71,7 +66,10 @@ def flatten_vector(record: dict[str, Any], eligible_item_ids: set[str] | None = 
     # Reuse Elastic Net's canonical vector parser.  That function alone
     # decides which catalog items are approved formal features; candidates and
     # sensitivity-only items never reach this nonlinear model.
-    raw_features = feature_mapping(record)
+    states = record.get("item_states", {})
+    if isinstance(states, dict) and states:
+        raise ModelingInputError("legacy_item_state_mapping_not_supported")
+    raw_features = feature_mapping(record, eligible_item_ids)
     for key, raw in raw_features.items():
         # train_elastic_net exposes its categorical item state for its own
         # one-hot pipeline.  XGBoost uses the explicit known/owned pair below
@@ -86,9 +84,6 @@ def flatten_vector(record: dict[str, Any], eligible_item_ids: set[str] | None = 
             category = "__unknown__" if raw in (None, "unknown") else str(raw)
             name = f"{key}={category}"
             values[name], groups[name] = 1.0, group
-    states = record.get("item_states", {})
-    if isinstance(states, dict) and states:
-        raise ModelingInputError("legacy_item_state_mapping_not_supported")
     if isinstance(states, list):
         for state in states:
             if not isinstance(state, dict) or state.get("model_feature") is not True or state.get("review_status") != "approved":
@@ -128,7 +123,7 @@ def grouped_fold_indices(groups: list[str], folds: int):
     return GroupKFold(n_splits=folds).split([[0]] * len(groups), groups=groups)
 
 
-def artifact_base(input_paths: list[Path], output: Path, price_line: str, records: list[dict[str, Any]], features: list[str], groups: set[str]) -> dict[str, Any]:
+def artifact_base(input_paths: list[Path], output: Path, price_line: str, records: list[dict[str, Any]], features: list[str], groups: set[str], catalog_binding: dict | None = None) -> dict[str, Any]:
     required = max(300, 20 * len(groups))
     # These are repository-relative (not artifact-relative), making a
     # snapshot stable across checkout directory names.
@@ -141,7 +136,7 @@ def artifact_base(input_paths: list[Path], output: Path, price_line: str, record
         pairs = [(path.name, path) for path in input_paths]
         relative_inputs = [name for name, _ in sorted(pairs)]
         joined_hash = snapshot_hash(pairs).lower()
-    return {
+    artifact = {
         "schema_version": "3.1-p1",
         "model_type": "xgboost",
         "status": "insufficient_training_data",
@@ -159,9 +154,13 @@ def artifact_base(input_paths: list[Path], output: Path, price_line: str, record
         "model_file": None,
         "explanation_contract": {"method": "xgboost_pred_contribs_and_pred_interactions", "unit": "log_price_twd", "conditional_attribution_only": True},
     }
+    if catalog_binding is not None:
+        artifact["catalog_provenance"] = catalog_binding
+    return artifact
 
 
 def train(input_path: Path, output: Path, price_line: str, seed: int = 20260816, prices_path: Path | None = None) -> dict[str, Any]:
+    _, catalog_binding, catalog_eligible_item_ids = formal_catalog_binding(input_path)
     if prices_path:
         # Do not use the Elastic training row projection here: it intentionally
         # flattens away item_states.  XGBoost needs the original vector so its
@@ -183,11 +182,11 @@ def train(input_path: Path, output: Path, price_line: str, seed: int = 20260816,
     else:
         records = eligible_records(read_jsonl(input_path), price_line)
         input_paths = [input_path]
-    eligible_item_ids = load_model_eligible_items(input_path)
+    eligible_item_ids = catalog_eligible_item_ids if catalog_eligible_item_ids is not None else load_model_eligible_items(input_path)
     flattened = [flatten_vector(row, eligible_item_ids) for row in records]
     feature_names = sorted({name for values, _ in flattened for name in values})
     feature_groups = {group for _, mapping in flattened for group in mapping.values()}
-    artifact = artifact_base(input_paths, output, price_line, records, feature_names, feature_groups)
+    artifact = artifact_base(input_paths, output, price_line, records, feature_names, feature_groups, catalog_binding)
     artifact["training"]["seed"] = seed
     cluster_ids = [str(row.get("cluster_id") or row.get("account_id") or f"row_{index}") for index, row in enumerate(records)]
     artifact["training"]["unique_clusters"] = len(set(cluster_ids))

@@ -20,3 +20,15 @@ account profile：使用者估價輸入可沒有 `source_listing_ids`，不得�
 ```powershell
 python tools/classify/classify.py input-claims.json --output valuation-account.json
 ```
+
+`resolve_catalog_claims.py` is a separate offline Unified Catalog Query/Resolution
+layer. It accepts only IDs in the derived catalog query index and retains no raw
+name or post text. Results preserve canonical, review-candidate and source
+observation truth levels. Only a unique verified canonical exact mapping can
+resolve ownership; the current 94 canonical items are all `needs_review`, so
+all current results remain review-only and are excluded from model features.
+Unknown is not missing; contradictory owned/missing claims fail closed.
+
+```powershell
+python tools/classify/resolve_catalog_claims.py catalog-claims.json --output catalog-resolution.json
+```

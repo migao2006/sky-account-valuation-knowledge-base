@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.6.0-p2.4 — 2026-08-17
+
+- 新增 2,474 筆離線 Catalog query index 與結構化 resolver；canonical、review candidate、source observation 維持不同 truth level，verified canonical resolution 仍為 0。
+- 3,266 筆 vendor universe 全部增加逐列 scope disposition、理由與證據基礎；WingBuff、Spell、Quest、Special 等 1,508 筆保留 needs review，不再用 type-only 排除冒充完整範圍判定。
+- 修正套組三態：unknown／未達 model eligibility 的 required 成員不再輸出 0% 或 `false`，且不進 Elastic Net／XGBoost 特徵。
+- 每筆 Item Vector 與四個模型 artifact 綁定 canonical items、aliases、sets 的 Catalog provenance；兩種 trainer 重新驗證正式白名單，不信任 vector 自稱 eligibility。
+- 修正急售／急出語意、Game Center 獨立綁定、明示任次、常駐圖畢業、倒裝精確資源與 canonical 收藏投影；正式正常刊登仍為 3、急售 0、verified sale 0，模型保持 fail-closed。
+
 ## 3.5.0-p2.3 — 2026-08-17
 
 - 將舊 review registry 遷移為唯一的 `data/normalized/source-scoped-item-identities.jsonl`：1,758 筆來源範圍身分，64 canonical relation、296 candidate relation、1,398 unresolved；全部 canonical unverified、promotion prohibited、model excluded。

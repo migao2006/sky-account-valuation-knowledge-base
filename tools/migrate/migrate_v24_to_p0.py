@@ -20,22 +20,68 @@ from typing import Any, Iterable
 SCHEMA_VERSION = "3.0-p0"
 
 
-def normalize_history_price_type(legacy_price_type: str, listing_text: str) -> str:
+URGENT_LISTING_MARKERS = ("急售", "急出")
+NEGATED_URGENT_RE = re.compile(r"(?:不|非|不是|並非|并非)\s*急(?:售|出)")
+
+
+def has_explicit_urgent_claim(listing_text: str) -> bool:
+    """Return true only for an affirmative urgent-sale claim.
+
+    A literal substring test would incorrectly recode statements such as
+    ``不急售``.  Remove the small, explicit negation vocabulary before testing
+    the two supported affirmative markers; broader sentiment inference remains
+    out of scope.
+    """
+    affirmative_text = NEGATED_URGENT_RE.sub("", str(listing_text))
+    return any(marker in affirmative_text for marker in URGENT_LISTING_MARKERS)
+
+
+def normalize_urgent_listing_price_type(price_type: str, listing_text: str) -> str:
+    """Apply only the urgent-text correction without recoding other legacy types."""
+    if str(price_type).strip().casefold() in {
+        "asking", "normal_listing", "reduced", "instant", "instant_price", "quick_sale", "buyout"
+    } and has_explicit_urgent_claim(listing_text):
+        return "urgent_sale"
+    return price_type
+
+
+def normalize_market_price_type(legacy_price_type: str, listing_text: str) -> str:
     """Separate explicit urgent listings from ordinary asking prices.
 
-    A listed amount is still an asking price, but an explicit ``急售`` claim
-    changes the market line.  This is a deterministic text fact, not an
-    inferred discount or transaction outcome.
+    A listed amount is still an asking price, but an explicit ``急售`` or
+    ``急出`` claim changes its market line to ``urgent_sale``.  This applies
+    consistently to the source listing, normalized listing, and its derived
+    history.  It is a deterministic text fact, not an inferred discount or
+    transaction outcome.  Sold claims retain their distinct semantics.
     """
     mapped = {
-        "asking": "asking", "reduced": "reduced", "instant": "instant",
+        "asking": "asking", "normal_listing": "normal_listing",
+        "urgent_sale": "urgent_sale", "reduced": "reduced", "instant": "instant",
         "instant_price": "instant", "quick_sale": "urgent_sale",
         "buyout": "normal_listing", "sold_explicit": "sold_claim",
-        "sold_last_ask": "sold_claim",
-    }.get(str(legacy_price_type), "unknown")
-    if mapped in {"asking", "normal_listing"} and "急售" in str(listing_text):
-        return "urgent_sale"
-    return mapped
+        "sold_last_ask": "sold_claim", "sold_claim": "sold_claim",
+    }.get(str(legacy_price_type).strip().casefold(), "unknown")
+    return normalize_urgent_listing_price_type(mapped, listing_text)
+
+
+def normalize_history_price_type(legacy_price_type: str, listing_text: str) -> str:
+    """Backward-compatible name for history callers of market normalization."""
+    return normalize_market_price_type(legacy_price_type, listing_text)
+
+
+def normalize_price_variants(price_variants: Any, listing_text: str) -> list[Any]:
+    """Keep nested price observations consistent with their parent listing."""
+    if not isinstance(price_variants, list):
+        return []
+    normalized: list[Any] = []
+    for variant in price_variants:
+        if not isinstance(variant, dict):
+            normalized.append(variant)
+            continue
+        result = dict(variant)
+        result["kind"] = normalize_urgent_listing_price_type(str(result.get("kind", "unknown")), listing_text)
+        normalized.append(result)
+    return normalized
 
 
 def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] | None:
@@ -175,7 +221,9 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
     candidates: dict[str, set[tuple[str, str]]] = {}
     item_path = v3_root / "knowledge" / "items" / "items.jsonl"
     set_path = v3_root / "knowledge" / "sets" / "item-sets.jsonl"
-    item_ids = {row.get("item_id") for row in read_jsonl(item_path)} if item_path.exists() else set()
+    item_rows = read_jsonl(item_path) if item_path.exists() else []
+    item_ids = {row.get("item_id") for row in item_rows}
+    item_status = {row.get("item_id"): row.get("verification_status") for row in item_rows}
     set_ids = {row.get("set_id") for row in read_jsonl(set_path)} if set_path.exists() else set()
 
     def add(alias: Any, target_type: str, target_id: Any) -> None:
@@ -187,10 +235,18 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
             return
         candidates.setdefault(alias.casefold(), set()).add((target_type, str(target_id)))
 
-    # Canonical titles and the item-owned alias list are exact catalog aliases.
-    for row in read_jsonl(item_path) if item_path.exists() else []:
-        for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en"), *row.get("aliases", [])):
+    def safe_alias(value: Any, target_id: Any) -> bool:
+        normalized = "".join(char for char in str(value) if char.isalnum())
+        return item_status.get(target_id) == "verified" or len(normalized) >= 3
+
+    # Canonical titles remain searchable. Short aliases on unverified items
+    # (for example 鹿角 or 紅斗) require context and cannot prove ownership.
+    for row in item_rows:
+        for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en")):
             add(value, "item", row.get("item_id"))
+        for value in row.get("aliases", []):
+            if safe_alias(value, row.get("item_id")):
+                add(value, "item", row.get("item_id"))
     for row in read_jsonl(set_path) if set_path.exists() else []:
         for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en")):
             add(value, "set", row.get("set_id"))
@@ -200,7 +256,9 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
     for row in read_jsonl(path):
         target_type, target_id = row.get("target_type"), row.get("target_id")
         if target_type in {"item", "set"}:
-            add(row.get("alias_text") or row.get("normalized_alias"), target_type, target_id)
+            value = row.get("alias_text") or row.get("normalized_alias")
+            if target_type != "item" or safe_alias(value, target_id):
+                add(value, target_type, target_id)
     return {alias: next(iter(targets)) for alias, targets in candidates.items() if len(targets) == 1}
 
 
@@ -279,6 +337,83 @@ def merge_collection_claims(
         },
     }
     return owned, set_rows, evidence
+
+
+def canonical_collection_metadata(
+    items: Iterable[dict[str, Any]], sets: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build deterministic, canonical-only collection derivation indexes.
+
+    Listing text can establish only positive ownership.  The category fields
+    below are therefore *intersections* of that ownership with the canonical
+    catalog; they never turn a category word into an owned item.  Event-limited
+    is intentionally narrower than general temporary availability: it requires
+    an event source plus a restricted availability state.
+    """
+    item_rows = [row for row in items if isinstance(row.get("item_id"), str)]
+    bundle_set_ids = {
+        row.get("set_id") for row in sets
+        if row.get("set_type") == "bundle" and isinstance(row.get("set_id"), str)
+    }
+    ultimate_by_season: dict[str, set[str]] = {}
+    for row in item_rows:
+        if row.get("ultimate_reward") is True and isinstance(row.get("season_id"), str):
+            ultimate_by_season.setdefault(row["season_id"], set()).add(row["item_id"])
+    return {
+        "ultimate_item_ids": {row["item_id"] for row in item_rows if row.get("ultimate_reward") is True},
+        "ultimate_by_season": ultimate_by_season,
+        "collaboration_item_ids": {row["item_id"] for row in item_rows if row.get("collaboration") is True},
+        "bundle_item_ids": {
+            row["item_id"] for row in item_rows
+            if bundle_set_ids.intersection(set(row.get("set_ids") or []))
+        },
+        "event_limited_item_ids": {
+            row["item_id"] for row in item_rows
+            if row.get("source_type") == "event"
+            and row.get("availability_status") in {"limited_time", "temporarily_unavailable", "officially_discontinued"}
+        },
+    }
+
+
+def enrich_collection_from_canonical(
+    owned_item_ids: set[str],
+    graduation_season_ids: Iterable[str],
+    metadata: dict[str, Any],
+    owned_evidence: dict[str, Any],
+) -> tuple[dict[str, list[str]], dict[str, dict[str, Any]]]:
+    """Derive collection subsets while preserving positive-claim provenance.
+
+    A contradictory/unknown ownership field cannot safely support a derived
+    subset.  Canonical metadata itself is the only classifier and has no
+    fallback from names, aliases, or availability guesses.
+    """
+    if owned_evidence.get("evidence_state") != "text_claim":
+        empty = {key: [] for key in (
+            "graduation_rewards", "collaboration_items", "bundle_item_ids", "event_limited_item_ids",
+        )}
+        return empty, {
+            f"collection.{key}": {"sources": [], "evidence_state": owned_evidence.get("evidence_state", "unknown")}
+            for key in empty
+        }
+    ultimate_items = set(metadata.get("ultimate_item_ids", set()))
+    # An explicit "season graduation" claim supports that season's ultimate
+    # reward only; it must not spill into ordinary seasonal items.
+    for season_id in graduation_season_ids:
+        ultimate_items.update(metadata.get("ultimate_by_season", {}).get(season_id, set()))
+    values = {
+        "graduation_rewards": sorted(owned_item_ids & ultimate_items),
+        "collaboration_items": sorted(owned_item_ids & set(metadata.get("collaboration_item_ids", set()))),
+        "bundle_item_ids": sorted(owned_item_ids & set(metadata.get("bundle_item_ids", set()))),
+        "event_limited_item_ids": sorted(owned_item_ids & set(metadata.get("event_limited_item_ids", set()))),
+    }
+    evidence = {
+        f"collection.{key}": {
+            "sources": list(owned_evidence.get("sources", [])),
+            "evidence_state": "text_claim",
+        }
+        for key in values
+    }
+    return values, evidence
 
 
 def season_terms(text: str) -> list[str]:
@@ -461,9 +596,21 @@ def resource_vector(text: str) -> dict[str, Any]:
         # lower bounds such as "1000以上" / "超過1000" are deliberately not
         # coerced to exact values by this static profile contract.
         match = re.search(rf"{label}\s*[:：]?\s*(約|约|近)?\s*(\d+)(?!\d|\s*(?:以上|起|\+))", text)
+        inverted = None
+        if not match:
+            # Listings also commonly write "1831白蠟".  Only a bare point
+            # value is exact: modifiers, lower bounds, plus signs and unit
+            # abbreviations such as "千蠟" remain deliberately unknown.
+            inverted = re.search(
+                rf"(?<![\d約约近+])(?P<value>\d+)(?!\d|\s*(?:\+|以上|起))\s*{label}(?!\s*(?:以上|起))",
+                text,
+            )
         if match:
             values[key] = int(match.group(2))
             claim_kinds[key] = "approximate" if match.group(1) else "exact"
+        elif inverted:
+            values[key] = int(inverted.group("value"))
+            claim_kinds[key] = "exact"
         else:
             values[key] = None
             claim_kinds[key] = None
@@ -519,8 +666,8 @@ def merge_resources(
 def binding_matrix(record: dict[str, Any], text: str, summary: str = "") -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Build a fail-closed binding matrix from both textual provenance fields."""
     known = {item.get("platform"): item.get("status", "unknown") for item in record.get("bindings", []) if isinstance(item, dict) and isinstance(item.get("platform"), str)}
-    platforms = ["google", "apple", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter"]
-    labels = {"google": r"Google|GG", "apple": r"Apple|蘋果|苹果", "facebook": r"Facebook|FB", "nintendo": r"Nintendo|任天堂", "playstation": r"PlayStation|PSN|PS", "steam": r"Steam", "huawei": r"Huawei|華為|华为", "twitter": r"Twitter|推特"}
+    platforms = ["google", "apple", "game_center", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter"]
+    labels = {"google": r"Google|GG", "apple": r"Apple|蘋果|苹果", "game_center": r"Game\s*Center|(?<![A-Za-z0-9])GC(?![A-Za-z0-9])", "facebook": r"Facebook|FB", "nintendo": r"Nintendo|任天堂", "playstation": r"PlayStation|PSN|PS", "steam": r"Steam", "huawei": r"Huawei|華為|华为", "twitter": r"Twitter|推特"}
     results = []
     evidence_rows: dict[str, dict[str, Any]] = {}
     for platform in platforms:
@@ -528,7 +675,15 @@ def binding_matrix(record: dict[str, Any], text: str, summary: str = "") -> tupl
             match = re.search(labels[platform], source_text, re.I)
             if not match:
                 return "unknown"
-            context = source_text[max(0, match.start() - 8): min(len(source_text), match.end() + 12)]
+            # Keep the platform claim inside its punctuation-delimited clause.
+            # Without this, e.g. "GC 不出，Apple 可綁" would leak Apple's
+            # availability onto the distinct Game Center binding.
+            before = source_text[:match.start()]
+            after = source_text[match.end():]
+            left = max(before.rfind(mark) for mark in "，,;；。\n") + 1
+            right_candidates = [index for mark in "，,;；。\n" if (index := after.find(mark)) >= 0]
+            right = min(right_candidates) if right_candidates else len(after)
+            context = source_text[left:match.start()] + source_text[match.start():match.end()] + after[:right]
             if re.search(r"未綁|未绑|空綁|空绑|可綁|可绑|可換綁|可换绑|可改綁|可改绑|同出", context):
                 return "available"
             if re.search(r"死綁|死绑|不出|遺失|遗失", context):
@@ -559,7 +714,7 @@ def binding_matrix(record: dict[str, Any], text: str, summary: str = "") -> tupl
 
 
 def map_completion(text: str) -> dict[str, Any]:
-    standard = "partial" if re.search(r"(?:幾乎|几乎|近|大部分).{0,4}(?:全圖|全图|地圖|地图).{0,3}(?:畢|毕)", text) else "complete" if re.search(r"(?:全圖|全图|全地圖|全地图).{0,3}(?:畢|毕)", text) else "unknown"
+    standard = "partial" if re.search(r"(?:幾乎|几乎|近|大部分).{0,4}(?:全圖|全图|地圖|地图).{0,3}(?:畢|毕)", text) else "complete" if re.search(r"(?:全圖|全图|全地圖|全地图|常駐圖|常驻图).{0,3}(?:畢|毕)", text) else "unknown"
     second = "complete" if re.search(r"(?:全二級斗|全二级斗|二級斗全|二级斗全)", text) else "partial" if re.search(r"二級斗|二级斗", text) else "unknown"
     return {"standard_maps": standard, "second_tier_capes": second, "evidence_state": "text_claim" if standard != "unknown" or second != "unknown" else "unknown"}
 
@@ -584,6 +739,17 @@ def merge_map_completion(
 
 
 def ownership_history(text: str) -> str:
+    ordinal = re.search(r"第\s*([0-9一二三四五六七八九十]+)\s*任", text)
+    if ordinal:
+        value = ordinal.group(1)
+        chinese = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+        number = int(value) if value.isdigit() else chinese.get(value)
+        if number == 1:
+            return "first_owner"
+        if number == 2:
+            return "second_owner"
+        if number is not None and number >= 3:
+            return "multiple_owners"
     if re.search(r"(?:三手|四手|五手|多任|多手)", text): return "multiple_owners"
     if re.search(r"二手|前號主|前号主", text): return "second_owner"
     if re.search(r"一手|自創|自创", text): return "first_owner"
@@ -613,6 +779,7 @@ def graduation_claims(text: str, aliases: dict[str, str]) -> list[str]:
 def base_profile(
     record: dict[str, Any], account_id: str, aliases: dict[str, str], order: dict[str, int],
     graduation_items: dict[str, list[str]], collection_index: dict[str, tuple[str, str]] | None = None,
+    collection_metadata: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     content_claims_allowed = record.get("offer_kind") == "seller_listing" and record.get("entity_kind") == "single_account"
     text = str(record.get("listing_text", "")) if content_claims_allowed else ""
@@ -635,6 +802,13 @@ def base_profile(
     # intentionally not a completion inference; only season-profile fields
     # participate in the conflict-aware merge above.
     graduation_seasons = sorted(set(graduation_claims(text, aliases)) | set(graduation_claims(summary, aliases)))
+    metadata = collection_metadata or {
+        "ultimate_item_ids": {item for values in graduation_items.values() for item in values},
+        "ultimate_by_season": {season_id: set(item_ids) for season_id, item_ids in graduation_items.items()},
+    }
+    derived_collection, derived_evidence = enrich_collection_from_canonical(
+        collection_owned, graduation_seasons, metadata, collection_evidence["collection.owned_item_ids"],
+    )
     has_field_conflict = any(
         row["evidence_state"] == "conflict"
         for row in (*resource_evidence.values(), *map_evidence.values(), *history_evidence.values(), *binding_evidence.values())
@@ -647,8 +821,8 @@ def base_profile(
         "base_account": {"account_type": account_type, "wing_state": wing_state, "special_appearance": [], "short_id": "unknown"},
         "season_profiles": seasons,
         "season_summary": season_summary(seasons, order),
-        "field_evidence": {**resource_evidence, **map_evidence, **history_evidence, **binding_evidence, **collection_evidence},
-        "collection": {"owned_item_ids": sorted(collection_owned), "item_set_profiles": collection_sets, "graduation_rewards": sorted({item for season in graduation_seasons for item in graduation_items.get(season, [])}), "graduation_reward_season_ids": graduation_seasons, "collaboration_items": [], "bundle_claim_level": "unknown"},
+        "field_evidence": {**resource_evidence, **map_evidence, **history_evidence, **binding_evidence, **collection_evidence, **derived_evidence},
+        "collection": {"owned_item_ids": sorted(collection_owned), "item_set_profiles": collection_sets, "graduation_rewards": derived_collection["graduation_rewards"], "graduation_reward_season_ids": graduation_seasons, "collaboration_items": derived_collection["collaboration_items"], "bundle_item_ids": derived_collection["bundle_item_ids"], "event_limited_item_ids": derived_collection["event_limited_item_ids"], "bundle_claim_level": "unknown"},
         "map_completion": maps,
         "resources": resources,
         "bindings": bindings,
@@ -679,6 +853,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
         key = str(row.get("post_key", f"raw-{index}"))
         listing_id = f"listing_{index:04d}"
         post_to_new[key] = listing_id
+        listing_text = sanitize_market_text(row.get("listing_text", ""), source_names)
         source_out.append({
             "schema_version": SCHEMA_VERSION,
             "listing_id": listing_id,
@@ -688,9 +863,9 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             "date_verified": False,
             "date_evidence_state": "unknown",
             "post_date_text": row.get("post_date_text") or "unknown",
-            "listing_text": sanitize_market_text(row.get("listing_text", ""), source_names),
+            "listing_text": listing_text,
             "price_twd": row.get("price_twd"),
-            "price_type": row.get("price_type", "unknown"),
+            "price_type": normalize_urgent_listing_price_type(str(row.get("price_type", "unknown")), listing_text),
             "status": row.get("status", "unknown"),
             "account_features": sanitize_market_text(row.get("account_features", ""), source_names),
             "risk_features": sanitize_market_text(row.get("risk_features", ""), source_names),
@@ -713,6 +888,9 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             "date_verified": bool(row.get("date_verified")),
         })
         result["listing_text"] = sanitize_market_text(result.get("listing_text", ""), source_names)
+        result["price_type"] = normalize_urgent_listing_price_type(str(result.get("price_type", "unknown")), result["listing_text"])
+        if "price_variants" in result:
+            result["price_variants"] = normalize_price_variants(result["price_variants"], result["listing_text"])
         result["feature_summary"] = [sanitize_market_text(value, source_names) for value in result.get("feature_summary", [])]
         result["risk_summary"] = [sanitize_market_text(value, source_names) for value in result.get("risk_summary", [])]
         if result["date_verified"] and not result["post_date"]:
@@ -730,8 +908,8 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
     item_index = item_aliases(v3_root)
     collection_index = collection_aliases(v3_root)
     items = read_jsonl(v3_root / "knowledge/items/items.jsonl")
-    collaboration_item_ids = {row["item_id"] for row in items if row.get("collaboration") is True}
-    ultimate_item_ids = {row["item_id"] for row in items if row.get("ultimate_reward") is True}
+    item_sets = read_jsonl(v3_root / "knowledge/sets/item-sets.jsonl")
+    collection_metadata = canonical_collection_metadata(items, item_sets)
     graduation_items: dict[str, list[str]] = {}
     for item in items:
         if item.get("ultimate_reward") is True and isinstance(item.get("season_id"), str):
@@ -742,6 +920,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
         profile, unresolved = base_profile(
             row, f"account_{row['listing_id'].split('_')[1]}", aliases,
             season_order, graduation_items, collection_index,
+            collection_metadata,
         )
         profile["post_date"] = row.get("post_date")
         profile["date_verified"] = bool(row.get("date_verified"))
@@ -767,7 +946,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             continue
         sold_claimed = history.get("status") in {"sold", "sold_claimed", "reported_sold"} or history.get("price_type") in {"sold_explicit", "sold_last_ask"}
         legacy_price_type = str(history.get("price_type", "unknown"))
-        price_type = normalize_history_price_type(legacy_price_type, primary.get("listing_text", ""))
+        price_type = normalize_market_price_type(legacy_price_type, primary.get("listing_text", ""))
         legacy_status = str(history.get("status", "unknown"))
         status = {"sold": "sold_claimed", "sold_claimed": "sold_claimed", "reported_sold": "sold_claimed", "active": "active"}.get(legacy_status, "unknown")
         history_row = {
@@ -812,8 +991,10 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
                 + [str(value) for value in comp.get("bundle_tags", [])]
             )
             owned_items = set(profile["collection"]["owned_item_ids"])
+            owned_before_comparable_summary = set(owned_items)
             set_claims = {row["set_id"]: row for row in profile["collection"]["item_set_profiles"]}
-            for alias, (target_type, target_id) in collection_index.items():
+            for alias in longest_non_overlapping_aliases(evidence_text.casefold(), collection_index):
+                target_type, target_id = collection_index[alias]
                 if not mentioned_without_negation(evidence_text.casefold(), alias):
                     continue
                 if target_type == "item":
@@ -826,8 +1007,23 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
                         "evidence_state": "text_claim", "review_status": "needs_review",
                     }
             profile["collection"]["owned_item_ids"] = sorted(owned_items)
-            profile["collection"]["collaboration_items"] = sorted(owned_items & collaboration_item_ids)
-            profile["collection"]["graduation_rewards"] = sorted(owned_items & ultimate_item_ids)
+            # Comparable summaries are an explicit, normalized text field;
+            # preserve that provenance when they add a canonical owned item.
+            if owned_items != owned_before_comparable_summary:
+                owned_provenance = profile["field_evidence"]["collection.owned_item_ids"]
+                owned_provenance["sources"] = sorted(set(owned_provenance.get("sources", [])) | {"normalized_feature_summary"})
+                owned_provenance["evidence_state"] = "text_claim"
+            derived, derived_evidence = enrich_collection_from_canonical(
+                owned_items,
+                profile["collection"]["graduation_reward_season_ids"],
+                collection_metadata,
+                profile["field_evidence"]["collection.owned_item_ids"],
+            )
+            profile["collection"]["collaboration_items"] = derived["collaboration_items"]
+            profile["collection"]["bundle_item_ids"] = derived["bundle_item_ids"]
+            profile["collection"]["event_limited_item_ids"] = derived["event_limited_item_ids"]
+            profile["collection"]["graduation_rewards"] = derived["graduation_rewards"]
+            profile["field_evidence"].update(derived_evidence)
             profile["collection"]["item_set_profiles"] = [set_claims[key] for key in sorted(set_claims)]
         ledger.append({"legacy_history_id": history_id, "history_id": f"history_{history_id.split('-')[-1]}", "migration_status": "migrated", "source_listing_ids": source_ids, "date_repaired": date_verified, "post_date": post_date})
 
@@ -838,7 +1034,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             if isinstance(term, str) and term.casefold() not in collection_index:
                 unresolved_items[term] += 1
     item_review_rows = [{"term": term, "kind": "item_alias", "count": count, "review_status": "needs_review", "reason": "legacy bundle tag has no canonical item alias mapping"} for term, count in sorted(unresolved_items.items())]
-    canonical_price_types = {"asking", "reduced", "instant", "instant_price", "buyout", "quick_sale", "sold_explicit", "sold_last_ask"}
+    canonical_price_types = {"asking", "normal_listing", "urgent_sale", "reduced", "instant", "instant_price", "buyout", "quick_sale", "sold_explicit", "sold_last_ask", "sold_claim"}
     price_types = Counter(str(row.get("price_type", "unknown")) for row in normalized_out)
     price_review_rows = [
         {"price_type": price_type, "count": count, "review_status": "needs_review", "reason": "non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}

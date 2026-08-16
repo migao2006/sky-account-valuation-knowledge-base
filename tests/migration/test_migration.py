@@ -16,8 +16,41 @@ MIGRATE_SPEC.loader.exec_module(MIGRATE)
 class MigrationContractTests(unittest.TestCase):
     def test_explicit_urgent_claim_does_not_enter_normal_asking_line(self):
         self.assertEqual("urgent_sale", MIGRATE.normalize_history_price_type("asking", "急售國際服帳號"))
+        self.assertEqual("urgent_sale", MIGRATE.normalize_history_price_type("normal_listing", "急出國際服帳號"))
         self.assertEqual("asking", MIGRATE.normalize_history_price_type("asking", "一般售帳"))
         self.assertEqual("sold_claim", MIGRATE.normalize_history_price_type("sold_explicit", "急售後已售"))
+
+    def test_formal_urgent_listings_normalize_at_each_market_layer(self):
+        # These texts are the four formally identified regressions.  The
+        # migration must apply the same rule before source, normalized, and
+        # history records are written, rather than fixing only the history.
+        formal_listings = {
+            "listing_0716": "#售 #代友售 #急售；開價 NTD 2500。",
+            "listing_0965": "#售號／#無翼號／#急出：開價 14000 台幣可小刀。",
+            "listing_1014": "急售帳號，開價 1,000 台幣。",
+            "listing_1018": "急售魔法季大斷帳號，開價 10,000 台幣。",
+        }
+        for listing_id, listing_text in formal_listings.items():
+            with self.subTest(listing_id=listing_id):
+                source_price_type = MIGRATE.normalize_urgent_listing_price_type("asking", listing_text)
+                normalized_price_type = MIGRATE.normalize_urgent_listing_price_type(source_price_type, listing_text)
+                history_price_type = MIGRATE.normalize_history_price_type("asking", listing_text)
+                self.assertEqual("urgent_sale", source_price_type)
+                self.assertEqual("urgent_sale", normalized_price_type)
+                self.assertEqual("urgent_sale", history_price_type)
+
+    def test_plain_sale_word_does_not_imply_urgent_and_sold_claim_is_preserved(self):
+        self.assertEqual("asking", MIGRATE.normalize_market_price_type("asking", "出售帳號，開價 2500 台幣"))
+        self.assertEqual("normal_listing", MIGRATE.normalize_market_price_type("normal_listing", "一般出售帳號"))
+        self.assertEqual("sold_claim", MIGRATE.normalize_market_price_type("sold_explicit", "急出後已售"))
+
+    def test_urgent_price_variant_is_consistent_with_parent_listing(self):
+        variants = MIGRATE.normalize_price_variants(
+            [{"kind": "asking", "amount_twd": 14000}, {"kind": "sold_explicit", "amount_twd": 12000}],
+            "#急出 開價 14000；已售聲稱 12000",
+        )
+        self.assertEqual("urgent_sale", variants[0]["kind"])
+        self.assertEqual("sold_explicit", variants[1]["kind"])
 
     def test_brokerage_included_price_preserves_urgent_semantics_but_requires_review(self):
         review = MIGRATE.price_semantic_review("急售國際服帳號；售價 18000 台幣（含仲）", "urgent_sale")
@@ -156,6 +189,16 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIsNone(lower_bound["values"]["white_candles"])
         self.assertIsNone(lower_bound["values"]["hearts"])
 
+    def test_inverted_exact_resource_claims_do_not_coerce_qualifiers_or_lower_bounds(self):
+        parsed = MIGRATE.resource_vector("1831白蠟、130愛心、12紅蠟、89季蠟")
+        self.assertEqual(parsed["values"], {
+            "white_candles": 1831, "hearts": 130,
+            "red_candles": 12, "season_candles": 89,
+        })
+        self.assertTrue(all(kind == "exact" for kind in parsed["claim_kinds"].values()))
+        ambiguous = MIGRATE.resource_vector("約1831白蠟、2100+白蠟、1千白蠟")
+        self.assertIsNone(ambiguous["values"]["white_candles"])
+
     def test_approximate_resource_provenance_survives_merge(self):
         listing = MIGRATE.resource_vector("白蠟約1831")
         summary = MIGRATE.resource_vector("")
@@ -233,6 +276,60 @@ class MigrationContractTests(unittest.TestCase):
         self.assertEqual(google["evidence_state"], "conflict")
         self.assertEqual(evidence["bindings.platforms.google"]["sources"], ["listing_text", "normalized_feature_summary"])
 
+    def test_game_center_is_its_own_binding_platform(self):
+        bindings, _ = MIGRATE.binding_matrix({"bindings": []}, "GC 不出，Apple 可綁，GG 可綁")
+        by_platform = {row["platform"]: row for row in bindings["platforms"]}
+        self.assertEqual(by_platform["game_center"]["status"], "high_risk")
+        self.assertEqual(by_platform["apple"]["status"], "available")
+        self.assertEqual(by_platform["google"]["status"], "available")
+        tgc_bindings, _ = MIGRATE.binding_matrix({"bindings": []}, "TGC斗篷")
+        tgc_by_platform = {row["platform"]: row for row in tgc_bindings["platforms"]}
+        self.assertEqual(tgc_by_platform["game_center"]["status"], "unknown")
+
+    def test_explicit_urgent_overrides_reduced_but_never_sold_claim(self):
+        self.assertEqual(MIGRATE.normalize_market_price_type("reduced", "急售降價"), "urgent_sale")
+        self.assertEqual(MIGRATE.normalize_market_price_type("sold_explicit", "急售後已售"), "sold_claim")
+        self.assertEqual(MIGRATE.normalize_market_price_type("asking", "不急售，一般掛價"), "asking")
+        self.assertEqual(MIGRATE.normalize_urgent_listing_price_type("buyout", "急售直購"), "urgent_sale")
+
+    def test_unverified_two_character_alias_requires_context(self):
+        index = MIGRATE.collection_aliases(ROOT)
+        self.assertNotIn("紅斗", index)
+        self.assertNotIn("鹿角", index)
+        self.assertIn("任天堂紅斗", index)
+
+    def test_explicit_ordinal_ownership_and_resident_map_completion_are_safe(self):
+        self.assertEqual(MIGRATE.ownership_history("第一任私用"), "first_owner")
+        self.assertEqual(MIGRATE.ownership_history("第2任"), "second_owner")
+        self.assertEqual(MIGRATE.ownership_history("到買方第六任"), "multiple_owners")
+        self.assertEqual(MIGRATE.map_completion("常駐圖畢業")["standard_maps"], "complete")
+
+    def test_canonical_collection_enrichment_uses_only_owned_items_and_strict_event_availability(self):
+        metadata = MIGRATE.canonical_collection_metadata(
+            [
+                {"item_id": "item_ultimate", "ultimate_reward": True, "season_id": "season_example", "collaboration": False, "set_ids": [], "source_type": "season", "availability_status": "temporarily_unavailable"},
+                {"item_id": "item_collab_bundle", "ultimate_reward": False, "collaboration": True, "set_ids": ["set_bundle"], "source_type": "collaboration", "availability_status": "limited_time"},
+                {"item_id": "item_recurring_event", "ultimate_reward": False, "collaboration": False, "set_ids": [], "source_type": "event", "availability_status": "recurring_event"},
+                {"item_id": "item_limited_event", "ultimate_reward": False, "collaboration": False, "set_ids": [], "source_type": "event", "availability_status": "limited_time"},
+            ],
+            [{"set_id": "set_bundle", "set_type": "bundle"}],
+        )
+        values, evidence = MIGRATE.enrich_collection_from_canonical(
+            {"item_ultimate", "item_collab_bundle", "item_recurring_event"},
+            ["season_example"], metadata,
+            {"sources": ["listing_text"], "evidence_state": "text_claim"},
+        )
+        self.assertEqual(values["graduation_rewards"], ["item_ultimate"])
+        self.assertEqual(values["collaboration_items"], ["item_collab_bundle"])
+        self.assertEqual(values["bundle_item_ids"], ["item_collab_bundle"])
+        self.assertEqual(values["event_limited_item_ids"], [])
+        self.assertEqual(evidence["collection.bundle_item_ids"], {"sources": ["listing_text"], "evidence_state": "text_claim"})
+        unknown_values, unknown_evidence = MIGRATE.enrich_collection_from_canonical(
+            {"item_collab_bundle"}, [], metadata, {"sources": [], "evidence_state": "conflict"},
+        )
+        self.assertEqual(unknown_values["collaboration_items"], [])
+        self.assertEqual(unknown_evidence["collection.collaboration_items"]["evidence_state"], "conflict")
+
     def test_cjk_phrase_matching_does_not_depend_on_word_boundaries(self):
         self.assertTrue(MIGRATE.mentioned_without_negation("含TGC斗篷與白蠟", "TGC"))
         self.assertFalse(MIGRATE.mentioned_without_negation("不含TGC斗篷", "TGC"))
@@ -242,6 +339,27 @@ class MigrationContractTests(unittest.TestCase):
         claimed = [row for row in histories if row["sale_outcome"]["status"] == "sold_claimed"]
         self.assertGreater(len(claimed), 0)
         self.assertTrue(all(not row["sale_outcome"]["verified"] and row["sale_outcome"]["completed_sale_price_twd"] is None for row in claimed))
+
+    def test_committed_derivatives_reflect_alias_binding_and_urgent_fixes(self):
+        profiles = {
+            row["account_id"]: row for row in (
+                json.loads(line) for line in (ROOT / "data/normalized/account-profiles.jsonl").read_text(encoding="utf-8").splitlines() if line
+            )
+        }
+        game_center = {row["platform"]: row["status"] for row in profiles["account_0040"]["bindings"]["platforms"]}
+        self.assertEqual(game_center["game_center"], "unknown")
+        self.assertNotIn("item_nintendo_red_cape", profiles["account_0141"]["collection"]["owned_item_ids"])
+        for account_id in ("account_0197", "account_0282", "account_0314"):
+            owned = profiles[account_id]["collection"]["owned_item_ids"]
+            self.assertIn("item_nine_colored_deer_antlers", owned)
+            self.assertNotIn("item_days_feast_reindeer_antlers", owned)
+        histories = {
+            row["history_id"]: row for row in (
+                json.loads(line) for line in (ROOT / "data/curated/histories.jsonl").read_text(encoding="utf-8").splitlines() if line
+            )
+        }
+        self.assertEqual(histories["history_0039"]["price_type"], "urgent_sale")
+        self.assertEqual(histories["history_0066"]["price_type"], "urgent_sale")
 
 
 if __name__ == "__main__":

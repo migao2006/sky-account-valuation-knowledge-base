@@ -3,7 +3,7 @@
   "$id": "review/catalog-universe-summary.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["snapshot_id", "source_id", "snapshot_sha256", "vendor_item_count", "canonical_linked_count", "candidate_linked_count", "unmatched_count", "explicitly_excluded_count", "expected_count", "reconciliation_status", "notes"],
+  "required": ["snapshot_id", "source_id", "snapshot_sha256", "vendor_item_count", "canonical_linked_count", "candidate_linked_count", "unmatched_count", "explicitly_excluded_count", "vendor_item_type_counts", "scope_disposition_counts", "needs_scope_review_count", "expected_count", "reconciliation_status", "notes"],
   "properties": {
     "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
     "source_id": {"const": "source_skygame_data_1_3_4"},
@@ -13,6 +13,9 @@
     "candidate_linked_count": {"type": "integer", "minimum": 0},
     "unmatched_count": {"type": "integer", "minimum": 0},
     "explicitly_excluded_count": {"type": "integer", "minimum": 0},
+    "vendor_item_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "scope_disposition_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "needs_scope_review_count": {"type": "integer", "minimum": 0},
     "expected_count": {"type": "integer", "minimum": 1},
     "reconciliation_status": {"const": "reconciled"},
     "notes": {"type": "string", "minLength": 1}
