@@ -1,14 +1,14 @@
-# Sky 光遇帳號估價知識庫 v3.4 P2.2
+# Sky 光遇帳號估價知識庫 v3.5 P2.3
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.4 P2.2 在 P2.1 基礎上建立 1,758 筆 review-only vendor collectible registry，保存名稱碰撞與跨類型衝突；另固定一份 Fandom revision 作可重播的同來源 template coordinate，但明確不把它當第二獨立來源。匿名人工雙標 review queue 擴為 200 筆。所有正式工具仍只處理本機檔案，不主動連網。
+v3.5 P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一的 source-scoped identity 層，保存名稱碰撞與跨類型衝突，但不冒充 canonical item；另建立 22 筆匿名 market near-miss evidence queue，approved evidence 維持 0。所有正式工具仍只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售；唯一明示急售價格含仲，保留為 `needs_review` 而不猜測仲介費。94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
 
 P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。精確名稱比對得到 64 個 canonical 命中與 296 個 candidate 命中；candidate 命中只形成二級 `needs_review` 證據，沒有自動提升 canonical、alias 或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
-P2.2 的 vendor registry 有 64 筆 canonical name link、296 筆 candidate name link、1,398 筆 unresolved；它描述來源列，不代表 1,758 個已確認物品。Fandom fixed revision 與既有 printable seed 同屬同一社群 Wiki lineage，因此只有可重播性，獨立證據數仍為 0。所有列不寫入 canonical、不進模型；市場 review queue 仍未產生任何人工 gold。
+P2.3 的 source-scoped identity layer 有 64 筆 canonical relation、296 筆 candidate relation、1,398 筆 unresolved；它描述一份固定來源快照中的身分，不代表 1,758 個已確認物品。Fandom fixed revision 與既有 printable seed 同屬同一社群 Wiki lineage，因此只有可重播性，獨立證據數仍為 0。所有列禁止 promotion、不進模型；市場 review 與 near-miss queue 仍未產生任何 approved evidence 或人工 gold。
 
 ## 快速入口
 
@@ -52,4 +52,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.2 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.3 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。

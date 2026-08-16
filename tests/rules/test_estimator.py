@@ -336,6 +336,26 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertIn("fewer_than_three_comparables_meet_similarity_and_content_thresholds", result["insufficiency_reasons"])
         self.assertNotIn("fewer_than_three_hard_pool_compatible_comparables", result["insufficiency_reasons"])
 
+    def test_winged_or_unspecified_is_unknown_not_a_similarity_match(self):
+        target = {"base_account": {"account_type": "winged_or_unspecified"}}
+        comparable = {"base_account": {"account_type": "winged_or_unspecified"}}
+        result = score(target, comparable)
+        self.assertEqual(result["dimensions"]["account_type"], 0.0)
+        self.assertFalse(result["known_dimensions"]["account_type"])
+
+    def test_formal_three_do_not_gain_shared_unknown_account_type_points(self):
+        rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        strict_ids = {"history_0068", "history_0085", "history_recovered_0792"}
+        strict_rows = [row for row in rows if row.get("history_id") in strict_ids]
+        self.assertEqual(len(strict_rows), 3)
+        for left in strict_rows:
+            for right in strict_rows:
+                if left is right:
+                    continue
+                result = score(left, right)
+                self.assertEqual(result["dimensions"]["account_type"], 0.0)
+                self.assertFalse(result["known_dimensions"]["account_type"])
+
     def test_confirmed_differences_are_not_reported_as_unknown(self):
         comparable = dict(self.rows[0])
         comparable["ownership_generation"] = "second_hand"

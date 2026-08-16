@@ -79,8 +79,10 @@ def main() -> None:
         "item_promotion_ledger": root / "data/review/item-promotion-ledger.jsonl",
         "market_claim_review": root / "data/review/market-claim-review.jsonl",
         "market_claim_gold": root / "data/review/market-claim-gold.jsonl",
+        "market_near_miss_review": root / "data/review/market-near-miss-field-review.jsonl",
+        "market_near_miss_evidence": root / "data/review/market-near-miss-approved-evidence.jsonl",
         "fandom_crosswalk": root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl",
-        "vendor_collectible_registry": root / "data/review/vendor-collectible-registry.jsonl",
+        "source_scoped_item_identities": root / "data/normalized/source-scoped-item-identities.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -105,7 +107,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.4-p2.2",
+        "schema_version": "3.5-p2.3",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -198,16 +200,21 @@ def main() -> None:
             "human_gold_rows": len(rows["market_claim_gold"]),
         },
         "p2_2_evidence": {
-            "vendor_collectible_registry_rows": len(rows["vendor_collectible_registry"]),
-            "vendor_registry_canonical_links": sum(row.get("link_status") == "canonical_link" for row in rows["vendor_collectible_registry"]),
-            "vendor_registry_candidate_links": sum(row.get("link_status") == "candidate_link" for row in rows["vendor_collectible_registry"]),
-            "vendor_registry_unresolved": sum(row.get("link_status") == "unresolved" for row in rows["vendor_collectible_registry"]),
-            "vendor_registry_model_eligible": sum(row.get("model_feature_status") == "eligible" for row in rows["vendor_collectible_registry"]),
             "fandom_template_records": len(rows["fandom_crosswalk"]),
             "fandom_candidate_links": sum(row.get("match_status") == "season_mapped_candidate_linked" for row in rows["fandom_crosswalk"]),
             "fandom_independent_evidence": sum(row.get("source_independence") != "not_independent_same_fandom_wiki" for row in rows["fandom_crosswalk"]),
             "market_claim_review_queue": len(rows["market_claim_review"]),
             "human_gold_rows": len(rows["market_claim_gold"]),
+        },
+        "p2_3_reference_identities": {
+            "source_scoped_identity_rows": len(rows["source_scoped_item_identities"]),
+            "canonical_relation_rows": sum(row.get("link_status") == "canonical_link" for row in rows["source_scoped_item_identities"]),
+            "candidate_relation_rows": sum(row.get("link_status") == "candidate_link" for row in rows["source_scoped_item_identities"]),
+            "unresolved_rows": sum(row.get("link_status") == "unresolved" for row in rows["source_scoped_item_identities"]),
+            "quarantined_rows": sum(row.get("review_status") == "quarantined_cross_type_conflict" for row in rows["source_scoped_item_identities"]),
+            "model_eligible_rows": sum(row.get("model_feature_status") == "eligible" for row in rows["source_scoped_item_identities"]),
+            "market_near_miss_review_rows": len(rows["market_near_miss_review"]),
+            "market_near_miss_approved_evidence_rows": len(rows["market_near_miss_evidence"]),
         },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
@@ -217,9 +224,10 @@ def main() -> None:
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
             "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
-            "P2.2 固定 1,758 筆 vendor collectible registry 是 review-only 來源列母體，不是 1,758 個 canonical items；重名與跨類型衝突均隔離，模型白名單提升為 0。",
+            "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
             "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
             "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
+            "P2.3 另列出 22 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
         ],
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
@@ -276,13 +284,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "3.4-p2.2"
+    previous_validation["schema_version"] = "3.5-p2.3"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p22"
-    manifest["package_version"] = "3.4.0-p2.2"
+    manifest["package_id"] = "sky-valuation-v3-p23"
+    manifest["package_version"] = "3.5.0-p2.3"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -314,8 +322,10 @@ def main() -> None:
         "identity_rejected_fail_closed": sum(row.get("decision") == "rejected_fail_closed" for row in rows["item_promotion_ledger"]),
         "market_claim_review_rows": len(rows["market_claim_review"]),
         "human_gold_rows": len(rows["market_claim_gold"]),
-        "vendor_collectible_registry_rows": len(rows["vendor_collectible_registry"]),
-        "vendor_registry_unresolved": sum(row.get("link_status") == "unresolved" for row in rows["vendor_collectible_registry"]),
+        "market_near_miss_review_rows": len(rows["market_near_miss_review"]),
+        "market_near_miss_approved_evidence_rows": len(rows["market_near_miss_evidence"]),
+        "source_scoped_item_identity_rows": len(rows["source_scoped_item_identities"]),
+        "source_scoped_identity_unresolved": sum(row.get("link_status") == "unresolved" for row in rows["source_scoped_item_identities"]),
         "fandom_template_records": len(rows["fandom_crosswalk"]),
         "fandom_candidate_links": sum(row.get("match_status") == "season_mapped_candidate_linked" for row in rows["fandom_crosswalk"]),
     }
@@ -327,11 +337,18 @@ def main() -> None:
         "data/review/catalog-universe.jsonl", "data/review/catalog-universe-summary.json",
         "data/review/item-evidence.jsonl", "data/review/item-promotion-ledger.jsonl",
         "data/review/market-claim-review.jsonl",
+        "data/review/market-near-miss-field-review.jsonl",
         "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl",
-        "data/review/vendor-collectible-registry.jsonl", "data/review/vendor-collectible-registry-summary.json",
+        "data/normalized/source-scoped-item-identities.jsonl", "data/normalized/source-scoped-item-identities-summary.json",
         "modeling/artifacts/elastic-net-normal_listing.json", "modeling/artifacts/elastic-net-urgent_sale.json",
         "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
         "reports/coverage/catalog-coverage.json", "reports/validation/p0-validation.json",
+    ]
+    # Human decisions are curated inputs. They are never implied to be
+    # reproducible derived output merely because the ledger currently starts empty.
+    manifest["human_review_paths"] = [
+        "data/review/market-claim-gold.jsonl",
+        "data/review/market-near-miss-approved-evidence.jsonl",
     ]
     manifest["generated_at"] = BUILT_AT
     manifest["catalog_status"] = "partial_verified_catalog"

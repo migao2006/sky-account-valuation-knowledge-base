@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-near-miss-approved-evidence.schema.json",
+  "description": "Human-adjudicated field evidence. This ledger is not an automatic comparable promotion channel.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "review_id", "listing_id", "listing_text_sha256", "field", "value", "reviewers", "adjudication", "review_status"],
+  "properties": {
+    "evidence_id": {"type": "string", "pattern": "^market_near_miss_evidence_[0-9]{4}$"},
+    "review_id": {"type": "string", "pattern": "^market_near_miss_review_[0-9]{4}$"},
+    "listing_id": {"type": "string", "pattern": "^listing_[0-9]{4}$"},
+    "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "field": {"enum": ["server", "server_verified", "price_type", "status"]},
+    "value": {"oneOf": [{"type": "boolean"}, {"enum": ["international", "china", "unknown", "asking", "normal_listing", "reduced", "instant", "urgent_sale", "quick_sale", "active", "sold", "sold_claimed", "reported_sold", "wanted", "unknown"]}]},
+    "reviewers": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": {"$ref": "#/$defs/reviewer"}
+    },
+    "adjudication": {"$ref": "#/$defs/adjudication"},
+    "review_status": {"const": "approved_human_field_evidence"}
+  },
+  "allOf": [
+    {"if": {"required": ["field"], "properties": {"field": {"const": "server"}}}, "then": {"properties": {"value": {"enum": ["international", "china", "unknown"]}}}},
+    {"if": {"required": ["field"], "properties": {"field": {"const": "server_verified"}}}, "then": {"properties": {"value": {"type": "boolean"}}}},
+    {"if": {"required": ["field"], "properties": {"field": {"const": "price_type"}}}, "then": {"properties": {"value": {"enum": ["asking", "normal_listing", "reduced", "instant", "urgent_sale", "quick_sale", "unknown"]}}}},
+    {"if": {"required": ["field"], "properties": {"field": {"const": "status"}}}, "then": {"properties": {"value": {"enum": ["active", "sold", "sold_claimed", "reported_sold", "wanted", "unknown"]}}}}
+  ],
+  "$defs": {
+    "reviewer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewer_id", "reviewer_kind", "reviewed_at", "value"],
+      "properties": {
+        "reviewer_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
+        "reviewer_kind": {"const": "human"},
+        "reviewed_at": {"type": "string", "format": "date"},
+        "value": {"oneOf": [{"type": "boolean"}, {"enum": ["international", "china", "unknown", "asking", "normal_listing", "reduced", "instant", "urgent_sale", "quick_sale", "active", "sold", "sold_claimed", "reported_sold", "wanted", "unknown"]}]}
+      }
+    },
+    "adjudication": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adjudicator_id", "adjudicator_kind", "adjudicated_at", "decision", "final_value"],
+      "properties": {
+        "adjudicator_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
+        "adjudicator_kind": {"const": "human"},
+        "adjudicated_at": {"type": "string", "format": "date"},
+        "decision": {"enum": ["agreement", "resolved_disagreement"]},
+        "final_value": {"oneOf": [{"type": "boolean"}, {"enum": ["international", "china", "unknown", "asking", "normal_listing", "reduced", "instant", "urgent_sale", "quick_sale", "active", "sold", "sold_claimed", "reported_sold", "wanted", "unknown"]}]}
+      }
+    }
+  }
+}

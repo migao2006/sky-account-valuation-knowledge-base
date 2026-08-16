@@ -50,6 +50,17 @@ The corresponding `market-claim-gold.jsonl` is intentionally empty until two
 humans annotate and a human adjudicator resolves each row under
 `docs/methodology/market-claim-gold-contract.md`.
 
+`build_market_near_miss_review.py` creates a separate P2.3 queue for a narrow
+review of one missing hard-evidence domain. It starts only from seller,
+single-account, positive-price, verified-TWD listings, excludes mixed brokerage
+prices such as `listing_0260`, and emits neither source text, URL nor a proposed
+field value. Its approved-evidence ledger is intentionally empty and is never
+read by comparable or price-cleaning builders:
+
+```powershell
+python tools/normalize/build_market_near_miss_review.py --root .
+```
+
 For a bounded vendor-correlation review pass, first build a replayable evidence
 bundle from the existing pinned candidate page snapshot and vendored catalog,
 then evaluate it in `vendor_correlation` mode:

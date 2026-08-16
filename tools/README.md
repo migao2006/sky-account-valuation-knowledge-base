@@ -1,4 +1,4 @@
-# 離線工具（v3.4 P2.2）
+# 離線工具（v3.5 P2.3）
 
 核心工具採 Python 3 標準函式庫，只處理本機 JSON／JSONL。`modeling/` 是獨立鎖版的可選科學運算環境；它也不含下載、HTTP、排程或背景能力。
 
@@ -34,9 +34,9 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 
 正式市場資料目前只有三筆正常刊登同時確認 TWD 與國際服；唯一急售觀察含仲，保留為 `needs_review`，不猜測或扣除仲介費。估價適用範圍有限。這一版新增固定 vendor catalog 的 review evidence 與一筆明示覆核恢復歷程，但不把二級來源自動升級 canonical，也不加入回測、校準或自動資料更新。
 
-## P2.2 Catalog review 與模型資料流
+## P2.3 Catalog reference 與市場證據資料流
 
-`tools/normalize/build_catalog_universe.py` 對固定 vendor snapshot 作全量封閉分類；`build_vendor_collectible_registry.py` 產生 1,758 筆 review-only 來源列母體；Fandom import 工具只重播固定 revision 且不提供獨立 promotion evidence。`build_item_evidence_bundle.py` 與 `promote_items.py` 不修改 canonical。`build_market_claim_review.py` 產生固定 200 筆匿名人工雙標 queue，gold 檔在真正人工標註與裁決前保持空白。
+`tools/normalize/build_catalog_universe.py` 對固定 vendor snapshot 作全量封閉分類；`build_source_scoped_item_identities.py` 產生單一 1,758 筆 source-scoped reference identity 主檔，並禁止 canonical 與模型提升；Fandom import 工具只重播固定 revision 且不提供獨立 promotion evidence。`build_item_evidence_bundle.py` 與 `promote_items.py` 不修改 canonical。`build_market_claim_review.py` 產生固定 200 筆匿名人工雙標 queue；`build_market_near_miss_review.py` 產生 22 筆只缺單一硬證據群組的匿名 queue。兩條 evidence ledger 在真正人工標註與裁決前保持空白。
 
 `parse_item_vectors.py` 會為每個帳號與每個 canonical item 產生 `owned`、`confirmed_missing` 或 `unknown`；未提及永遠是 unknown。`clean_prices.py` 只保留已驗證 TWD、international、seller listing、single account，並將正常刊登與急售分開。
 

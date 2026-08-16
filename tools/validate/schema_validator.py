@@ -51,6 +51,15 @@ class OfflineSchemaValidator:
             target, target_path = self.resolve_ref(schema["$ref"], current)
             self._walk(value, target, target_path, loc, errors)
             return
+        if "oneOf" in schema:
+            matches = 0
+            for option in schema["oneOf"]:
+                option_errors: list[str] = []
+                self._walk(value, option, current, loc, option_errors)
+                if not option_errors:
+                    matches += 1
+            if matches != 1:
+                errors.append(f"{loc}: expected exactly one oneOf schema match, got {matches}")
         for part in schema.get("allOf", []):
             self._walk(value, part, current, loc, errors)
         if "if" in schema:
@@ -101,4 +110,3 @@ class OfflineSchemaValidator:
                     errors.append(f"{loc}: unexpected property {key}")
                 elif isinstance(schema.get("additionalProperties"), dict):
                     self._walk(item, schema["additionalProperties"], current, f"{loc}.{key}", errors)
-

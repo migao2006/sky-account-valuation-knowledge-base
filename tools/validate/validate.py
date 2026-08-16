@@ -23,6 +23,8 @@ from build_comparables import deduplication_is_approved, predicate_hash, strict_
 from build_catalog_universe import build_catalog_universe  # noqa: E402
 from build_item_evidence_bundle import build as build_item_evidence, sha as item_evidence_sha  # noqa: E402
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
+from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
+from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
 CANONICAL_FILES = {
@@ -65,8 +67,10 @@ SCHEMA_FILES = {
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
+    "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
+    "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
-    "data/review/vendor-collectible-registry.jsonl": "schemas/review/vendor-collectible-registry.schema.json",
+    "data/normalized/source-scoped-item-identities.jsonl": "schemas/normalized/source-scoped-item-identity.schema.json",
     "reports/coverage/unmapped-aliases.jsonl": "schemas/reports/unmapped-coverage.schema.json",
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
@@ -88,7 +92,7 @@ JSON_SCHEMA_FILES = {
     "data/source/vendor/fandom-seasonal-cosmetics-r107991-snapshot.json": "schemas/review/fandom-seasonal-cosmetics-snapshot.schema.json",
     "data/source/vendor/fandom-seasonal-cosmetics-r107991-metadata.json": "schemas/review/fandom-seasonal-cosmetics-metadata.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk-summary.json": "schemas/review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
-    "data/review/vendor-collectible-registry-summary.json": "schemas/review/vendor-collectible-registry-summary.schema.json",
+    "data/normalized/source-scoped-item-identities-summary.json": "schemas/normalized/source-scoped-item-identities-summary.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -359,6 +363,37 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
                 errors.append(f"vendor-catalog:{row.get('vendor_guid')}: dangling candidate item={candidate_id}")
         if row.get("match_status") == "matched_candidate_name" and (row.get("canonical_item_ids") or len(row.get("candidate_item_ids", [])) != 1):
             errors.append(f"vendor-catalog:{row.get('vendor_guid')}: candidate match violates canonical-priority gate")
+    source_scoped_identities = read_jsonl(root / "data/normalized/source-scoped-item-identities.jsonl")
+    source_scoped_summary = json.loads((root / "data/normalized/source-scoped-item-identities-summary.json").read_text(encoding="utf-8"))
+    try:
+        expected_source_scoped_identities, expected_source_scoped_summary = build_source_scoped_identities(vendor_snapshot, vendor_metadata, crosswalk)
+    except ValueError as exc:
+        errors.append(f"source-scoped-identities: cannot rebuild: {exc}")
+    else:
+        if source_scoped_identities != expected_source_scoped_identities:
+            errors.append("source-scoped-identities: committed rows differ from deterministic snapshot/crosswalk rebuild")
+        if source_scoped_summary != expected_source_scoped_summary:
+            errors.append("source-scoped-identities: committed summary differs from deterministic rebuild")
+    reference_ids: set[str] = set()
+    for row in source_scoped_identities:
+        reference_id = row.get("reference_identity_id")
+        if reference_id in reference_ids:
+            errors.append(f"source-scoped-identities: duplicate reference_identity_id={reference_id}")
+        reference_ids.add(str(reference_id))
+        if row.get("source_id") not in sources:
+            errors.append(f"source-scoped-identities:{reference_id}: dangling source_id")
+        if row.get("source_id") != vendor_metadata.get("source_id") or row.get("snapshot_id") != vendor_metadata.get("snapshot_id") or row.get("source_snapshot_sha256") != vendor_metadata.get("snapshot_sha256"):
+            errors.append(f"source-scoped-identities:{reference_id}: source/snapshot hash mismatch")
+        if (row.get("vendor_guid"), row.get("vendor_item_id")) not in vendor_pairs:
+            errors.append(f"source-scoped-identities:{reference_id}: dangling vendor observation")
+        for item_id in row.get("canonical_item_ids", []):
+            if item_id not in items:
+                errors.append(f"source-scoped-identities:{reference_id}: dangling canonical item={item_id}")
+        for candidate_id in row.get("candidate_item_ids", []):
+            if candidate_id not in candidates:
+                errors.append(f"source-scoped-identities:{reference_id}: dangling candidate item={candidate_id}")
+        if row.get("model_feature_status") != "excluded_pending_verification" or row.get("promotion_eligibility") != "prohibited":
+            errors.append(f"source-scoped-identities:{reference_id}: attempted model or canonical promotion")
     evidence_rows = read_jsonl(root / "data/review/skygame-data-1.3.4-item-evidence.jsonl")
     evidence_ids: set[str] = set()
     for row in evidence_rows:
@@ -432,6 +467,14 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     errors.extend(f"market-claim-gold: {issue}" for issue in validate_gold_links(market_claim_queue, market_claim_gold))
     if market_claim_gold:
         warnings.append("market-claim-gold contains human-reviewed rows; reviewer identities and adjudication must be audited before use")
+    near_miss_queue = read_jsonl(root / "data/review/market-near-miss-field-review.jsonl")
+    expected_near_miss_queue = build_market_near_miss_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
+    if near_miss_queue != expected_near_miss_queue:
+        errors.append("market-near-miss: committed queue differs from deterministic single-hard-evidence selection")
+    near_miss_evidence = read_jsonl(root / "data/review/market-near-miss-approved-evidence.jsonl")
+    errors.extend(f"market-near-miss: {issue}" for issue in validate_approved_evidence(near_miss_queue, near_miss_evidence))
+    if near_miss_evidence:
+        warnings.append("market-near-miss: approved evidence is review-only and requires an explicit normalized-data migration before use")
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -646,7 +689,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if formal_counts[key] != expected:
             errors.append(f"formal market coverage: expected {key}={expected}, found {formal_counts[key]}")
     # Date invariant at every market stage.
-    for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl"):
+    for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl", "data/review/market-near-miss-approved-evidence.jsonl"):
         path = root / rel
         try:
             rows = read_jsonl(path)
@@ -680,10 +723,14 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for name in node.names:
-                        if name.name in {"requests", "socket", "http.client", "urllib.request"}:
+                        if name.name in {"requests", "socket", "http.client", "urllib.request", "aiohttp", "httpx"} or name.name.startswith(("requests.", "aiohttp.", "httpx.")):
                             errors.append(f"{path.relative_to(root)}:{node.lineno}: forbidden network import {name.name}")
-                elif isinstance(node, ast.ImportFrom) and node.module in {"requests", "socket", "http.client", "urllib.request"}:
-                    errors.append(f"{path.relative_to(root)}:{node.lineno}: forbidden network import {node.module}")
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ""
+                    imported = {name.name for name in node.names}
+                    forbidden_from = module in {"requests", "socket", "http.client", "urllib.request", "aiohttp", "httpx"} or module.startswith(("requests.", "aiohttp.", "httpx.")) or (module == "urllib" and "request" in imported)
+                    if forbidden_from:
+                        errors.append(f"{path.relative_to(root)}:{node.lineno}: forbidden network import {module}:{sorted(imported)}")
         except SyntaxError as exc:
             errors.append(f"{path.relative_to(root)}: Python syntax error: {exc}")
         if path.name in {"validate.py", "build_file_inventory.py"}:
@@ -691,7 +738,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.4-p2.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.5-p2.3", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

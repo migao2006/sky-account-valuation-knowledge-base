@@ -69,7 +69,19 @@ class PackageIntegrityTests(unittest.TestCase):
                     imported.update(alias.name for alias in node.names)
                 elif isinstance(node, ast.ImportFrom) and node.module:
                     imported.add(node.module)
+                    if node.module == "urllib" and any(alias.name == "request" for alias in node.names):
+                        imported.add("urllib.request")
             self.assertFalse(imported & forbidden, f"{path}: {imported & forbidden}")
+
+    def test_network_import_detector_covers_from_urllib_request(self):
+        tree = ast.parse("from urllib import request\n")
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module)
+                if node.module == "urllib" and any(alias.name == "request" for alias in node.names):
+                    imported.add("urllib.request")
+        self.assertIn("urllib.request", imported)
 
 
 if __name__ == "__main__":
