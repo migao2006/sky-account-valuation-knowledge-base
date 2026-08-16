@@ -1,12 +1,12 @@
-# Sky 光遇帳號估價知識庫 v3.7 P2.5
+# Sky 光遇帳號估價知識庫 v3.8 P2.6
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.7 P2.5 維持 2,474 筆離線 Catalog 查詢索引，嚴格分開 94 筆 canonical、622 筆 review candidate 與 1,758 筆來源觀測。Nintendo Switch Starter Pack 四件物品由固定官方 fact snapshot 證明描述性套組成分，再由獨立 vendor snapshot 提供精確英文名稱與類別；未證實欄位仍為 unknown。所有正式工具只處理本機檔案，不主動連網。
+v3.8 P2.6 維持 2,476 筆離線 Catalog 查詢索引，嚴格分開 96 筆 canonical、622 筆 review candidate 與 1,758 筆來源觀測。除了 Nintendo Switch Starter Pack 四件，新增 AURORA FAQ 968 六件可重播英文 identity／類別／歷史價格證據；未證實的目前供應、永久性、正式繁中名與視覺身份仍為 unknown。所有正式工具只處理本機檔案，不主動連網。
 
-目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售。94 個 canonical item 中 4 筆 identity 已驗證、90 筆仍待審；因取得狀態、永久性及持有觀測等建模證據仍不足，正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`。
+目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售。96 個 canonical item 中 10 筆 identity 已驗證、86 筆仍待審；因取得狀態、辨識 token、永久性及持有觀測等建模證據仍不足，正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，96 列 Item Value Table 也全部為 `insufficient_support`。
 
-P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P2.5 重建後精確名稱比對得到 67 個 canonical relation、296 個 candidate relation 與 1,395 個 unresolved collectible；relation 仍只是來源觀測關係，不會自動提升 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P2.6 重建後精確名稱比對得到 69 個 canonical relation、296 個 candidate relation 與 1,393 個 unresolved collectible；relation 仍只是來源觀測關係，不會自動提升 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
 P2.4 也修正 Item Vector 的套組三態：任何 required 成員未知或尚未達 model eligibility 時，套組比例與完整旗標維持 `null`，不再把缺資料寫成 0%／不完整。每筆 vector 與模型 artifact 都綁定 canonical item、alias、set 的 Catalog provenance；Catalog 變更但未重建時會 fail closed。3,266 筆 vendor 列均有逐列 scope disposition，但其中 1,508 筆仍需範圍審查，不能據此宣稱全物品完成。
 
@@ -52,4 +52,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.5 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；新增的 4 筆 visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.6 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；10 筆 visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。

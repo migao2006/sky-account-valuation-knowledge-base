@@ -1,0 +1,33 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_968_aurora_remaining_iap_2026_08_17",
+  "source_id":"source_tgc_faq_968_aurora_remaining_iap",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/968-patch-notes---november-28-2022---0-19-5-206971-android-huawei-ios-206872-switch/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of only the AURORA item names, listed USD or Candle prices, and availability conditions stated by FAQ 968. No image, storefront state, account, or full-page text is retained.",
+  "facts":{
+    "remaining_seasonal_iap":[
+      {"official_name_en":"To the Love Outfit","price_usd":9.99},
+      {"official_name_en":"Voice of AURORA","price_usd":14.99},
+      {"official_name_en":"Giving In Cape","price_usd":14.99},
+      {"official_name_en":"Wings of AURORA","price_usd":24.99}
+    ],
+    "cure_for_me_unlocks":[
+      {"official_name_en":"Cure For Me Mask","price_candles":50},
+      {"official_name_en":"Cure For Me Outfit","price_candles":200}
+    ],
+    "availability_context":{
+      "remaining_iap_location":"Coliseum",
+      "voice_location":"in-game shop",
+      "to_the_love_and_giving_in_available_at":"2022-12-08T17:00:00-08:00",
+      "wings_condition":"after completing all Seasonal Quests and taking part in the concert",
+      "cure_for_me_condition":"attend the concert during the Season and complete all Seasonal Quests; no Season Pass or other purchase is necessary",
+      "historical_window_end_date":"2023-01-02"
+    }
+  },
+  "non_claims":[
+    "This FAQ 968 slice does not establish a complete AURORA paid-item catalog.",
+    "No current storefront availability, return policy, permanent-account property, image asset, or formal Traditional Chinese name is asserted.",
+    "The page gives no first-release date for Voice of AURORA, Wings of AURORA, Cure For Me Mask, or Cure For Me Outfit."
+  ]
+}

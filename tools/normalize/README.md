@@ -79,11 +79,12 @@ keeps `verification_status=needs_review` and
 `model_feature_status=excluded_pending_verification`; season, acquisition,
 availability, cost and visual-reference fields remain unresolved.
 
-`build_catalog_query_index.py` derives a query index over the 94 canonical
-items, 622 review candidates, and 1,758 source-scoped references. It verifies
-the pinned snapshot bytes and all target IDs, keeps truth levels separate, and
-does not duplicate or promote the canonical item master. The index is only
-offline lookup/review support; it is never ownership proof or a model feature.
+`build_catalog_query_index.py` derives a query index over the current canonical
+items, review candidates, and source-scoped references. Its summary counts are
+rebuilt from those three input layers, verifies the pinned snapshot bytes and
+all target IDs, keeps truth levels separate, and does not duplicate or promote
+the canonical item master. The index is only offline lookup/review support; it
+is never ownership proof or a model feature.
 
 `apply_nintendo_starter_pack.py` is the bounded P2.5 canonical-evidence
 replayer. It verifies the fixed official fact snapshot, independent vendor
@@ -94,4 +95,16 @@ the command neither fetches data nor adds model features:
 
 ```powershell
 python tools/normalize/apply_nintendo_starter_pack.py --root .
+```
+
+`apply_aurora_faq968_cohort.py` replays a second bounded cohort from a pinned,
+fact-limited TGC FAQ 968 transcription and the independent vendored catalog.
+It covers six named items but defines the paid set only as the four remaining
+seasonal IAP listed by that FAQ. Current availability, permanence, formal
+Traditional Chinese names, images, and model eligibility remain unknown or
+excluded. The tool requires pre-registered source lineages and cannot bootstrap
+its own trust root:
+
+```powershell
+python tools/normalize/apply_aurora_faq968_cohort.py --root .
 ```

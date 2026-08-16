@@ -25,8 +25,8 @@ python tools/classify/classify.py input-claims.json --output valuation-account.j
 layer. It accepts only IDs in the derived catalog query index and retains no raw
 name or post text. Results preserve canonical, review-candidate and source
 observation truth levels. Only a unique verified canonical exact mapping can
-resolve ownership; the current 94 canonical items are all `needs_review`, so
-all current results remain review-only and are excluded from model features.
+resolve ownership; verification and model-feature eligibility are separate
+canonical fields, so a verified identity is not automatically a model feature.
 Unknown is not missing; contradictory owned/missing claims fail closed.
 
 ```powershell

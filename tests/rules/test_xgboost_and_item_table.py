@@ -67,7 +67,12 @@ class XGBoostAndItemTableTests(unittest.TestCase):
             empty, table = Path(temporary) / "empty.jsonl", Path(temporary) / "table.jsonl"
             empty.write_text("", encoding="utf-8")
             rows = build(root / "data/modeling/account-item-vectors.jsonl", empty, table)
-        self.assertEqual(len(rows), 94)
+        canonical_ids = {
+            row["item_id"]
+            for row in (json.loads(line) for line in (root / "knowledge/items/items.jsonl").read_text(encoding="utf-8").splitlines() if line.strip())
+        }
+        self.assertEqual({row["item_id"] for row in rows}, canonical_ids)
+        self.assertEqual(len(rows), len(canonical_ids))
         self.assertTrue(all(row["status"] == "insufficient_support" for row in rows))
         self.assertTrue(all(row["mean_conditional_attribution"] is None for row in rows))
         self.assertTrue(all(row["owned_sample_count"] + row["confirmed_missing_sample_count"] + row["unknown_sample_count"] == 1022 for row in rows))

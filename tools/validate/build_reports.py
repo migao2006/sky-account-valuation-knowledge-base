@@ -78,6 +78,7 @@ def main() -> None:
         "item_identity_evidence": root / "data/review/item-evidence.jsonl",
         "item_promotion_ledger": root / "data/review/item-promotion-ledger.jsonl",
         "nintendo_canonical_evidence": root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl",
+        "aurora_canonical_evidence": root / "data/review/aurora-faq968-canonical-evidence.jsonl",
         "market_claim_review": root / "data/review/market-claim-review.jsonl",
         "market_claim_gold": root / "data/review/market-claim-gold.jsonl",
         "market_near_miss_review": root / "data/review/market-near-miss-field-review.jsonl",
@@ -109,7 +110,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.7-p2.5",
+        "schema_version": "3.8-p2.6",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -234,9 +235,18 @@ def main() -> None:
             "visual_source_descriptions": sum(row.get("reference_mode") == "source_description" for row in rows["visual_references"]),
             "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
         },
+        "p2_6_verified_identity_slice": {
+            "verified_canonical_items": sum(row.get("verification_status") == "verified" for row in rows["items"]),
+            "verified_cohorts": {
+                "nintendo_starter_pack": len(rows["nintendo_canonical_evidence"]),
+                "aurora_faq968": len(rows["aurora_canonical_evidence"]),
+            },
+            "field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]),
+            "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-            "P2.5 已以可重播的官方與獨立次級來源確認 Nintendo Starter Pack 四件英文 identity、類別與套組關係；正式繁中名稱、現況供應、永久性與價格仍未知，因此四件仍不進模型白名單。",
+            "P2.6 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件及 AURORA FAQ 968 六件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
             "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
@@ -245,8 +255,8 @@ def main() -> None:
             "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
             "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
             "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-            f"P2.5 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
-            f"P2.5 的 2,474 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
+            f"P2.6 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
+            f"P2.6 的 {len(rows['catalog_query_index'])} 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
             "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
             "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。",
         ],
@@ -305,13 +315,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "3.7-p2.5"
+    previous_validation["schema_version"] = "3.8-p2.6"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p25"
-    manifest["package_version"] = "3.7.0-p2.5"
+    manifest["package_id"] = "sky-valuation-v3-p26"
+    manifest["package_version"] = "3.8.0-p2.6"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -353,6 +363,8 @@ def main() -> None:
         "catalog_query_index_rows": len(rows["catalog_query_index"]),
         "verified_canonical_items": sum(row.get("verification_status") == "verified" for row in rows["items"]),
         "nintendo_canonical_field_evidence_rows": len(rows["nintendo_canonical_evidence"]),
+        "aurora_canonical_field_evidence_rows": len(rows["aurora_canonical_evidence"]),
+        "canonical_field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]),
         "catalog_scope_needs_review_rows": sum(row.get("scope_disposition") != "collectible_item" for row in rows["catalog_universe"]),
     }
     manifest["derived_paths"] = [
@@ -375,6 +387,7 @@ def main() -> None:
     # reproducible derived output merely because the ledger currently starts empty.
     manifest["human_review_paths"] = [
         "data/review/nintendo-starter-pack-canonical-evidence.jsonl",
+        "data/review/aurora-faq968-canonical-evidence.jsonl",
         "data/review/market-claim-gold.jsonl",
         "data/review/market-near-miss-approved-evidence.jsonl",
     ]
