@@ -10,6 +10,7 @@
     "schema_version": {"const": "3.0-p0"},
     "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"},
     "source_listing_ids": {"type": "array", "items": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "uniqueItems": true},
+    "item_states": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["item_id", "state", "evidence_state", "model_feature", "conflict", "review_status"], "properties": {"item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "state": {"enum": ["owned", "confirmed_missing", "unknown"]}, "evidence_state": {"enum": ["profile_claim", "text_claim", "unknown", "conflict"]}, "model_feature": {"type": "boolean"}, "conflict": {"type": "boolean"}, "review_status": {"enum": ["approved", "needs_review", "unknown"]}}}},
     "currency": {"enum": ["TWD", "CNY", "RM", "unknown"]},
     "server": {"enum": ["international", "unknown"]},
     "valuation_date": {"type": ["string", "null"], "format": "date"},

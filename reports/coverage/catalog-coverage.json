@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.0-p0",
+  "schema_version": "3.1-p1",
   "as_of_date": "2026-08-16",
   "catalog_claim": "partial_verified_catalog",
   "full_item_catalog_complete": false,
@@ -9,13 +9,14 @@
     "ancestors": 132,
     "items": 94,
     "sets": 8,
-    "aliases": 324,
+    "aliases": 322,
     "availability_events": 12,
     "sources": 24,
     "visual_references": 0,
     "unresolved": 39,
     "unmapped": 13,
-    "item_candidates": 622
+    "item_candidates": 622,
+    "alias_conflicts": 1
   },
   "review_state": {
     "canonical_needs_review_by_entity": {
@@ -23,12 +24,13 @@
       "events": 13,
       "items": 94,
       "sets": 8,
-      "aliases": 310,
+      "aliases": 308,
       "availability_events": 8
     },
-    "canonical_needs_review_total": 460,
+    "canonical_needs_review_total": 458,
     "unresolved_queue_records": 39,
     "item_candidate_records": 622,
+    "alias_conflict_records": 1,
     "unmapped_terms": 13,
     "overlap_note": "各欄分開計數，可能描述同一知識缺口，不直接相加為唯一項目數。"
   },
@@ -58,6 +60,13 @@
     "by_verification_status": {
       "needs_review": 94
     },
+    "by_evidence_tier": {
+      "unverified_seed": 94
+    },
+    "by_model_feature_status": {
+      "excluded_pending_verification": 94
+    },
+    "model_eligible_items": 0,
     "by_availability_status": {
       "limited_time": 3,
       "permanent": 44,
@@ -126,8 +135,20 @@
     "profiles_with_mapped_items": 24,
     "profiles_with_set_claims": 10
   },
+  "modeling": {
+    "account_item_vectors": 1022,
+    "canonical_items_per_vector": 94,
+    "model_eligible_items": 0,
+    "clean_normal_rows": 3,
+    "clean_urgent_rows": 0,
+    "excluded_or_review_rows": 99,
+    "item_value_rows": 94,
+    "eligible_item_value_rows": 0,
+    "model_status": "insufficient_training_data"
+  },
   "known_limitations": [
     "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
+    "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。"

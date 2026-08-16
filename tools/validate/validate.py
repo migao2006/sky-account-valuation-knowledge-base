@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -36,8 +38,14 @@ SCHEMA_FILES = {
     "data/curated/histories.jsonl": "schemas/market/history.schema.json",
     "data/comparables/histories.jsonl": "schemas/market/history.schema.json",
     "data/comparables/accounts.jsonl": "schemas/market/comparable-account.schema.json",
+    "data/modeling/account-item-vectors.jsonl": "schemas/modeling/item-vector.schema.json",
+    "data/modeling/price-cleaned-normal.jsonl": "schemas/modeling/cleaned-price.schema.json",
+    "data/modeling/price-cleaned-urgent.jsonl": "schemas/modeling/cleaned-price.schema.json",
+    "data/modeling/model-exclusions.jsonl": "schemas/modeling/price-exclusion.schema.json",
+    "data/modeling/item-value-table.jsonl": "schemas/modeling/item-value-table.schema.json",
     "data/curated/image-evidence.jsonl": "schemas/evidence/image-evidence.schema.json",
     "data/review/item-candidates.jsonl": "schemas/review/item-candidate.schema.json",
+    "data/review/alias-conflicts.jsonl": "schemas/review/alias-conflict.schema.json",
     "data/review/unmapped-item-aliases.jsonl": "schemas/review/unmapped-alias.schema.json",
     "data/review/unmapped-season-aliases.jsonl": "schemas/review/unmapped-alias.schema.json",
     "data/review/price-type-review.jsonl": "schemas/review/price-type-review.schema.json",
@@ -51,10 +59,17 @@ JSON_SCHEMA_FILES = {
     "reports/migration/migration-summary.json": "schemas/reports/migration-summary.schema.json",
     "reports/migration/file-inventory.json": "schemas/reports/file-inventory.schema.json",
     "reports/validation/p0-validation.json": "schemas/reports/validation.schema.json",
+    "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
+    "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
+    "modeling/artifacts/xgboost-normal_listing.json": "schemas/modeling/xgboost-artifact.schema.json",
+    "modeling/artifacts/xgboost-urgent_sale.json": "schemas/modeling/xgboost-artifact.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
     "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
+    "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
+    "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
+    "data/modeling/item-value-table.jsonl",
 }
 PRIVATE_KEYS = {"player_name", "account_name", "uid", "phone", "email", "payment", "login", "password", "social_handle", "source_url", "url", "raw_ocr", "ocr_text"}
 PRIVATE_VALUE_PATTERNS = {
@@ -184,17 +199,33 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for ref in row.get("set_ids", []):
             if ref not in sets: errors.append(f"item:{iid}: dangling set={ref}")
     target_ids = {"season": set(seasons), "event": set(events), "item": set(items), "set": set(sets), "ancestor": set(ancestors)}
-    alias_targets: dict[tuple[str, str], set[str]] = {}
+    alias_targets: dict[str, set[tuple[str, str]]] = {}
+    alias_ids: set[str] = set()
     for row in read_jsonl(root / "knowledge/aliases/item-aliases.jsonl"):
         if row.get("target_id") not in target_ids.get(row.get("target_type"), set()):
             errors.append(f"alias:{row.get('alias_id')}: dangling target")
         for ref in row.get("source_ids", []):
             if ref not in sources: errors.append(f"alias:{row.get('alias_id')}: dangling source={ref}")
-        key = (str(row.get("target_type")), str(row.get("normalized_alias")))
-        alias_targets.setdefault(key, set()).add(str(row.get("target_id")))
-    for (target_type, alias), targets in alias_targets.items():
+        alias_ids.add(str(row.get("alias_id")))
+        key = str(row.get("normalized_alias"))
+        alias_targets.setdefault(key, set()).add((str(row.get("target_type")), str(row.get("target_id"))))
+    for alias, targets in alias_targets.items():
         if len(targets) > 1:
-            errors.append(f"alias:{target_type}:{alias}: ambiguous canonical targets={sorted(targets)}")
+            errors.append(f"alias:{alias}: ambiguous canonical targets={sorted(targets)}")
+    for row in read_jsonl(root / "data/review/alias-conflicts.jsonl"):
+        for candidate in row.get("candidate_targets", []):
+            target_type, target_id = candidate.get("target_type"), candidate.get("target_id")
+            if target_id not in target_ids.get(target_type, set()):
+                errors.append(f"alias-conflict:{row.get('normalized_alias')}: dangling candidate target={target_id}")
+        for alias_id in row.get("source_alias_ids", []):
+            if alias_id in alias_ids:
+                errors.append(f"alias-conflict:{row.get('normalized_alias')}: unresolved alias remains canonical={alias_id}")
+    for iid, row in items.items():
+        eligible = row.get("model_feature_status") == "eligible"
+        if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
+            errors.append(f"item:{iid}: model eligible item lacks item-level verified evidence")
+        if not eligible and row.get("model_feature_status") not in {"excluded_pending_verification", "excluded_non_valuation"}:
+            errors.append(f"item:{iid}: invalid model feature status")
     for row in read_jsonl(root / "knowledge/acquisition/availability-events.jsonl"):
         ident = row.get("availability_id", "unknown")
         if row.get("item_id") and row["item_id"] not in items: errors.append(f"availability:{ident}: dangling item")
@@ -226,6 +257,108 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             if ref not in items: errors.append(f"profile:{account_id}: dangling owned item={ref}")
         for set_profile in collection.get("item_set_profiles", []):
             if set_profile.get("set_id") not in sets: errors.append(f"profile:{account_id}: dangling set={set_profile.get('set_id')}")
+    # Modeling vectors are derived from the complete canonical item catalog.
+    # A vector must not silently turn a missing mention into confirmed absence.
+    vector_rows = read_jsonl(root / "data/modeling/account-item-vectors.jsonl")
+    vectors_by_account: dict[str, dict[str, Any]] = {}
+    for vector in vector_rows:
+        account_id = vector.get("account_id", "unknown")
+        if account_id in vectors_by_account:
+            errors.append(f"item-vector: duplicate account_id={account_id}")
+        vectors_by_account[account_id] = vector
+        if vector.get("vector_id") != f"vector_{account_id}":
+            errors.append(f"item-vector:{account_id}: invalid vector_id")
+        state_rows = vector.get("item_states", [])
+        item_ids = [state.get("item_id") for state in state_rows if isinstance(state, dict)]
+        if len(item_ids) != len(set(item_ids)) or set(item_ids) != set(items):
+            errors.append(f"item-vector:{account_id}: item states are not an exact canonical catalog")
+        for state in state_rows:
+            if not isinstance(state, dict):
+                continue
+            item = items.get(state.get("item_id"))
+            if not item:
+                continue
+            eligible = item.get("model_feature_status") == "eligible" and item.get("verification_status") == "verified"
+            if state.get("model_feature") != eligible:
+                errors.append(f"item-vector:{account_id}:{state.get('item_id')}: model feature policy mismatch")
+            if state.get("state") == "confirmed_missing" and state.get("evidence_state") == "unknown":
+                errors.append(f"item-vector:{account_id}:{state.get('item_id')}: unknown cannot be confirmed missing")
+    if set(vectors_by_account) != account_ids:
+        errors.append("item-vector: account coverage differs from normalized profiles")
+    # Clean model prices must be a strict, reproducible subset of vectors.
+    for relative, expected_line in (
+        ("data/modeling/price-cleaned-normal.jsonl", "normal_listing"),
+        ("data/modeling/price-cleaned-urgent.jsonl", "urgent_sale"),
+    ):
+        seen_cleaned: set[str] = set()
+        for row in read_jsonl(root / relative):
+            cleaned_id = row.get("cleaned_price_id", "unknown")
+            if cleaned_id in seen_cleaned:
+                errors.append(f"{relative}: duplicate cleaned_price_id={cleaned_id}")
+            seen_cleaned.add(cleaned_id)
+            if row.get("account_id") not in vectors_by_account:
+                errors.append(f"{relative}:{cleaned_id}: missing account item vector")
+            if row.get("price_line") != expected_line or row.get("normalized_price_type") != expected_line:
+                errors.append(f"{relative}:{cleaned_id}: price line mismatch")
+            price, logged = row.get("selected_price_twd"), row.get("log_price_twd")
+            if not isinstance(price, (int, float)) or isinstance(price, bool) or price <= 0 or not isinstance(logged, (int, float)) or abs(math.log(float(price)) - float(logged)) > 1e-9:
+                errors.append(f"{relative}:{cleaned_id}: invalid price/log-price pair")
+            if row.get("currency") != "TWD" or row.get("server") != "international":
+                errors.append(f"{relative}:{cleaned_id}: non-TWD or non-international row")
+    item_value_rows = read_jsonl(root / "data/modeling/item-value-table.jsonl")
+    value_item_ids = [row.get("item_id") for row in item_value_rows]
+    if len(value_item_ids) != len(set(value_item_ids)) or set(value_item_ids) != set(items):
+        errors.append("item-value-table: item IDs are not an exact unique canonical catalog")
+    # Model envelopes bind to exact local inputs. A trained status is accepted
+    # only with the same conservative sample, grouped-CV and baseline gates used
+    # by the runtime estimator.
+    for relative in (
+        "modeling/artifacts/elastic-net-normal_listing.json",
+        "modeling/artifacts/elastic-net-urgent_sale.json",
+        "modeling/artifacts/xgboost-normal_listing.json",
+        "modeling/artifacts/xgboost-urgent_sale.json",
+    ):
+        artifact_path = root / relative
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        digest = hashlib.sha256()
+        snapshot_valid = True
+        for snapshot in sorted(artifact.get("input_snapshot_paths", [])):
+            if not isinstance(snapshot, str):
+                snapshot_valid = False; break
+            candidate = (root / snapshot).resolve()
+            if root.resolve() not in candidate.parents or not candidate.is_file():
+                snapshot_valid = False; break
+            name = candidate.relative_to(root.resolve()).as_posix()
+            digest.update(name.encode("utf-8") + b"\0")
+            digest.update(hashlib.sha256(candidate.read_bytes()).hexdigest().encode("ascii") + b"\n")
+        expected_snapshot = artifact.get("input_snapshot_sha256")
+        if not snapshot_valid or not isinstance(expected_snapshot, str) or digest.hexdigest().lower() != expected_snapshot.lower():
+            errors.append(f"{relative}: input snapshot hash mismatch")
+        if artifact.get("status") == "trained":
+            training = artifact.get("training", {})
+            rows = training.get("eligible_rows", training.get("records"))
+            minimum = training.get("minimum_rows", training.get("min_required_records"))
+            groups = training.get("group_count", training.get("unique_clusters"))
+            folds = training.get("folds", training.get("outer_cv_folds"))
+            mae = training.get("outer_cv_mae")
+            baseline = training.get("baseline_mae", training.get("baseline_median_mae"))
+            quality_ok = (
+                training.get("threshold_met") is True and training.get("baseline_beaten") is True
+                and isinstance(rows, int) and isinstance(minimum, int) and rows >= minimum
+                and isinstance(groups, int) and groups >= 4 and isinstance(folds, int) and folds >= 2
+                and isinstance(mae, (int, float)) and isinstance(baseline, (int, float)) and 0 < mae < baseline
+            )
+            if not quality_ok:
+                errors.append(f"{relative}: trained artifact does not meet quality gates")
+            if artifact.get("model_type") == "elastic_net":
+                contract = artifact.get("prediction_contract", {})
+                if contract.get("kind") != "additive_log_price" or not isinstance(contract.get("continuous", {}).get("means"), dict):
+                    errors.append(f"{relative}: incomplete portable Elastic contract")
+            elif artifact.get("model_type") == "xgboost":
+                model_name, model_hash = artifact.get("model_file"), artifact.get("model_sha256")
+                model_path = artifact_path.parent / model_name if isinstance(model_name, str) else None
+                if not model_path or not model_path.is_file() or not isinstance(model_hash, str) or hashlib.sha256(model_path.read_bytes()).hexdigest().lower() != model_hash.lower():
+                    errors.append(f"{relative}: XGBoost model hash mismatch")
     histories = read_jsonl(root / "data/curated/histories.jsonl")
     history_ids: set[str] = set()
     for row in histories:
@@ -306,7 +439,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         errors.append(str(exc))
     # No retired execution capability may enter the new tools tree.
     forbidden_terms = re.compile(r"\b(backtest|calibrat(?:e|ion)?|market[_-]?drift|follow[_-]?up|scheduler|provider|crawler)\b", re.I)
-    for path in (root / "tools").rglob("*.py"):
+    executable_python = list((root / "tools").rglob("*.py")) + list((root / "modeling").rglob("*.py"))
+    for path in executable_python:
         text = path.read_text(encoding="utf-8")
         try:
             tree = ast.parse(text)
@@ -324,7 +458,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.0-p0", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.1-p1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

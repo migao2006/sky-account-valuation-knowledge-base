@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model/model-estimate-result.schema.json",
+  "title": "Offline model-backed valuation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "offline_only", "status", "price_line", "eligible", "range_twd", "model_selection", "market_gate", "evidence_gate", "ood_gate", "comparables", "confirmed_differences", "unknown_dimensions", "shap_drivers", "insufficiency_reasons"],
+  "properties": {
+    "schema_version": {"const": "3.1-p1"},
+    "offline_only": {"const": true},
+    "status": {"enum": ["estimated", "insufficient_training_data", "dependency_unavailable", "ineligible_input", "out_of_distribution"]},
+    "price_line": {"enum": ["normal_listing", "urgent_sale"]},
+    "eligible": {"type": "boolean"},
+    "range_twd": {"type": ["object", "null"], "properties": {"low": {"type": "number"}, "point": {"type": "number"}, "high": {"type": "number"}}, "required": ["low", "point", "high"], "additionalProperties": false},
+    "model_selection": {"type": "array", "items": {"type": "object"}},
+    "market_gate": {"type": "object"},
+    "evidence_gate": {"type": "object"},
+    "ood_gate": {"type": "object"},
+    "comparables": {"type": "array", "items": {"type": "object"}},
+    "confirmed_differences": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "unknown_dimensions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "shap_drivers": {"type": "array", "items": {"type": "object"}},
+    "insufficiency_reasons": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "comparable_fallback": {"type": ["object", "null"]},
+    "artifact_rejections": {"type": "array", "items": {"type": "object"}}
+  }
+}

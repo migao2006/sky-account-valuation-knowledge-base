@@ -1,8 +1,10 @@
-# Sky 光遇帳號估價知識庫 v3.0.1 P0.1
+# Sky 光遇帳號估價知識庫 v3.1 P1
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.0.1 P0.1 的範圍是修復發布完整性、分類器輸出契約與估價器整合，不是全物品完成版。這一版不擴充物品資料、不新增市場資料，也不重新加入回測、校準、漂移監控或網路執行能力。
+v3.1 P1 新增三態 Item Vector、嚴格價格清洗、Elastic Net／XGBoost 訓練框架、TreeSHAP 契約、條件式 Item Value Table 與模型估價入口。模型訓練採隔離的鎖版環境；所有正式工具仍只處理本機檔案，不主動連網。
+
+目前資料不足以訓練可信模型：102 個可比歷程清洗後只有 3 筆正常刊登、0 筆急售；94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
 
 ## 快速入口
 
@@ -10,6 +12,7 @@ v3.0.1 P0.1 的範圍是修復發布完整性、分類器輸出契約與估價�
 - [`data/README.md`](data/README.md)：匿名來源、正規化、人工審核與可比資料。
 - [`schemas/README.md`](schemas/README.md)：所有 JSON/JSONL 資料契約；使用者本次估價輸入契約見 [`schemas/input/valuation-account.schema.json`](schemas/input/valuation-account.schema.json)。
 - [`tools/README.md`](tools/README.md)：Python 3 離線重建、分類、估價與驗證入口。
+- [`modeling/README.md`](modeling/README.md)：隔離的 Elastic Net、XGBoost、TreeSHAP 與 Item Value Table 管線。
 - [`docs/architecture/architecture.md`](docs/architecture/architecture.md)：資料流與 canonical source of truth。
 - [`reports/README.md`](reports/README.md)：遷移、覆蓋率與驗證結果。
 
@@ -23,7 +26,7 @@ v3.0.1 P0.1 的範圍是修復發布完整性、分類器輸出契約與估價�
 
 市場資料只保存匿名 ID 與必要的交易事實。不得加入玩家姓名、帳號、UID、電話、Email、付款資料、登入資訊、社群帳號或可回推至原貼文的 locator。
 
-本版本不把單件物品換算為固定價格；物品、季節與套組只用於辨識帳號結構、完成度與可比帳號選擇。正式市場資料中，目前只有三筆同時確認幣別為 TWD 且伺服器為國際服，因此估價適用範圍有限，不能代表完整市場。
+本版本不把單件物品換算為固定價格。Item Value Table 是控制其他特徵後的條件歸因，不能逐件相加；未達持有、具證據的確認缺少、跨 refit fold 方向穩定度及模型 provenance 門檻時不顯示數值。單一模型內的 bootstrap 只作診斷，不能自行解鎖物品歸因。正式市場資料中，目前只有三筆同時確認幣別為 TWD 且伺服器為國際服，因此模型保持停用。
 
 ## 分類、估價與證據
 
@@ -40,6 +43,9 @@ python tools/validate/build_reports.py --root .
 python tools/validate/validate.py --root .
 python tools/classify/classify.py input-claims.json --output valuation-account.json
 python tools/estimate/estimate.py valuation-account.json data/comparables/accounts.jsonl --output estimate.json
+python tools/modeling/parse_item_vectors.py --root .
+python tools/modeling/clean_prices.py --root .
+python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、檔案 hash 與來源 ZIP 指紋。P0.1 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P1 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。

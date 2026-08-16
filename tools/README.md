@@ -1,11 +1,12 @@
-# 離線工具（v3.0.1 P0.1）
+# 離線工具（v3.1 P1）
 
-工具採 Python 3 標準函式庫，只處理本機 JSON／JSONL。正式程式永遠不主動連網，不得 import 或呼叫 HTTP、socket、API、Provider、網頁自動化、排程或背景服務。
+核心工具採 Python 3 標準函式庫，只處理本機 JSON／JSONL。`modeling/` 是獨立鎖版的可選科學運算環境；它也不含下載、HTTP、排程或背景能力。
 
 - `migrate/`：將 v2.4 已匿名資料遷移到新契約並產生逐列 ledger。
 - `normalize/`：別名正規化及資料清理。
 - `classify/`：將受控結構化聲稱轉成使用者估價輸入 profile 與季節矩陣。
 - `estimate/`：離線選擇可比案例並輸出透明理由。
+- `modeling/`：建立三態 Item Vector、清洗正常／急售價格，並提供模型估價整合入口。
 - `validate/`：schema、參照、隱私、日期及規則驗證。
 
 ## 正式資料入口
@@ -32,6 +33,12 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 輸出的 `price_type` 只使用正規化值：`normal_listing`、`urgent_sale`、`last_public_price`、`verified_sale` 或 `unknown`。已售聲稱不是 verified sale；未知資料不補值。相似度說明會將已確認不同的 `major_differences` 與資料未知的 `unconfirmed_dimensions` 分開，`unknown` 不會匹配 `unknown`。
 
 正式市場資料目前只有三筆同時確認 TWD 與國際服，估價適用範圍有限。這一版不擴充全物品資料、不新增市場資料、不加入回測、校準或自動資料更新。
+
+## P1 模型資料流
+
+`parse_item_vectors.py` 會為每個帳號與每個 canonical item 產生 `owned`、`confirmed_missing` 或 `unknown`；未提及永遠是 unknown。`clean_prices.py` 只保留已驗證 TWD、international、seller listing、single account，並將正常刊登與急售分開。
+
+正式結果為 1,022 個向量、3 筆正常刊登、0 筆急售、99 筆排除／待審。模型門檻未達時，`model_estimator.py` 回傳 `insufficient_training_data`，不輸出模型價格；既有 comparable estimator 仍可作保守 fallback。
 
 ## 網路與圖片邊界
 

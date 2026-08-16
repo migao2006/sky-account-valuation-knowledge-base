@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/item-value-table.schema.json",
+  "title": "Conditional item attribution row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "item_id", "valuation_kind", "owned_sample_count", "confirmed_missing_sample_count", "confirmed_missing_evidence_count", "unknown_sample_count", "attribution_sample_count", "model_feature_eligible", "bootstrap_within_model_direction_stability", "refit_fold_count", "refit_direction_stability", "explanation_provenance", "status", "contribution_unit", "mean_conditional_attribution", "median_conditional_attribution", "top_interaction"],
+  "properties": {
+    "schema_version": {"const": "3.1-p1"},
+    "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "valuation_kind": {"const": "conditional_model_attribution_not_additive_item_price"},
+    "owned_sample_count": {"type": "integer", "minimum": 0},
+    "confirmed_missing_sample_count": {"type": "integer", "minimum": 0},
+    "confirmed_missing_evidence_count": {"type": "integer", "minimum": 0},
+    "unknown_sample_count": {"type": "integer", "minimum": 0},
+    "attribution_sample_count": {"type": "integer", "minimum": 0},
+    "model_feature_eligible": {"type": "boolean"},
+    "bootstrap_within_model_direction_stability": {"type": "number", "minimum": 0, "maximum": 1},
+    "refit_fold_count": {"type": "integer", "minimum": 0},
+    "refit_direction_stability": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "explanation_provenance": {"type": "object", "required": ["status", "price_line", "artifact_sha256", "model_sha256", "input_snapshot_sha256"]},
+    "status": {"enum": ["eligible", "insufficient_support"]},
+    "contribution_unit": {"const": "log_price_twd"},
+    "mean_conditional_attribution": {"type": ["number", "null"]},
+    "median_conditional_attribution": {"type": ["number", "null"]},
+    "top_interaction": {"type": ["object", "null"]}
+  }
+}

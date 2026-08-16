@@ -1,0 +1,6 @@
+# Optional, isolated dependencies for offline P1 modelling only.
+# Installing this file is an explicit operator action; repository tools never install packages.
+numpy==2.5.1
+pandas==2.3.3
+scikit-learn==1.9.0
+xgboost==3.3.0

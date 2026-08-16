@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.1.0-p1 — 2026-08-16
+
+- 新增 1,022 筆三態 Item Vector；未提及物品保持 unknown，待審核物品不得進正式模型特徵。
+- 新增正常刊登／急售分線的嚴格價格清洗：正式結果為正常 3、急售 0、排除或待審 99。
+- 新增隔離、無網路的 Elastic Net、XGBoost、TreeSHAP 與條件式 Item Value Table 管線。
+- 新增模型資料門檻、分組巢狀交叉驗證、snapshot hash、純 JSON／安全模型 artifact 與模型估價入口。
+- 正式模型仍為 `insufficient_training_data`；94 列 Item Value Table 均為 `insufficient_support`，不輸出單品價值或模型估價。
+
 ## 3.0.1-p0.1 — 2026-08-16
 
 - 修復 v3 P0 的發布完整性、換行與 manifest 重建說明，要求以 UTF-8 LF checkout 驗證實際檔案位元組。

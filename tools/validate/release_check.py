@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -69,9 +68,28 @@ def main() -> None:
     args = parser.parse_args()
     root = args.root.resolve()
     integrity = validate(root)
-    suite = unittest.defaultTestLoader.discover(str(root / "tests"), pattern="test_*.py", top_level_dir=str(root / "tests"))
-    stream = io.StringIO()
-    test_result = unittest.TextTestRunner(stream=stream, verbosity=1).run(suite)
+    # Run tests in a fresh interpreter. Importing the validator above adjusts
+    # sys.path for its own local modules; sharing that interpreter with test
+    # discovery can shadow the top-level `modeling` package and make release
+    # results depend on import order.
+    test_code = (
+        "import io,json,unittest; "
+        "suite=unittest.defaultTestLoader.discover('tests',pattern='test_*.py',top_level_dir='tests'); "
+        "stream=io.StringIO(); result=unittest.TextTestRunner(stream=stream,verbosity=1).run(suite); "
+        "print(json.dumps({'run':result.testsRun,'failures':len(result.failures),'errors':len(result.errors),'skipped':len(result.skipped)})); "
+        "raise SystemExit(0 if result.wasSuccessful() else 1)"
+    )
+    test_env = dict(os.environ)
+    test_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    test_child = subprocess.run(
+        [sys.executable, "-c", test_code], cwd=root, env=test_env,
+        text=True, capture_output=True, check=False,
+    )
+    try:
+        test_summary = json.loads(test_child.stdout.strip().splitlines()[-1])
+    except (IndexError, json.JSONDecodeError):
+        test_summary = {"run": 0, "failures": 0, "errors": 1, "skipped": 0}
+    test_success = test_child.returncode == 0 and test_summary["failures"] == test_summary["errors"] == 0
 
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     mismatches = []
@@ -102,16 +120,28 @@ def main() -> None:
 
     migration = json.loads((root / "reports/migration/migration-summary.json").read_text(encoding="utf-8"))
     coverage = json.loads((root / "reports/coverage/catalog-coverage.json").read_text(encoding="utf-8"))
-    required_top = {"docs", "schemas", "knowledge", "data", "tools", "tests", "reports"}
+    required_top = {"docs", "schemas", "knowledge", "data", "tools", "modeling", "tests", "reports"}
     top_dirs = {path.name for path in root.iterdir() if path.is_dir() and path.name != "__pycache__"}
     residue = sorted(
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
         if path.name == "__pycache__" or path.suffix == ".pyc"
     )
+    vectors = [json.loads(line) for line in (root / "data/modeling/account-item-vectors.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    clean_normal = [json.loads(line) for line in (root / "data/modeling/price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    clean_urgent = [json.loads(line) for line in (root / "data/modeling/price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    model_artifacts = [
+        json.loads((root / f"modeling/artifacts/{name}").read_text(encoding="utf-8"))
+        for name in (
+            "elastic-net-normal_listing.json", "elastic-net-urgent_sale.json",
+            "xgboost-normal_listing.json", "xgboost-urgent_sale.json",
+        )
+    ]
+    item_values = [json.loads(line) for line in (root / "data/modeling/item-value-table.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    items = [json.loads(line) for line in (root / "knowledge/items/items.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     checks = {
         "schema_and_integrity": integrity["valid"],
-        "unit_tests": test_result.wasSuccessful(),
+        "unit_tests": test_success,
         "manifest_hashes": not mismatches,
         "source_zip_unchanged": archive["unchanged"] is True,
         "required_directory_structure": required_top <= top_dirs and "staging" not in top_dirs,
@@ -120,16 +150,21 @@ def main() -> None:
         "histories_102": migration["migrated_histories"] == 102 and migration["not_migrated_histories"] == 0,
         "verified_sales_remain_zero": coverage["market_migration"]["verified_completed_sales"] == 0,
         "catalog_claim_is_partial": coverage["full_item_catalog_complete"] is False,
+        "model_vectors_1022": len(vectors) == 1022,
+        "strict_model_price_lines_3_and_0": len(clean_normal) == 3 and len(clean_urgent) == 0,
+        "formal_models_fail_closed": all(row.get("status") == "insufficient_training_data" for row in model_artifacts),
+        "item_values_fail_closed": len(item_values) == len(items) == 94 and all(row.get("status") == "insufficient_support" and row.get("mean_conditional_attribution") is None for row in item_values),
+        "no_model_eligible_items": not any(row.get("model_feature_status") == "eligible" for row in items),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.0-p0", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "3.1-p1", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
-        "unit_tests": {"run": test_result.testsRun, "failures": len(test_result.failures), "errors": len(test_result.errors), "skipped": len(test_result.skipped)},
+        "unit_tests": test_summary,
         "manifest": {"hashed_files": len(manifest.get("file_hashes", {})), "mismatches": mismatches},
         "release_residue": residue,
         "source_archive": archive,

@@ -89,5 +89,13 @@ class ValuationInputContractTest(unittest.TestCase):
         comparable = json.loads(next(line for line in (ROOT / "data/comparables/accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()))
         self.assertEqual(self.validator.validate(comparable, ROOT / "schemas/market/comparable-account.schema.json"), [])
 
+    def test_model_estimator_input_can_carry_reviewed_item_states(self):
+        profile = classify(self.claims())
+        profile["item_states"] = [{
+            "item_id": self.item, "state": "owned", "evidence_state": "profile_claim",
+            "model_feature": False, "conflict": False, "review_status": "needs_review",
+        }]
+        self.assertEqual(self.validator.validate(profile, ROOT / "schemas/input/valuation-account.schema.json"), [])
+
 
 if __name__ == "__main__": unittest.main()

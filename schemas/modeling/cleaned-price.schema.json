@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/cleaned-price.schema.json",
+  "title": "Offline price observation admitted to a P1 training line",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cleaned_price_id", "history_id", "account_id", "cluster_id", "cluster_rank", "selected_price_twd", "log_price_twd", "price_line", "normalized_price_type", "base_account_type", "post_date", "observed_at", "currency", "server", "evidence_quality", "review_status"],
+  "properties": {
+    "schema_version": {"const": "3.1-p1"},
+    "cleaned_price_id": {"type": "string", "pattern": "^cleaned_price_[a-z0-9_]+$"},
+    "history_id": {"type": "string", "pattern": "^history_[a-z0-9_]+$"},
+    "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"},
+    "cluster_id": {"type": "string", "pattern": "^cluster_[a-z0-9_]+$"},
+    "cluster_rank": {"type": "integer", "minimum": 1},
+    "selected_price_twd": {"type": "number", "exclusiveMinimum": 0},
+    "log_price_twd": {"type": "number"},
+    "price_line": {"enum": ["normal_listing", "urgent_sale"]},
+    "normalized_price_type": {"enum": ["normal_listing", "urgent_sale"]},
+    "base_account_type": {"type": "string", "minLength": 1},
+    "post_date": {"type": ["string", "null"], "format": "date"},
+    "observed_at": {"type": "string", "format": "date"},
+    "currency": {"const": "TWD"},
+    "server": {"const": "international"},
+    "evidence_quality": {"enum": ["high", "medium", "low", "unknown"]},
+    "review_status": {"enum": ["accepted", "needs_review"]}
+  }
+}
