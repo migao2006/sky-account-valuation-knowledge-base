@@ -79,7 +79,24 @@ class ElasticNetModelingTest(unittest.TestCase):
             continuous["missing_indicator_scaling"]["resources.hearts"]["scale"],
         )
         self.assertNotIn("pickle", json.dumps(artifact).lower())
-        self.assertTrue(evaluate(artifact)["valid"])
+        evaluation = evaluate(artifact)
+        self.assertFalse(evaluation["valid"])
+        self.assertIn("model_publication_evaluator_required", evaluation["reasons"])
+
+    def test_evaluator_rejects_self_attested_publication_with_missing_snapshot(self):
+        artifact = train(self.write_rows([self.row(n) for n in range(100)]), "normal_listing")
+        artifact["publication_gate"]["status"] = "passed"
+        artifact.pop("input_snapshot_sha256")
+        evaluation = evaluate(artifact)
+        self.assertFalse(evaluation["valid"])
+        self.assertEqual(evaluation["reasons"], ["model_publication_evaluator_required"])
+
+    def test_evaluator_rejects_unknown_artifact_status(self):
+        artifact = train(self.write_rows([self.row(1)]), "normal_listing")
+        artifact["status"] = "garbage"
+        evaluation = evaluate(artifact)
+        self.assertFalse(evaluation["valid"])
+        self.assertEqual(evaluation["reasons"], ["unsupported_artifact_status"])
 
     def test_portable_contract_matches_sklearn_for_present_and_missing_values(self):
         # The fixture has a numeric hearts field with both present and missing

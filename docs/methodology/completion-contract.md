@@ -58,10 +58,10 @@
 
 ## 圖片證據門檻
 
-P0 至 P2.6 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
+P0 至 P2.7 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
 
 ## 目前狀態
 
-截至 P2.6，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,476 筆離線查詢索引。Nintendo 四件與 AURORA FAQ 968 六件 canonical item 具有受限、可重播的 identity 證據鏈，但 1,393 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。市場人工 gold 與 near-miss approved evidence 都是 0，正式正常刊登仍只有 3 筆，Catalog、Item Vector、價格資料、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
+截至 P2.7，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,478 筆離線查詢索引。Nintendo 四件、AURORA FAQ 968 六件與 Journey Pack 三件 canonical item 具有受限、可重播的 identity 證據鏈，但 1,390 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。市場人工 gold 與 near-miss approved evidence 都是 0，正式正常刊登仍只有 3 筆，Catalog、Item Vector、價格資料、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P2.6 也沒有固定 holdout bytes、不可交疊 cluster 與時間切分的可重算發布評估器；因此 runtime 無條件拒絕所有 `trained` artifact 對外估價，schema 只允許 `publication_gate.status=not_evaluated`。模型發布必須在後續版本先建立可重播 evaluator，不能由 artifact 自填指標解鎖。
+P2.7 也沒有固定 holdout bytes、不可交疊 cluster 與時間切分的可重算發布評估器；因此 runtime 與離線 evaluator 都拒絕未通過獨立發布證據的 `trained` artifact 對外估價。模型發布必須在後續版本先建立可重播 evaluator，不能由 artifact 自填指標解鎖。

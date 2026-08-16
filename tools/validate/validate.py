@@ -34,6 +34,7 @@ from build_market_claim_review import build_queue as build_market_claim_queue, v
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
 from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
 from apply_aurora_faq968_cohort import verify as verify_aurora_faq968  # noqa: E402
+from apply_journey_pack_cohort import verify as verify_journey_pack  # noqa: E402
 from apply_nintendo_starter_pack import verify as verify_nintendo_starter_pack  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
@@ -77,6 +78,7 @@ SCHEMA_FILES = {
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/nintendo-starter-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
     "data/review/aurora-faq968-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
+    "data/review/journey-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
@@ -109,6 +111,7 @@ JSON_SCHEMA_FILES = {
     "data/normalized/catalog-query-index-summary.json": "schemas/normalized/catalog-query-index-summary.schema.json",
     "data/source/research/tgc-faq-823-nintendo-starter-pack.json": "schemas/knowledge/official-item-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-968-aurora-remaining-iap.json": "schemas/knowledge/aurora-faq-968-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1308-journey-pack.json": "schemas/knowledge/journey-pack-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -154,7 +157,7 @@ def validate_canonical_field_evidence(
         "original_currency", "first_release_date", "free_or_premium",
         "permanent_account_item", "collaboration", "visual_reference",
     }
-    set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition"}
+    set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history"}
     string_fields = item_fields - {"original_cost", "collaboration"}
     official_source_types = {"official_site", "official_news", "official_support", "thatgamecompany"}
     for label, rows in evidence_groups:
@@ -559,12 +562,15 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     evidence_groups = [
         ("nintendo", read_jsonl(root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl")),
         ("aurora-faq968", read_jsonl(root / "data/review/aurora-faq968-canonical-evidence.jsonl")),
+        ("journey-pack", read_jsonl(root / "data/review/journey-pack-canonical-evidence.jsonl")),
     ]
     errors.extend(validate_canonical_field_evidence(evidence_groups, items, sets, source_records))
     for problem in verify_nintendo_starter_pack(root):
         errors.append(f"nintendo-starter-pack: {problem}")
     for problem in verify_aurora_faq968(root):
         errors.append(f"aurora-faq968: {problem}")
+    for problem in verify_journey_pack(root):
+        errors.append(f"journey-pack: {problem}")
     market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
     expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if market_claim_queue != expected_market_claim_queue:
@@ -572,7 +578,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     market_claim_gold = read_jsonl(root / "data/review/market-claim-gold.jsonl")
     errors.extend(f"market-claim-gold: {issue}" for issue in validate_gold_links(market_claim_queue, market_claim_gold))
     if market_claim_gold:
-        warnings.append("market-claim-gold contains human-reviewed rows; reviewer identities and adjudication must be audited before use")
+        errors.append("market-claim-gold: nonempty ledger requires a replayable external human-audit or signature artifact")
     near_miss_queue = read_jsonl(root / "data/review/market-near-miss-field-review.jsonl")
     expected_near_miss_queue = build_market_near_miss_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if near_miss_queue != expected_near_miss_queue:
@@ -580,7 +586,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     near_miss_evidence = read_jsonl(root / "data/review/market-near-miss-approved-evidence.jsonl")
     errors.extend(f"market-near-miss: {issue}" for issue in validate_approved_evidence(near_miss_queue, near_miss_evidence))
     if near_miss_evidence:
-        warnings.append("market-near-miss: approved evidence is review-only and requires an explicit normalized-data migration before use")
+        errors.append("market-near-miss: nonempty approved-evidence ledger requires a replayable external human-audit or signature artifact")
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -698,6 +704,31 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     value_item_ids = [row.get("item_id") for row in item_value_rows]
     if len(value_item_ids) != len(set(value_item_ids)) or set(value_item_ids) != set(items):
         errors.append("item-value-table: item IDs are not an exact unique canonical catalog")
+    for row in item_value_rows:
+        item_id = row.get("item_id", "unknown")
+        status = row.get("status")
+        mean = row.get("mean_conditional_attribution")
+        median = row.get("median_conditional_attribution")
+        if status == "insufficient_support":
+            if mean is not None or median is not None:
+                errors.append(f"item-value-table:{item_id}: unsupported row has numeric attribution")
+            continue
+        if status != "eligible":
+            errors.append(f"item-value-table:{item_id}: invalid attribution status")
+            continue
+        # Hash-shaped strings are not replayable attribution provenance.  A
+        # future evaluator must verify explanations and fold refits before an
+        # eligible conditional value can enter a formal release.
+        errors.append(f"item-value-table:{item_id}: eligible attribution requires a replayable publication evaluator")
+        if row.get("model_feature_eligible") is not True:
+            errors.append(f"item-value-table:{item_id}: eligible attribution requires an eligible model feature")
+        if not all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)) for value in (mean, median)):
+            errors.append(f"item-value-table:{item_id}: eligible attribution requires finite numerical estimates")
+        provenance = row.get("explanation_provenance")
+        if not isinstance(provenance, dict) or provenance.get("status") != "verified":
+            errors.append(f"item-value-table:{item_id}: eligible attribution requires verified provenance")
+        elif not all(isinstance(provenance.get(key), str) and provenance[key] for key in ("artifact_sha256", "model_sha256", "input_snapshot_sha256")):
+            errors.append(f"item-value-table:{item_id}: eligible attribution has incomplete provenance hashes")
     # Model envelopes bind to exact local inputs. A trained status is accepted
     # only with the same conservative sample, grouped-CV and baseline gates used
     # by the runtime estimator.
@@ -784,10 +815,11 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             errors.append(f"comparable:{row.get('comparable_id')}: date differs from curated history")
     verified_normalized = [row for row in normalized_rows if row.get("date_verified")]
     verified_histories = [row for row in histories if row.get("date_verified")]
-    if len(verified_normalized) != 28:
-        errors.append(f"date coverage: expected 28 verified normalized dates, found {len(verified_normalized)}")
-    if len(verified_histories) != 5:
-        errors.append(f"date coverage: expected 5 verified history dates, found {len(verified_histories)}")
+    migration_summary = json.loads((root / "reports/migration/migration-summary.json").read_text(encoding="utf-8"))
+    if len(verified_normalized) != migration_summary.get("verified_dates_in_normalized"):
+        errors.append("date coverage: normalized verified-date count differs from migration summary")
+    if len(verified_histories) != migration_summary.get("verified_dates_repaired_in_histories"):
+        errors.append("date coverage: history verified-date count differs from migration summary")
     # Coverage reports must be reproducible from formal data, never fixture rows.
     formal_counts = {
         "source_listings": len(read_jsonl(root / "data/source/listings.jsonl")),
@@ -805,10 +837,11 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         report_value = reported_market.get(key) if key in {"source_listings", "normalized_listings", "account_profiles", "curated_histories", "comparable_histories", "comparable_accounts"} else reported.get(key)
         if report_value != actual:
             errors.append(f"coverage count mismatch: {key} report={report_value!r} actual={actual}")
-    expected_market = {"source_listings": 1022, "normalized_listings": 1022, "account_profiles": 1022, "curated_histories": 103, "comparable_histories": 103, "comparable_accounts": 103}
-    for key, expected in expected_market.items():
-        if formal_counts[key] != expected:
-            errors.append(f"formal market coverage: expected {key}={expected}, found {formal_counts[key]}")
+    for key in ("source_listings", "normalized_listings"):
+        if migration_summary.get(key) != formal_counts[key]:
+            errors.append(f"migration summary mismatch: {key} summary={migration_summary.get(key)!r} actual={formal_counts[key]}")
+    if migration_summary.get("migrated_histories", 0) + migration_summary.get("not_migrated_histories", 0) != migration_summary.get("legacy_histories"):
+        errors.append("migration summary mismatch: migrated and unmigrated histories do not account for legacy histories")
     # Date invariant at every market stage.
     for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl", "data/review/market-near-miss-approved-evidence.jsonl"):
         path = root / rel
@@ -859,7 +892,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.8-p2.6", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.9-p2.7", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

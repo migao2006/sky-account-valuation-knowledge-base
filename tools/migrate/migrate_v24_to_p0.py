@@ -574,7 +574,7 @@ def season_profile(
             if not clause_is_negative:
                 for mention in re.finditer(r"畢業|毕业", clause):
                     prefix = clause[max(0, mention.start() - 6):mention.start()]
-                    if not re.search(r"(?:未|尚未|沒有|没有|無法|无法|無|无|不算)\s*$", prefix):
+                    if not re.search(r"(?:未|尚未|沒有|没有|無法|无法|無|无|不算|半)\s*$", prefix):
                         positive_completion = True
                         break
             # Explicit headings such as ``畢業季節：...`` and ``畢業季含...``
@@ -585,14 +585,49 @@ def season_profile(
                 positive_completion = True
         explicit_completion_conflict = negative_completion and positive_completion
         complete = positive_completion and not negative_completion
-        partial = re.search(rf"{escaped}.{{0,8}}(?:半畢|半毕|[1-9]\s*/\s*[2-9]|進度|进度)|(?:半畢|半毕|[1-9]\s*/\s*[2-9]).{{0,8}}{escaped}", text)
+        # Partial completion has to be asserted in the *same* clause as the
+        # season.  In particular, a list heading such as ``表演、破曉 1/2``
+        # must not turn 表演 into a partial season, and ``...至歸巢進度`` is
+        # not an assertion that either endpoint is half-complete.  A generic
+        # ``進度`` claim is intentionally insufficient: it says that there is
+        # progress, not that the season is partial.
+        partial = False
+        for term_match in re.finditer(escaped, text, re.I):
+            right_candidates = [text.find(mark, term_match.end()) for mark in "，,。；;！!？?、\n"]
+            right_candidates = [position for position in right_candidates if position >= 0]
+            # Whitespace is commonly used as the only separator in compact
+            # season lists.  Stop before the next known season token so that
+            # ``魔法1/2 小王子`` assigns 1/2 only to 魔法, never 小王子.
+            next_season: tuple[int, int] | None = None
+            for other_term in aliases:
+                following = re.search(re.escape(other_term), text[term_match.end():], re.I)
+                if following:
+                    start = term_match.end() + following.start()
+                    end = term_match.end() + following.end()
+                    right_candidates.append(start)
+                    if next_season is None or start < next_season[0]:
+                        next_season = (start, end)
+            right = min(right_candidates, default=len(text))
+            direct_suffix = text[term_match.end():right]
+            if re.match(r"\s*(?:季\s*)?(?:半畢(?:業)?|半毕(?:业)?|[1-9]\s*/\s*[2-9])", direct_suffix):
+                partial = True
+                break
+            # A grammatical conjunction may share one trailing half-complete
+            # marker (``夜行與拾光半畢業``). Plain whitespace and ``、`` do
+            # not propagate ratios because they commonly delimit independent
+            # season entries.
+            if next_season and re.fullmatch(r"\s*(?:與|与|和|及)\s*", text[term_match.end():next_season[0]]):
+                shared_tail = text[next_season[1]:]
+                if re.match(r"\s*(?:季\s*)?(?:半畢(?:業)?|半毕(?:业)?|[1-9]\s*/\s*[2-9])", shared_tail):
+                    partial = True
+                    break
         missing = re.search(rf"(?:缺|缺少|斷|断)\s*{escaped}|{escaped}\s*(?:缺|缺少|斷季|断季)", text)
         status = (
             "confirmed_missing" if missing else
             "unknown" if explicit_completion_conflict else
             "owned_not_complete" if negative_completion else
-            "complete" if complete else
             "partial" if partial else
+            "complete" if complete else
             "owned_not_complete"
         )
         profile = make_profile(season_id, status, "conflict" if explicit_completion_conflict else "text_claim")
@@ -814,30 +849,70 @@ def binding_matrix(record: dict[str, Any], text: str, summary: str = "") -> tupl
     """Build a fail-closed binding matrix from both textual provenance fields."""
     known = {item.get("platform"): item.get("status", "unknown") for item in record.get("bindings", []) if isinstance(item, dict) and isinstance(item.get("platform"), str)}
     platforms = ["google", "apple", "game_center", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter"]
-    labels = {"google": r"Google|GG", "apple": r"Apple|蘋果|苹果", "game_center": r"Game\s*Center|(?<![A-Za-z0-9])GC(?![A-Za-z0-9])", "facebook": r"Facebook|FB", "nintendo": r"Nintendo|任天堂", "playstation": r"PlayStation|PSN|PS", "steam": r"Steam", "huawei": r"Huawei|華為|华为", "twitter": r"Twitter|推特"}
+    labels = {"google": r"Google|GG", "apple": r"Apple|蘋果|苹果", "game_center": r"Game\s*Center|(?<![A-Za-z0-9])GC(?![A-Za-z0-9])", "facebook": r"Facebook|FB", "nintendo": r"Nintendo|任天堂|(?<![A-Za-z0-9])NS(?![A-Za-z0-9])", "playstation": r"PlayStation|PSN|PS", "steam": r"Steam", "huawei": r"Huawei|華為|华为", "twitter": r"Twitter|推特"}
+    def state(context: str) -> str:
+        # Risk wins when a single platform claim contains both an availability
+        # statement and an inability to transfer it.
+        if re.search(r"死綁|死绑|不出|無法轉出|无法转出|遺失|遗失|註銷|注销|被封", context):
+            return "high_risk"
+        if re.search(
+            r"未綁|未绑|空綁|空绑|可綁|可绑|可換綁|可换绑|換綁|换绑|可改綁|可改绑|可解綁|可解绑|可解|可出|同出|全出|整組出|只出|僅出|仅出|綁定出|绑定出",
+            context,
+        ):
+            return "available"
+        return "mentioned_unknown"
+
+    def merge_claims(claims: list[str]) -> str:
+        """Merge repeated platform mentions without letting safety regress."""
+        if "high_risk" in claims:
+            return "high_risk"
+        if "available" in claims:
+            return "available"
+        if "mentioned_unknown" in claims:
+            return "mentioned_unknown"
+        return "unknown"
+
+    def source_claims(source_text: str) -> dict[str, str]:
+        """Parse every platform mention in punctuation-scoped binding clauses.
+
+        ``、`` can separate independent platform statements, or a compact
+        platform list sharing the state in the final segment.  Earlier bare
+        segments are retained as pending until a state is encountered, which
+        supports both ``GG、GC 不出`` and ``Google、Apple ID、任天堂綁定不出``.
+        A hard punctuation boundary starts a new group, so later ``可出``
+        assertions cannot erase an earlier ``不出`` risk.
+        """
+        parsed: dict[str, list[str]] = {platform: [] for platform in platforms}
+        for hard_clause in re.split(r"[，,;；。\n]+", source_text):
+            pending: set[str] = set()
+            for segment in hard_clause.split("、"):
+                mentioned = {
+                    platform for platform, label in labels.items()
+                    if re.search(label, segment, re.I)
+                }
+                segment_state = state(segment)
+                if segment_state == "mentioned_unknown":
+                    for platform in mentioned:
+                        parsed[platform].append("mentioned_unknown")
+                    pending.update(mentioned)
+                    continue
+                # A state-bearing segment applies to its own platform names
+                # and any immediately preceding list members.  The previous
+                # members need not be pure labels (e.g. ``Apple ID``).
+                for platform in pending | mentioned:
+                    parsed[platform].append(segment_state)
+                pending.clear()
+        return {platform: merge_claims(claims) for platform, claims in parsed.items()}
+
+    listing_claims = source_claims(text)
+    summary_claims = source_claims(summary)
     results = []
     evidence_rows: dict[str, dict[str, Any]] = {}
     for platform in platforms:
-        def claim(source_text: str) -> str:
-            match = re.search(labels[platform], source_text, re.I)
-            if not match:
-                return "unknown"
-            # Keep the platform claim inside its punctuation-delimited clause.
-            # Without this, e.g. "GC 不出，Apple 可綁" would leak Apple's
-            # availability onto the distinct Game Center binding.
-            before = source_text[:match.start()]
-            after = source_text[match.end():]
-            left = max(before.rfind(mark) for mark in "，,;；。\n") + 1
-            right_candidates = [index for mark in "，,;；。\n" if (index := after.find(mark)) >= 0]
-            right = min(right_candidates) if right_candidates else len(after)
-            context = source_text[left:match.start()] + source_text[match.start():match.end()] + after[:right]
-            if re.search(r"未綁|未绑|空綁|空绑|可綁|可绑|可換綁|可换绑|可改綁|可改绑|同出", context):
-                return "available"
-            if re.search(r"死綁|死绑|不出|遺失|遗失", context):
-                return "high_risk"
-            return "mentioned_unknown"
-
-        listing_claim, summary_claim = claim(text), claim(summary)
+        listing_claim, summary_claim = listing_claims[platform], summary_claims[platform]
+        # Repeated claims inside one provenance source use risk priority, but
+        # two independent provenance fields that disagree remain a conflict.
+        # A summary must never silently override or confirm contradictory text.
         merged, provenance = merge_field_claims(
             f"bindings.{platform}",
             [(listing_claim, "listing_text"), (summary_claim, "normalized_feature_summary")],

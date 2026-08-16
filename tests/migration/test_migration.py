@@ -367,6 +367,183 @@ class MigrationContractTests(unittest.TestCase):
         tgc_by_platform = {row["platform"]: row for row in tgc_bindings["platforms"]}
         self.assertEqual(tgc_by_platform["game_center"]["status"], "unknown")
 
+    def test_game_center_cannot_transfer_is_high_risk(self):
+        bindings, evidence = MIGRATE.binding_matrix(
+            {"bindings": []}, "GC 因忘記帳號無法轉出", ""
+        )
+        game_center = next(row for row in bindings["platforms"] if row["platform"] == "game_center")
+        self.assertEqual(game_center["status"], "high_risk")
+        self.assertEqual(game_center["evidence_state"], "text_claim")
+        self.assertEqual(evidence["bindings.platforms.game_center"]["sources"], ["listing_text"])
+
+    def test_ideographic_comma_keeps_binding_claims_separate(self):
+        bindings, _ = MIGRATE.binding_matrix({}, "Google 不出、Apple 可綁", "")
+        by_platform = {row["platform"]: row for row in bindings["platforms"]}
+        self.assertEqual(by_platform["google"]["status"], "high_risk")
+        self.assertEqual(by_platform["apple"]["status"], "available")
+        contradictory, _ = MIGRATE.binding_matrix({}, "Google 可綁但前任綁定不出", "")
+        google = next(row for row in contradictory["platforms"] if row["platform"] == "google")
+        self.assertEqual(google["status"], "high_risk")
+        revoked, _ = MIGRATE.binding_matrix({}, "GG 註銷、GC ID 遺失、其他可換綁", "")
+        revoked_by_platform = {row["platform"]: row for row in revoked["platforms"]}
+        self.assertEqual(revoked_by_platform["google"]["status"], "high_risk")
+        self.assertEqual(revoked_by_platform["game_center"]["status"], "high_risk")
+
+    def test_half_complete_phrase_is_partial_not_complete(self):
+        profiles, unresolved = MIGRATE.season_profile(
+            "破碎半畢業", {"破碎": "season_shattering"}, {"season_shattering": 1}
+        )
+        self.assertEqual(unresolved, [])
+        self.assertEqual(profiles[0]["status"], "partial")
+        self.assertNotIn("status_completion_positive:listing_text", profiles[0]["evidence_sources"])
+
+    def test_shared_ideographic_comma_binding_suffix_applies_only_to_platform_list(self):
+        bindings, _ = MIGRATE.binding_matrix({}, "GG、GC、NS 前號主不出", "")
+        by_platform = {row["platform"]: row["status"] for row in bindings["platforms"]}
+        self.assertEqual(by_platform["google"], "high_risk")
+        self.assertEqual(by_platform["game_center"], "high_risk")
+        self.assertEqual(by_platform["nintendo"], "high_risk")
+        unbound, _ = MIGRATE.binding_matrix({}, "Nintendo 可解綁", "")
+        nintendo = next(row for row in unbound["platforms"] if row["platform"] == "nintendo")
+        self.assertEqual(nintendo["status"], "available")
+
+    def test_multi_match_binding_segments_merge_with_risk_priority(self):
+        bindings, _ = MIGRATE.binding_matrix(
+            {}, "Google、Apple ID、任天堂綁定不出，Google、PlayStation、Steam 可出", ""
+        )
+        by_platform = {row["platform"]: row["status"] for row in bindings["platforms"]}
+        self.assertEqual(by_platform["google"], "high_risk")
+        self.assertEqual(by_platform["apple"], "high_risk")
+        self.assertEqual(by_platform["nintendo"], "high_risk")
+        self.assertEqual(by_platform["playstation"], "available")
+        self.assertEqual(by_platform["steam"], "available")
+
+    def test_sale_verbs_are_not_inferred_as_binding_availability(self):
+        listings = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/normalized/listings.jsonl")}
+        for listing_id, platforms in {
+            "listing_0214": ("google", "apple"),
+            "listing_0960": ("apple",),
+        }.items():
+            row = listings[listing_id]
+            bindings, _ = MIGRATE.binding_matrix(row, row["listing_text"], "\n".join(row.get("feature_summary", [])))
+            by_platform = {entry["platform"]: entry["status"] for entry in bindings["platforms"]}
+            for platform in platforms:
+                with self.subTest(listing_id=listing_id, platform=platform):
+                    self.assertNotEqual(by_platform[platform], "available")
+
+    def test_partial_claims_do_not_cross_season_list_delimiters(self):
+        aliases = {
+            "表演": "season_performance", "破曉": "season_shattering",
+            "二重奏": "season_duets", "青鳥": "season_blue_bird",
+        }
+        order = {season_id: index for index, season_id in enumerate(aliases.values())}
+        profiles, _ = MIGRATE.season_profile("表演、破曉 1/2、二重奏 2/3、青鳥", aliases, order)
+        by_season = {row["season_id"]: row["status"] for row in profiles}
+        self.assertEqual(by_season["season_performance"], "owned_not_complete")
+        self.assertEqual(by_season["season_shattering"], "partial")
+        self.assertEqual(by_season["season_duets"], "partial")
+        self.assertEqual(by_season["season_blue_bird"], "owned_not_complete")
+
+    def test_committed_half_complete_and_binding_risk_regressions(self):
+        profiles = {
+            row["account_id"]: row
+            for row in MIGRATE.read_jsonl(ROOT / "data/normalized/account-profiles.jsonl")
+        }
+        half_complete = {
+            "account_0048": ("season_carnival",),
+            "account_0123": ("season_two_embers_part_1",),
+            "account_0246": ("season_prophecy",),
+            "account_0375": ("season_passage", "season_moments"),
+        }
+        for account_id, season_ids in half_complete.items():
+            by_season = {row["season_id"]: row["status"] for row in profiles[account_id]["season_profiles"]}
+            for season_id in season_ids:
+                self.assertEqual(by_season[season_id], "partial", (account_id, season_id))
+
+        expected_bindings = {
+            "account_0203": {"google": "available", "game_center": "available", "facebook": "available"},
+            "account_0291": {"google": "high_risk", "game_center": "high_risk"},
+            "account_0301": {"google": "high_risk", "game_center": "high_risk"},
+            "account_0388": {"game_center": "high_risk"},
+            "account_0391": {"google": "high_risk", "apple": "high_risk", "nintendo": "high_risk", "playstation": "available", "steam": "available"},
+            "account_0435": {"google": "high_risk"},
+            "account_0484": {"google": "high_risk", "facebook": "available"},
+            "account_0665": {"google": "high_risk", "facebook": "available"},
+            "account_0677": {"google": "available", "nintendo": "high_risk"},
+            "account_0675": {"google": "high_risk"},
+            "account_0756": {"google": "high_risk"},
+            "account_0757": {"google": "high_risk", "huawei": "available"},
+            "account_0784": {"apple": "high_risk", "facebook": "high_risk"},
+            "account_0930": {"google": "high_risk", "facebook": "available"},
+            "account_0932": {"google": "available", "game_center": "high_risk", "nintendo": "high_risk"},
+            "account_1019": {"google": "high_risk", "huawei": "available"},
+        }
+        for account_id, expected in expected_bindings.items():
+            by_platform = {
+                row["platform"]: row["status"]
+                for row in profiles[account_id]["bindings"]["platforms"]
+            }
+            for platform, status in expected.items():
+                self.assertEqual(by_platform[platform], status, (account_id, platform))
+
+    def test_committed_non_single_account_binding_segment_regressions(self):
+        listings = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/normalized/listings.jsonl")}
+        expected = {
+            "listing_0042": {"facebook": "high_risk", "google": "high_risk", "nintendo": "high_risk", "apple": "available", "steam": "available"},
+            "listing_0056": {"nintendo": "available"},
+        }
+        for listing_id, statuses in expected.items():
+            row = listings[listing_id]
+            bindings, _ = MIGRATE.binding_matrix(row, row["listing_text"], "\n".join(row.get("feature_summary", [])))
+            by_platform = {entry["platform"]: entry["status"] for entry in bindings["platforms"]}
+            for platform, status in statuses.items():
+                self.assertEqual(by_platform[platform], status, (listing_id, platform))
+
+    def test_committed_season_partial_scope_regressions(self):
+        profiles = {
+            row["account_id"]: row
+            for row in MIGRATE.read_jsonl(ROOT / "data/normalized/account-profiles.jsonl")
+        }
+        expected = {
+            "account_0165": {
+                "season_performance": "complete", "season_shattering": "partial",
+                "season_duets": "partial", "season_blue_bird": "complete",
+            },
+            "account_0052": {
+                "season_aurora": "complete", "season_remembrance": "complete",
+                "season_passage": "complete", "season_moments": "complete",
+                "season_revival": "complete", "season_carnival": "owned_not_complete",
+            },
+        }
+        for account_id, expected_statuses in expected.items():
+            by_season = {row["season_id"]: row["status"] for row in profiles[account_id]["season_profiles"]}
+            for season_id, status in expected_statuses.items():
+                self.assertEqual(by_season[season_id], status, (account_id, season_id))
+
+    def test_partial_ratio_does_not_cross_whitespace_season_boundaries(self):
+        aliases = {
+            "魔法": "season_enchantment", "小王子": "season_little_prince",
+            "姆明": "season_moomin", "夜行": "season_passage",
+        }
+        order = {season_id: index for index, season_id in enumerate(aliases.values())}
+        profiles, _ = MIGRATE.season_profile("魔法1/2 小王子；姆明1/3 夜行", aliases, order)
+        statuses = {row["season_id"]: row["status"] for row in profiles}
+        self.assertEqual(statuses["season_enchantment"], "partial")
+        self.assertEqual(statuses["season_moomin"], "partial")
+        self.assertEqual(statuses["season_little_prince"], "owned_not_complete")
+        self.assertEqual(statuses["season_passage"], "owned_not_complete")
+
+        formal = {
+            row["account_id"]: row
+            for row in MIGRATE.read_jsonl(ROOT / "data/normalized/account-profiles.jsonl")
+        }
+        account_0189 = {row["season_id"]: row["status"] for row in formal["account_0189"]["season_profiles"]}
+        account_0291 = {row["season_id"]: row["status"] for row in formal["account_0291"]["season_profiles"]}
+        self.assertNotEqual(account_0189.get("season_little_prince"), "partial")
+        self.assertNotEqual(account_0189.get("season_passage"), "partial")
+        self.assertNotEqual(account_0291.get("season_performance"), "partial")
+        self.assertNotEqual(account_0291.get("season_two_embers_part_1"), "partial")
+
     def test_explicit_urgent_overrides_reduced_but_never_sold_claim(self):
         self.assertEqual(MIGRATE.normalize_market_price_type("reduced", "急售降價"), "urgent_sale")
         self.assertEqual(MIGRATE.normalize_market_price_type("sold_explicit", "急售後已售"), "sold_claim")

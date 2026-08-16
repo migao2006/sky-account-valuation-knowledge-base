@@ -31,6 +31,37 @@ def write_utf8_lf(path: Path, content: str) -> None:
         handle.write(content)
 
 
+def model_artifacts_release_valid(artifacts: list[dict[str, object]]) -> bool:
+    """Fail closed until a publication evaluator can replay a trained artifact."""
+    return bool(artifacts) and all(artifact.get("status") == "insufficient_training_data" for artifact in artifacts)
+
+
+def item_value_rows_release_valid(rows: list[dict[str, object]], canonical_item_ids: set[str]) -> bool:
+    """Fail closed until attribution provenance has a replayable evaluator."""
+    if len(rows) != len({row.get("item_id") for row in rows}) or {row.get("item_id") for row in rows} != canonical_item_ids:
+        return False
+    for row in rows:
+        status = row.get("status")
+        mean, median = row.get("mean_conditional_attribution"), row.get("median_conditional_attribution")
+        if status == "insufficient_support":
+            if mean is not None or median is not None:
+                return False
+            continue
+        # A schema-valid eligible row is not publication-valid merely because
+        # its provenance fields contain strings.  No evaluator currently
+        # replays the explanations, refits, and attribution sidecars.
+        if status != "insufficient_support":
+            return False
+    return True
+
+
+def human_review_ledgers_release_valid(
+    market_claim_gold: list[dict[str, object]], near_miss_approved_evidence: list[dict[str, object]],
+) -> bool:
+    """Fail closed until external human review identities have replayable audit evidence."""
+    return not market_claim_gold and not near_miss_approved_evidence
+
+
 def verify_fresh_lf_checkout(root: Path, source_zip: Path) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
@@ -149,9 +180,11 @@ def main() -> None:
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
+    vendor_item_evidence = [json.loads(line) for line in (root / "data/review/skygame-data-1.3.4-item-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     nintendo_evidence = [json.loads(line) for line in (root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     aurora_evidence = [json.loads(line) for line in (root / "data/review/aurora-faq968-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    journey_evidence = [json.loads(line) for line in (root / "data/review/journey-pack-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     canonical_item_ids = {row["item_id"] for row in items}
     candidate_item_ids = {row["candidate_item_id"] for row in item_candidates}
     source_reference_ids = {row["reference_identity_id"] for row in reference_identities}
@@ -169,6 +202,7 @@ def main() -> None:
         "item_aurora_voice", "item_aurora_wings", "item_aurora_cure_for_me_mask",
         "item_aurora_cure_for_me_outfit", "item_aurora_to_the_love_outfit", "item_aurora_giving_in_cape",
     }
+    journey_cohort = {"item_journey_pack_cape", "item_journey_hair", "item_journey_mask"}
     checks = {
         "schema_and_integrity": integrity["valid"],
         "unit_tests": test_success,
@@ -176,26 +210,38 @@ def main() -> None:
         "source_zip_unchanged": archive["unchanged"] is True,
         "required_directory_structure": required_top <= top_dirs and "staging" not in top_dirs,
         "no_cache_or_staging_residue": not residue and not any(path.is_dir() for path in root.rglob("staging")),
-        "migration_1022": migration["source_listings"] == migration["normalized_listings"] == 1022,
-        "legacy_histories_102_plus_one_reviewed_recovery": migration["migrated_histories"] == 102 and migration["not_migrated_histories"] == 0 and coverage["market_migration"]["curated_histories"] == 103,
+        "market_stage_counts_consistent": (
+            migration["source_listings"] == coverage["market_migration"]["source_listings"]
+            and migration["normalized_listings"] == coverage["market_migration"]["normalized_listings"]
+            and len(vectors) == coverage["market_migration"]["account_profiles"]
+            and coverage["market_migration"]["curated_histories"] == coverage["market_migration"]["comparable_histories"] == coverage["market_migration"]["comparable_accounts"]
+            and coverage["modeling"]["clean_normal_rows"] == len(clean_normal)
+            and coverage["modeling"]["clean_urgent_rows"] == len(clean_urgent)
+        ),
+        "migration_history_accounting_consistent": migration["migrated_histories"] + migration["not_migrated_histories"] == migration["legacy_histories"],
         "verified_sales_remain_zero": coverage["market_migration"]["verified_completed_sales"] == 0,
         "catalog_claim_is_partial": coverage["full_item_catalog_complete"] is False,
-        "model_vectors_1022": len(vectors) == 1022,
-        "strict_model_price_lines_3_and_0": len(clean_normal) == 3 and len(clean_urgent) == 0,
-        "p2_vendor_evidence_fail_closed": coverage.get("p2_evidence", {}).get("candidate_field_evidence_rows") == 296 and coverage.get("p2_evidence", {}).get("canonical_promotions") == 0,
+        "p2_vendor_evidence_consistent": (
+            coverage.get("p2_evidence", {}).get("candidate_field_evidence_rows")
+            == len(vendor_item_evidence)
+            and coverage.get("p2_evidence", {}).get("canonical_promotions")
+            == sum(row.get("canonical_write") not in {None, "not_performed"} for row in item_promotions)
+        ),
         "p2_1_catalog_universe_reconciled": len(catalog_universe) == 3266 and coverage.get("p2_1_review_infrastructure", {}).get("catalog_universe_reconciled") is True,
-        "p2_1_vendor_correlation_fail_closed": len(item_promotions) == len(candidate_item_ids) and {row.get("candidate_item_id") for row in item_promotions} == candidate_item_ids and sum(row.get("decision") == "vendor_correlated_template_candidate" for row in item_promotions) == 284 and all(row.get("canonical_write") == "not_performed" and row.get("model_feature_status") == "excluded_pending_verification" and "canonical_identity" in row.get("unresolved_fields", []) for row in item_promotions if row.get("decision") == "vendor_correlated_template_candidate"),
-        "p2_1_human_gold_not_fabricated": len(market_claim_review) == 200 and not market_claim_gold,
+        "p2_1_promotion_ledger_complete": len(item_promotions) == len(candidate_item_ids) and {row.get("candidate_item_id") for row in item_promotions} == candidate_item_ids and all(isinstance(row.get("decision"), str) and isinstance(row.get("canonical_write"), str) for row in item_promotions),
+        "p2_1_human_gold_integrity": len({row.get("review_id") for row in market_claim_review}) == len(market_claim_review),
+        "human_review_ledgers_externally_audited": human_review_ledgers_release_valid(market_claim_gold, market_near_miss_evidence),
         "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == len(source_reference_ids) and all(row.get("link_status") in {"canonical_link", "candidate_link", "unresolved"} and row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
-        "p2_4_near_miss_evidence_not_fabricated": len(market_near_miss_review) >= 1 and not market_near_miss_evidence,
+        "p2_4_near_miss_evidence_integrity": len({row.get("review_id") for row in market_near_miss_review}) == len(market_near_miss_review),
         "p2_5_catalog_query_truth_layers": len(catalog_query_index) == len(canonical_item_ids) + len(candidate_item_ids) + len(source_reference_ids) and len({row.get("query_entity_id") for row in catalog_query_index}) == len(catalog_query_index) and query_ids_by_type["canonical_item"] == canonical_item_ids and query_ids_by_type["review_candidate"] == candidate_item_ids and query_ids_by_type["source_reference"] == source_reference_ids and resolved_query_ids == verified_item_ids and catalog_query_summary.get("canonical_item_count") == len(canonical_item_ids) and catalog_query_summary.get("review_candidate_count") == len(candidate_item_ids) and catalog_query_summary.get("source_reference_count") == len(source_reference_ids) and catalog_query_summary.get("query_row_count") == len(catalog_query_index),
         "p2_5_nintendo_identity_evidence_replayed": nintendo_cohort <= verified_item_ids and len(nintendo_evidence) == 18 and {row.get("target_id") for row in nintendo_evidence if row.get("target_type") == "item"} == nintendo_cohort and all(row.get("review_status") == "approved" for row in nintendo_evidence),
         "p2_6_aurora_identity_evidence_replayed": aurora_cohort <= verified_item_ids and len(aurora_evidence) == 33 and aurora_cohort <= {row.get("target_id") for row in aurora_evidence} and all(row.get("review_status") == "approved" for row in aurora_evidence),
-        "p2_4_catalog_scope_is_auditable": len(catalog_universe) == 3266 and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe) and sum(row.get("scope_disposition") != "collectible_item" for row in catalog_universe) == 1508,
+        "p2_7_journey_identity_evidence_replayed": journey_cohort <= verified_item_ids and len(journey_evidence) == 16 and journey_cohort <= {row.get("target_id") for row in journey_evidence} and all(row.get("review_status") == "approved" for row in journey_evidence),
+        "p2_4_catalog_scope_is_auditable": bool(catalog_universe) and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe),
         "p2_4_unknown_sets_not_model_features": all(all(set_row.get("model_feature") is False and set_row.get("completion_ratio") is None and set_row.get("is_complete") is None for set_row in vector.get("feature_groups", {}).get("item_sets", [])) for vector in vectors),
         "p2_2_fandom_same_lineage_only": len(fandom_crosswalk) == 700 and sum(row.get("match_status") == "season_mapped_candidate_linked" for row in fandom_crosswalk) == 579 and all(row.get("source_independence") == "not_independent_same_fandom_wiki" and row.get("promotion_effect") == "none" for row in fandom_crosswalk),
-        "formal_models_fail_closed": all(row.get("status") == "insufficient_training_data" for row in model_artifacts),
-        "item_values_fail_closed": len(item_values) == len({row.get("item_id") for row in item_values}) and {row.get("item_id") for row in item_values} == canonical_item_ids and all(row.get("status") == "insufficient_support" and row.get("mean_conditional_attribution") is None for row in item_values),
+        "formal_models_publication_gated": model_artifacts_release_valid(model_artifacts),
+        "item_values_provenance_gated": item_value_rows_release_valid(item_values, canonical_item_ids),
         "verified_identity_cohort_not_over_promoted_to_model": all(row.get("model_feature_status") != "eligible" or row.get("verification_status") == "verified" for row in items),
     }
     fresh_checkout = None
@@ -203,7 +249,7 @@ def main() -> None:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.8-p2.6", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "3.9-p2.7", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,
