@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.0-p2.8",
+  "schema_version": "4.1-p2.9",
   "as_of_date": "2026-08-17",
   "catalog_claim": "partial_verified_catalog",
   "full_item_catalog_complete": false,
@@ -7,11 +7,11 @@
     "seasons": 30,
     "events": 24,
     "ancestors": 132,
-    "items": 98,
-    "sets": 9,
-    "aliases": 322,
-    "availability_events": 20,
-    "sources": 30,
+    "items": 100,
+    "sets": 10,
+    "aliases": 320,
+    "availability_events": 23,
+    "sources": 31,
     "visual_references": 10,
     "unresolved": 39,
     "unmapped": 14,
@@ -22,10 +22,10 @@
     "canonical_needs_review_by_entity": {
       "seasons": 27,
       "events": 13,
-      "items": 83,
+      "items": 82,
       "sets": 5,
-      "aliases": 308,
-      "availability_events": 10
+      "aliases": 306,
+      "availability_events": 13
     },
     "canonical_needs_review_total": 446,
     "unresolved_queue_records": 39,
@@ -37,8 +37,8 @@
   "item_coverage": {
     "by_category": {
       "accessory": 13,
-      "cape": 20,
-      "hair": 27,
+      "cape": 21,
+      "hair": 28,
       "instrument": 13,
       "mask": 8,
       "music_sheet": 3,
@@ -47,7 +47,7 @@
       "prop": 6
     },
     "by_source_type": {
-      "collaboration": 19,
+      "collaboration": 21,
       "constellation": 32,
       "event": 13,
       "map_completion": 3,
@@ -58,24 +58,24 @@
       "shop": 4
     },
     "by_verification_status": {
-      "needs_review": 83,
-      "verified": 15
+      "needs_review": 82,
+      "verified": 18
     },
     "by_evidence_tier": {
-      "official_with_secondary": 15,
-      "unverified_seed": 83
+      "official_with_secondary": 18,
+      "unverified_seed": 82
     },
     "by_model_feature_status": {
-      "excluded_pending_verification": 98
+      "excluded_pending_verification": 100
     },
     "model_eligible_items": 0,
     "by_availability_status": {
       "limited_time": 3,
       "permanent": 39,
       "recurring_event": 13,
-      "temporarily_unavailable": 11,
+      "temporarily_unavailable": 10,
       "traveling_spirit_rotation": 16,
-      "unknown": 16
+      "unknown": 19
     },
     "with_visual_reference": 10,
     "with_canonical_zh_tw_name_confirmed": 0
@@ -117,10 +117,10 @@
       "community_database": 1,
       "community_wiki": 17,
       "official_news": 4,
-      "official_support": 5,
+      "official_support": 6,
       "thatgamecompany": 3
     },
-    "official_source_records": 12,
+    "official_source_records": 13,
     "community_or_other_source_records": 18
   },
   "market_migration": {
@@ -135,24 +135,24 @@
     "verified_history_dates_repaired": 5,
     "verified_completed_sales": 0,
     "image_evidence_records": 0,
-    "profiles_with_mapped_items": 91,
+    "profiles_with_mapped_items": 90,
     "profiles_with_set_claims": 20
   },
   "modeling": {
     "account_item_vectors": 1022,
-    "canonical_items_per_vector": 98,
+    "canonical_items_per_vector": 100,
     "model_eligible_items": 0,
-    "clean_normal_rows": 3,
+    "clean_normal_rows": 2,
     "clean_urgent_rows": 0,
-    "excluded_or_review_rows": 100,
-    "item_value_rows": 98,
+    "excluded_or_review_rows": 101,
+    "item_value_rows": 100,
     "eligible_item_value_rows": 0,
     "model_status": "insufficient_training_data"
   },
   "p2_evidence": {
     "vendor_snapshot_items": 3266,
     "vendor_crosswalk_rows": 3266,
-    "canonical_exact_name_matches": 74,
+    "canonical_exact_name_matches": 76,
     "candidate_exact_name_matches": 296,
     "candidate_field_evidence_rows": 296,
     "approved_strict_listing_recoveries": 1,
@@ -177,42 +177,51 @@
   },
   "p2_3_reference_identities": {
     "source_scoped_identity_rows": 1758,
-    "canonical_relation_rows": 74,
+    "canonical_relation_rows": 76,
     "candidate_relation_rows": 296,
-    "unresolved_rows": 1388,
+    "unresolved_rows": 1386,
     "quarantined_rows": 26,
     "model_eligible_rows": 0,
     "market_near_miss_review_rows": 16,
     "market_near_miss_approved_evidence_rows": 0
   },
   "p2_4_catalog_resolution": {
-    "query_index_rows": 2478,
-    "canonical_rows": 98,
+    "query_index_rows": 2480,
+    "canonical_rows": 100,
     "candidate_rows": 622,
     "source_reference_rows": 1758,
-    "canonical_resolved_eligible_rows": 15,
+    "canonical_resolved_eligible_rows": 18,
     "catalog_scope_needs_review_rows": 1508
   },
   "p2_5_verified_identity_slice": {
-    "verified_canonical_items": 15,
-    "field_evidence_rows": 82,
+    "verified_canonical_items": 18,
+    "field_evidence_rows": 104,
     "visual_source_descriptions": 10,
     "model_eligible_items": 0
   },
   "p2_7_verified_identity_slice": {
-    "verified_canonical_items": 15,
+    "verified_canonical_items": 18,
     "verified_cohorts": {
       "canonical_cohort_aurora_faq968": 33,
       "canonical_cohort_journey_pack": 16,
+      "canonical_cohort_kizuna_ai_2022": 22,
       "canonical_cohort_moomintroll_accessory_set": 15,
       "canonical_cohort_nintendo_starter_pack": 18
     },
-    "field_evidence_rows": 82,
+    "field_evidence_rows": 104,
     "model_eligible_items": 0
+  },
+  "p2_9_account_catalog_lexical_review": {
+    "account_rows": 1022,
+    "eligible_account_rows": 542,
+    "suppressed_account_rows": 480,
+    "accounts_with_review_matches": 86,
+    "review_match_rows": 160,
+    "ownership_or_model_promotions": 0
   },
   "known_limitations": [
     "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-    "P2.8 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件、AURORA FAQ 968 六件、Journey Pack 三件及 Moomintroll Accessory Set 兩件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+    "P2.9 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件、AURORA FAQ 968 六件、Journey Pack 三件、Moomintroll Accessory Set 兩件及 Kizuna AI 2022 三件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
@@ -221,8 +230,9 @@
     "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-    "P2.8 保留 16 筆僅缺單一硬證據群組的匿名 near-miss；沒有任何案例因缺乏核准 evidence 而自動進入可比池。",
-    "P2.8 的 2478 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 15，model eligible 仍為 0。",
+    "P2.9 保留 16 筆僅缺單一硬證據群組的匿名 near-miss；沒有任何案例因缺乏核准 evidence 而自動進入可比池。",
+    "P2.9 的 2480 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 18，model eligible 仍為 0。",
+    "P2.9 的帳號 lexical catalog sidecar 僅供人工複核：1022 個帳號中有 86 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
   ]

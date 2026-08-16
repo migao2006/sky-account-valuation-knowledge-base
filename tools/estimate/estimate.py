@@ -227,10 +227,10 @@ def _price_semantic_reasons(row: dict[str, Any], prefix: str = "") -> list[str]:
     """Return fail-closed reasons for an explicitly flagged price semantic.
 
     An absent review means no known price-semantic exception was imported.  A
-    present review is usable only after an explicit approval, and a price that
-    includes brokerage is never comparable until it is separated from the
-    account price.  This applies equally to an incoming target and a market
-    comparable.
+    present review is usable only after an explicit approval, and prices that
+    include brokerage or explicit installment variants are never comparable
+    until one unambiguous account-only cash price is evidenced.  This applies
+    equally to an incoming target and a market comparable.
     """
     review = row.get("price_semantic_review")
     if not isinstance(review, dict):
@@ -240,6 +240,8 @@ def _price_semantic_reasons(row: dict[str, Any], prefix: str = "") -> list[str]:
         reasons.append(f"{prefix}price_semantic_review_not_approved")
     if review.get("brokerage_included") is True:
         reasons.append(f"{prefix}brokerage_included")
+    if review.get("multi_price") is True:
+        reasons.append(f"{prefix}multi_price")
     return reasons
 
 

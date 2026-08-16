@@ -132,3 +132,12 @@ names, visual identity, and model eligibility remain unknown or excluded.
 ```powershell
 python tools/normalize/apply_moomintroll_accessory_set_cohort.py --root .
 ```
+
+`apply_kizuna_ai_2022_cohort.py` replays FAQ 879's bounded 2022 Kizuna AI
+cohort. It records the historical $19.99 pack and Secret Area/window context
+without allocating an individual price or asserting current availability,
+permanent ownership, formal Chinese names, visual identity, or model eligibility.
+
+```powershell
+python tools/normalize/apply_kizuna_ai_2022_cohort.py --root .
+```

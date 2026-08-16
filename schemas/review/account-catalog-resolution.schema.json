@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/account-catalog-resolution.schema.json",
+  "description": "Anonymous P2.9 lexical catalog-review sidecar. It establishes neither ownership nor model features.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "account_id", "listing_id", "matching_eligibility", "matcher_version", "catalog_query_index_sha256", "listing_text_sha256", "normalized_feature_summary_sha256", "review_only", "model_feature", "matches"],
+  "properties": {
+    "schema_version": {"const": "1.0-p2.9"}, "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"}, "listing_id": {"type": ["string", "null"], "pattern": "^listing_[a-z0-9_]+$"},
+    "matching_eligibility": {"enum": ["eligible", "suppressed_not_seller_single_account"]}, "matcher_version": {"const": "p2.9-cjk-longest-leftmost-review-only-v1"},
+    "catalog_query_index_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "normalized_feature_summary_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "review_only": {"const": true}, "model_feature": {"const": false},
+    "matches": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["query_entity_id", "query_entity_type", "truth_level", "verification_status", "review_status", "assertion", "review_only", "model_feature"], "properties": {
+      "query_entity_id": {"type": "string", "pattern": "^(item_[a-z0-9_]+|candidate_[a-z0-9_]+|reference_identity_[a-f0-9]{32})$"}, "query_entity_type": {"enum": ["canonical_item", "review_candidate", "source_reference"]}, "truth_level": {"enum": ["canonical_knowledge", "review_candidate", "source_snapshot_observation"]}, "verification_status": {"enum": ["verified", "needs_review", "unverified"]}, "review_status": {"enum": ["approved", "needs_review", "quarantined"]}, "assertion": {"enum": ["positive", "negative", "conflict"]}, "review_only": {"const": true}, "model_feature": {"const": false}
+    }}}
+  }
+}

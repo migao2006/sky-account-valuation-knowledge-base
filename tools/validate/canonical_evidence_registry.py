@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 REGISTRY_PATH = "data/review/canonical-evidence-cohorts.jsonl"
-ALLOWED_VERIFIER_IDS = frozenset({"nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack"})
+ALLOWED_VERIFIER_IDS = frozenset({"nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack", "kizuna_ai_bundle"})
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
@@ -51,6 +51,9 @@ def _verifier(verifier_id: str) -> tuple[Callable[[Path], list[str]], dict[str, 
             from tools.normalize.apply_moomintroll_accessory_set_cohort import registry_contract, verify
         except ImportError:
             return None
+        return verify, registry_contract()
+    if verifier_id == "kizuna_ai_bundle":
+        from tools.normalize.apply_kizuna_ai_2022_cohort import registry_contract, verify
         return verify, registry_contract()
     # An allowlisted but not-yet-implemented verifier remains unavailable. If
     # made active, validate_registry fails closed instead of trusting a ledger.

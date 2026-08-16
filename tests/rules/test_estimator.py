@@ -106,6 +106,25 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertIn("price_semantic_review_not_approved", reasons)
         self.assertIn("brokerage_included", reasons)
 
+    def test_listing_0388_installment_surcharge_is_hard_rejected(self):
+        rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        comparable = dict(next(row for row in rows if row["history_id"] == "history_0068"))
+        comparable["price_semantic_review"] = {
+            "urgency": "unknown", "multi_price": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["multiple_price_terms", "installment_price_variants"],
+        }
+        target = {
+            "base_account": {"account_type": "winged_or_unspecified"},
+            "currency": "TWD",
+            "server": "international",
+            "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "asking"},
+        }
+        accepted, reasons = hard_pool(target, comparable)
+        self.assertFalse(accepted)
+        self.assertIn("price_semantic_review_not_approved", reasons)
+        self.assertIn("multi_price", reasons)
+
     def test_identity_rejections_are_covered_by_estimate_output_accounting(self):
         target = dict(self.account)
         target.update({
@@ -329,12 +348,12 @@ class EstimatorRulesTest(unittest.TestCase):
             "evidence_quality": {"listing_text": "high"}, "valuation_date": "2026-08-16",
         }
         hard = [row for row in rows if hard_pool(target, row)[0]]
-        self.assertEqual(len(hard), 3)
+        self.assertEqual(len(hard), 2)
         result = estimate(target, rows)
-        self.assertEqual(result["strict_candidate_count"], 3)
+        self.assertEqual(result["strict_candidate_count"], 2)
         self.assertFalse(result["eligible"])
         self.assertIn("fewer_than_three_comparables_meet_similarity_and_content_thresholds", result["insufficiency_reasons"])
-        self.assertNotIn("fewer_than_three_hard_pool_compatible_comparables", result["insufficiency_reasons"])
+        self.assertIn("fewer_than_three_hard_pool_compatible_comparables", result["insufficiency_reasons"])
 
     def test_winged_or_unspecified_is_unknown_not_a_similarity_match(self):
         target = {"base_account": {"account_type": "winged_or_unspecified"}}

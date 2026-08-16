@@ -73,7 +73,7 @@ class ValuationInputContractTest(unittest.TestCase):
         self.assertEqual(self.validator.validate(profile, ROOT / "schemas/input/valuation-account.schema.json"), [])
         comparables = [json.loads(line) for line in (ROOT / "data/comparables/accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         result = estimate(profile, comparables)
-        self.assertEqual(result["strict_candidate_count"], 3)
+        self.assertEqual(result["strict_candidate_count"], 2)
         self.assertEqual(result["status"], "insufficient_comparables")
 
     def test_market_profile_schema_can_express_all_collection_union_categories(self):

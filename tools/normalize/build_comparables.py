@@ -13,8 +13,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+
+INSTALLMENT_SURCHARGE_RE = re.compile(
+    r"(?:另加|加收|加價|加\s*價|超過\s*(?:一|1)\s*期\s*加|"
+    r"(?:分期|期付款)[^，。；;]{0,24}?加)\s*(?:NTD|台幣|元|\$)?\s*\d+(?:\.\d+)?\s*(?:萬|元|台幣|NTD)?",
+    re.IGNORECASE,
+)
+INSTALLMENT_MARKER_RE = re.compile(r"分期|分\s*(?:\d+|[一二三四五六七八九十]+)\s*期")
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -27,20 +36,49 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def price_semantic_review(listing: dict[str, Any], history: dict[str, Any]) -> dict[str, Any] | None:
-    """Return an offline review gate for an amount that includes brokerage.
+    """Return an offline review gate for brokerage or priced installments.
 
-    No brokerage amount is inferred.  The marker merely prevents a mixed
-    account-plus-brokerage observation from entering a model training line.
+    No fee or installment total is inferred.  The marker merely prevents a
+    non-single-price observation from entering a model training line.
     """
-    if "含仲" not in str(listing.get("listing_text", "")):
+    text = str(listing.get("listing_text", ""))
+    brokerage_included = "含仲" in text
+    installment_surcharge = INSTALLMENT_MARKER_RE.search(text) is not None and INSTALLMENT_SURCHARGE_RE.search(text) is not None
+    if not brokerage_included and not installment_surcharge:
         return None
-    return {
+    result: dict[str, Any] = {
         "urgency": "urgent_sale" if history.get("price_type") == "urgent_sale" else "unknown",
-        "brokerage_included": True,
         "evidence_state": "text_claim",
         "review_status": "needs_review",
-        "reason_codes": ["brokerage_included_price"],
+        "reason_codes": [],
     }
+    if brokerage_included:
+        result["brokerage_included"] = True
+        result["reason_codes"].append("brokerage_included_price")
+    if installment_surcharge:
+        result["multi_price"] = True
+        result["reason_codes"].extend(["multiple_price_terms", "installment_price_variants"])
+    return result
+
+
+def merge_price_semantic_reviews(existing: Any, detected: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Keep a migration marker while adding independently rebuilt evidence."""
+    if not isinstance(existing, dict):
+        return detected
+    if detected is None:
+        return existing
+    merged = dict(existing)
+    for flag in ("brokerage_included", "multi_price"):
+        if detected.get(flag) is True:
+            merged[flag] = True
+    merged["urgency"] = detected["urgency"]
+    merged["evidence_state"] = "text_claim"
+    merged["review_status"] = "needs_review"
+    merged["reason_codes"] = list(dict.fromkeys([
+        *[str(reason) for reason in existing.get("reason_codes", []) if isinstance(reason, str)],
+        *detected["reason_codes"],
+    ]))
+    return merged
 
 
 def strict_recovery_predicates(listing: dict[str, Any], used_listing_ids: set[str]) -> list[str] | None:
@@ -209,9 +247,8 @@ def build(root: Path) -> dict[str, int]:
         # A migration-level review may cover explicit multi-price terms, while
         # this builder independently detects brokerage.  Do not discard the
         # former merely because it has no brokerage marker.
-        semantic_review = history.get("price_semantic_review")
-        if semantic_review is None and listing is not None:
-            semantic_review = price_semantic_review(listing, history)
+        detected_review = price_semantic_review(listing, history) if listing is not None else None
+        semantic_review = merge_price_semantic_reviews(history.get("price_semantic_review"), detected_review)
         if semantic_review is not None:
             history["price_semantic_review"] = semantic_review
         else:
