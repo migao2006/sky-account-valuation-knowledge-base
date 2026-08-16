@@ -145,7 +145,10 @@ def _account_family(value: Any) -> str:
     value = str(value or "unknown")
     if value in {"wingless", "permanent_wingless", "crash_wingless"}:
         return "wingless"
-    if value in {"winged", "winged_or_unspecified"}:
+    # ``winged_or_unspecified`` is a migration fallback, not affirmative
+    # evidence that an account is winged.  Treating two fallback values as a
+    # family match would award similarity for shared missing information.
+    if value == "winged":
         return "winged"
     if value in {"short_id", "special_appearance"}:
         return value
@@ -325,7 +328,9 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
     """Return all dimension scores. Unknown evidence is never treated as a match."""
     account, comparable = adapt_profile(account), adapt_profile(comparable)
     atype, btype = _value(account, "base_account_type", "account_type"), _value(comparable, "base_account_type", "account_type")
-    type_score = 1.0 if atype not in (None, "unknown") and atype == btype else 0.6 if _account_family(atype) != "unknown" and _account_family(atype) == _account_family(btype) else 0.0
+    account_type_known = atype not in (None, "unknown", "winged_or_unspecified")
+    comparable_type_known = btype not in (None, "unknown", "winged_or_unspecified")
+    type_score = 1.0 if account_type_known and comparable_type_known and atype == btype else 0.6 if _account_family(atype) != "unknown" and _account_family(atype) == _account_family(btype) else 0.0
     items = _ratio(_list(account, "owned_item_ids", "item_ids"), _list(comparable, "owned_item_ids", "item_ids"))
     complete_sets = _ratio(_list(account, "complete_set_ids", "set_ids"), _list(comparable, "complete_set_ids", "set_ids"))
     mentioned_sets = _ratio(_list(account, "mentioned_set_ids"), _list(comparable, "mentioned_set_ids"))
@@ -343,7 +348,7 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
     }
     weighted = {name: round(dimensions[name] * weight, 4) for name, weight in WEIGHTS.items()}
     known = {
-        "account_type": atype not in (None, "unknown") and btype not in (None, "unknown"),
+        "account_type": account_type_known and comparable_type_known,
         "seasons": bool(_season_entries(account)) and bool(_season_entries(comparable)),
         "items_sets": bool(_list(account, "owned_item_ids", "item_ids") or _list(account, "complete_set_ids", "set_ids") or _list(account, "mentioned_set_ids")) and bool(_list(comparable, "owned_item_ids", "item_ids") or _list(comparable, "complete_set_ids", "set_ids") or _list(comparable, "mentioned_set_ids")),
         "map_completion": _map_known(account, comparable),

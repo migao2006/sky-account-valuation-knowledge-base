@@ -1,5 +1,12 @@
 # 變更紀錄
 
+## 3.5.0-p2.3 — 2026-08-17
+
+- 將舊 review registry 遷移為唯一的 `data/normalized/source-scoped-item-identities.jsonl`：1,758 筆來源範圍身分，64 canonical relation、296 candidate relation、1,398 unresolved；全部 canonical unverified、promotion prohibited、model excluded。
+- 新增 22 筆匿名 market near-miss field-evidence queue；只列出缺少的硬證據欄位，不保存原文、價格、網址、PII 或機器建議值，approved evidence 維持 0。
+- 修正估價相似度：`winged_or_unspecified` 是 migration fallback，不再被視為已確認有翼，也不再因兩邊共享未知值獲得帳型相似分。
+- 正式資料仍為 103 筆 comparable、正常刊登 3、急售 0、verified sale 0；模型與 Item Value Table 保持 fail-closed。
+
 ## 3.4.0-p2.2 — 2026-08-17
 
 - 新增 1,758 筆 review-only vendor collectible registry；64 canonical link、296 candidate link、1,398 unresolved，所有跨類型名稱衝突隔離，canonical/model writes 均為 0。

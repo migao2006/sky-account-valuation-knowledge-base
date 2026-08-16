@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-near-miss-field-review.schema.json",
+  "description": "Anonymous P2.3 near-miss field-evidence queue. It contains no source text, URL, PII, proposed value, or admission decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_id", "listing_id", "listing_text_sha256", "selection_version", "evidence_domain", "required_fields", "review_status"],
+  "properties": {
+    "review_id": {"type": "string", "pattern": "^market_near_miss_review_[0-9]{4}$"},
+    "listing_id": {"type": "string", "pattern": "^listing_[0-9]{4}$"},
+    "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "selection_version": {"const": "p2.3-market-near-miss-single-hard-evidence-v1"},
+    "evidence_domain": {"enum": ["international_server_evidence", "normal_listing_price_type_evidence", "active_listing_status_evidence"]},
+    "required_fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["server", "server_verified", "price_type", "status"]}
+    },
+    "review_status": {"const": "needs_human_field_evidence"}
+  },
+  "allOf": [
+    {"if": {"properties": {"evidence_domain": {"const": "international_server_evidence"}}}, "then": {"properties": {"required_fields": {"const": ["server", "server_verified"]}}}},
+    {"if": {"properties": {"evidence_domain": {"const": "normal_listing_price_type_evidence"}}}, "then": {"properties": {"required_fields": {"const": ["price_type"]}}}},
+    {"if": {"properties": {"evidence_domain": {"const": "active_listing_status_evidence"}}}, "then": {"properties": {"required_fields": {"const": ["status"]}}}}
+  ]
+}
