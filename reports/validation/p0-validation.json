@@ -17,7 +17,8 @@
     "strict_model_price_lines_3_and_0": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
-    "no_model_eligible_items": true
+    "no_model_eligible_items": true,
+    "fresh_lf_checkout": true
   },
   "schema_records_checked": 6042,
   "schema_errors": [],
@@ -78,5 +79,11 @@
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。"
-  ]
+  ],
+  "fresh_lf_checkout": {
+    "checked": true,
+    "valid": true,
+    "commit": "2aedcc34d2ea65300e8c57f4608c642fcfd287d2",
+    "result": "{\"valid\": true, \"tests\": {\"run\": 99, \"failures\": 0, \"errors\": 0, \"skipped\": 0}, \"manifest_mismatches\": 0, \"source_zip_unchanged\": true}"
+  }
 }
