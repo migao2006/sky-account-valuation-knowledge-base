@@ -26,13 +26,15 @@ MIN_SIMILARITY_SCORE = 40.0
 MIN_EFFECTIVE_CONTENT_DIMENSIONS = 3
 
 
+class _InternalProfile(dict[str, Any]):
+    """An adapted profile type that cannot be constructed by JSON input."""
+
+
 def normalize_price_type(row: dict[str, Any]) -> str:
     """Map legacy history labels without promoting a claimed sale to a sale."""
-    # `adapt_profile` stores the canonical value.  Do not consult an older
-    # nested claim again when an internal row is passed through hard-pool or
-    # reporting a second time.
-    if row.get("_estimator_internal") is True and row.get("price_type") in PRICE_TYPES | {"unknown"}:
-        return str(row["price_type"])
+    # Never trust an input marker as evidence that a profile was already
+    # adapted.  A caller can supply arbitrary top-level fields, so the nested
+    # transaction claim remains authoritative whenever it is present.
     sale = row.get("sale_outcome", {})
     if isinstance(sale, dict) and sale.get("verified") is True and sale.get("completed_sale_price_twd") is not None:
         return "verified_sale"
@@ -42,9 +44,9 @@ def normalize_price_type(row: dict[str, Any]) -> str:
 
 def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
     """Flatten the canonical nested account-profile/history contract for scoring."""
-    if row.get("_estimator_internal") is True:
+    if isinstance(row, _InternalProfile):
         return row
-    result = dict(row)
+    result = _InternalProfile(row)
     base = row.get("base_account", {})
     if isinstance(base, dict) and base:
         result["base_account_type"] = base.get("account_type", result.get("base_account_type", "unknown"))
@@ -77,10 +79,17 @@ def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
             result["bindings"] = {str(x.get("platform")): x.get("status") for x in platforms if isinstance(x, dict) and x.get("platform") and x.get("status") not in (None, "unknown", "mentioned_unknown")}
         result["binding_state"] = bindings.get("risk_state", result.get("binding_state", "unknown"))
     result["ownership_generation"] = row.get("ownership_history", row.get("ownership_generation", "unknown"))
+    # Market account profiles keep these values under trade_conditions while
+    # older flat fixtures/history rows expose them at the top level.  Promote
+    # them once so hard-pool selection never loses the target's transaction
+    # type after adaptation.
+    trade_conditions = row.get("trade_conditions", {})
+    if isinstance(trade_conditions, dict):
+        result["offer_kind"] = trade_conditions.get("offer_kind", result.get("offer_kind", "unknown"))
+        result["entity_kind"] = trade_conditions.get("entity_kind", result.get("entity_kind", "unknown"))
     evidence = row.get("evidence_quality", {})
     if isinstance(evidence, dict): result["evidence_quality"] = evidence.get("listing_text", "unknown")
     result["price_type"] = normalize_price_type(row)
-    result["_estimator_internal"] = True
     return result
 
 
@@ -285,9 +294,17 @@ def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool
     for field in ("currency_verified", "server_verified"):
         if comparable.get(field) is not True:
             reasons.append(f"{field}_required")
-    if _value(comparable, "entity_kind") not in ("single_account", "unknown", None):
+    # This estimator values a seller's single account.  Buyer budgets,
+    # services, exchanges, and bundles use different price semantics.  A
+    # target must explicitly claim this transaction type; missing information
+    # is not treated as a compatible listing.
+    if _value(account, "offer_kind") != "seller_listing":
+        reasons.append("target_not_seller_listing")
+    if _value(account, "entity_kind") != "single_account":
+        reasons.append("target_not_single_account")
+    if _value(comparable, "entity_kind") != "single_account":
         reasons.append("not_single_account")
-    if _value(comparable, "offer_kind") in {"buyer_budget", "service", "exchange"}:
+    if _value(comparable, "offer_kind") != "seller_listing":
         reasons.append("not_seller_listing")
     account_type = _value(account, "base_account_type", "account_type")
     comparable_type = _value(comparable, "base_account_type", "account_type")

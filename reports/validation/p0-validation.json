@@ -18,7 +18,7 @@
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 48,
+    "run": 54,
     "failures": 0,
     "errors": 0,
     "skipped": 0

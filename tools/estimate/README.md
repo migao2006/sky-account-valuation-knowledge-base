@@ -10,4 +10,6 @@ python tools/estimate/estimate.py input-account.json data/comparables/accounts.j
 
 幣別、伺服器與價格型態是硬分池。只有至少三筆 hard-pool 相容、具有效價格、達最低 40 分相似度且各有至少三個有效內容維度的案例，才會輸出價格區間；否則回傳 `insufficient_comparables` 與 `range_twd: null`，並列出 hard-pool、品質與整體不足原因。未知資料不會視為相同，已確認不同與未確認維度會分開輸出。
 
+目標帳號的 `trade_conditions` 必須明確為 `offer_kind: seller_listing` 與 `entity_kind: single_account`。買方預算、服務、交換、套組及未知交易型態不會借用單帳賣方價格池。
+
 `evidence.py` 只提供圖片證據資料契約與驗證。`ocr_text` 只可表示文字觀察，不能直接聲稱偵測到物品；物品圖示需獨立的 `icon_match` 或人工標註 row，並指定已存在的 `item_*` canonical ID。正式 evidence 禁止原始 OCR 內容、玩家資料、網址及本機圖片路徑。

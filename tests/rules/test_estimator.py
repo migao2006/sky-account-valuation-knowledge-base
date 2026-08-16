@@ -16,6 +16,11 @@ class EstimatorRulesTest(unittest.TestCase):
         fixture = ROOT / "tests" / "fixtures"
         self.account = json.loads((fixture / "estimate-account.json").read_text(encoding="utf-8"))
         self.rows = [json.loads(x) for x in (fixture / "estimate-comparables.jsonl").read_text(encoding="utf-8").splitlines()]
+        # Flat legacy fixtures must state the same transaction contract as a
+        # formal valuation input; the estimator never infers it from absence.
+        self.account.update({"offer_kind": "seller_listing", "entity_kind": "single_account"})
+        for row in self.rows:
+            row.update({"offer_kind": "seller_listing", "entity_kind": "single_account"})
 
     def test_weights_are_exactly_one_hundred(self):
         self.assertEqual(sum(WEIGHTS.values()), 100)
@@ -70,6 +75,57 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertEqual({row["comparable_id"] for row in result["rejected_by_hard_pool"]}, {"price_pool_1", "price_pool_2", "price_pool_3"})
         self.assertTrue(all("target_price_type_unknown" in row["reasons"] for row in result["rejected_by_hard_pool"]))
 
+    def test_target_must_explicitly_be_a_seller_single_account_listing(self):
+        for field, invalid_values, expected_reason in (
+            ("offer_kind", ("unknown", "buyer_budget", "service", "exchange"), "target_not_seller_listing"),
+            ("entity_kind", ("unknown", "bundle", "service"), "target_not_single_account"),
+        ):
+            for value in invalid_values:
+                with self.subTest(field=field, value=value):
+                    target = dict(self.account)
+                    target[field] = value
+                    result = estimate(target, self.rows)
+                    self.assertFalse(result["eligible"])
+                    self.assertEqual(result["strict_candidate_count"], 0)
+                    self.assertTrue(all(expected_reason in row["reasons"] for row in result["rejected_by_hard_pool"]))
+
+    def test_external_adapter_marker_cannot_override_nested_target_trade_conditions(self):
+        target = dict(self.account)
+        target["_estimator_internal"] = True
+        target["trade_conditions"] = {"offer_kind": "buyer_budget", "entity_kind": "bundle", "price_type": "asking"}
+        result = estimate(target, self.rows)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["strict_candidate_count"], 0)
+        self.assertTrue(all("target_not_seller_listing" in row["reasons"] for row in result["rejected_by_hard_pool"]))
+        self.assertTrue(all("target_not_single_account" in row["reasons"] for row in result["rejected_by_hard_pool"]))
+
+    def test_unknown_comparable_trade_conditions_are_not_admitted(self):
+        rows = []
+        for index, source in enumerate(self.rows[:3], 1):
+            row = dict(source)
+            row["comparable_id"] = f"unknown_trade_{index}"
+            row["offer_kind"] = "unknown"
+            row["entity_kind"] = "unknown"
+            rows.append(row)
+        result = estimate(self.account, rows)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["strict_candidate_count"], 0)
+        for row in result["rejected_by_hard_pool"]:
+            self.assertIn("not_seller_listing", row["reasons"])
+            self.assertIn("not_single_account", row["reasons"])
+
+    def test_nested_trade_conditions_are_promoted_before_target_hard_pool(self):
+        target = {
+            "base_account": {"account_type": "permanent_wingless"},
+            "currency": "TWD", "server": "international",
+            "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "asking"},
+        }
+        flat = adapt_profile(target)
+        self.assertIs(adapt_profile(flat), flat)
+        self.assertEqual(flat["offer_kind"], "seller_listing")
+        self.assertEqual(flat["entity_kind"], "single_account")
+        self.assertTrue(hard_pool(target, self.rows[0])[0])
+
     def test_canonical_nested_profile_and_history_adapter(self):
         account = {
             "base_account": {"account_type": "permanent_wingless"},
@@ -77,7 +133,7 @@ class EstimatorRulesTest(unittest.TestCase):
             "collection": {"owned_item_ids": ["item_example_a"], "item_set_profiles": [{"set_id":"set_example", "is_complete": True}]},
             "resources": {"values": {"white_candles": 100}},
             "bindings": {"platforms": [{"platform":"google", "status":"transferable"}], "risk_state":"clean"},
-            "ownership_history":"first_hand", "trade_conditions":{"price_type":"asking"},
+            "ownership_history":"first_hand", "trade_conditions":{"offer_kind":"seller_listing", "entity_kind":"single_account", "price_type":"asking"},
             "evidence_quality":{"listing_text":"high"}, "currency":"TWD", "server":"international"
         }
         history = {**account, "history_id":"history_fixture", "selected_price_twd":9000, "post_date":"2026-08-01"}
@@ -85,6 +141,8 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertEqual(flat["base_account_type"], "permanent_wingless")
         self.assertEqual(flat["complete_set_ids"], ["set_example"])
         self.assertEqual(flat["bindings"], {"google":"transferable"})
+        self.assertEqual(flat["offer_kind"], "seller_listing")
+        self.assertEqual(flat["entity_kind"], "single_account")
         self.assertEqual(normalize_price_type(history), "normal_listing")
         self.assertGreater(score(account, history)["score"], 50)
 
@@ -116,7 +174,7 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertEqual(normalize_price_type({"price_type":"instant_price"}), "urgent_sale")
         self.assertEqual(normalize_price_type({"price_type":"buyout"}), "unknown")
         for value in ("normal_listing", "urgent_sale", "last_public_price", "verified_sale"):
-            self.assertEqual(normalize_price_type({"_estimator_internal": True, "price_type": value, "trade_conditions": {"price_type": "buyout"}}), value)
+            self.assertEqual(normalize_price_type({"_estimator_internal": True, "price_type": value, "trade_conditions": {"price_type": "buyout"}}), "unknown")
 
     def test_urgent_target_does_not_mix_normal_or_last_public_prices(self):
         target = dict(self.account)
@@ -154,7 +212,7 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertIn("currency_verified_required", result["rejected_by_hard_pool"][0]["reasons"])
 
     def test_classify_then_estimate_end_to_end(self):
-        profile = classify({"account_id":"account_e2e","structured_claims":{"market_context":{"currency":"TWD","server":"international","valuation_date":"2026-08-16"},"base_account":{"account_type":"permanent_wingless"},"season_profiles":[{"season_id":"season_gratitude","status":"complete"}],"collection":{"owned_item_ids":["item_anniversary_bass"]},"resources":{"values":{"white_candles":100}},"bindings":{"platforms":[{"platform":"google","status":"transferable"}]},"trade_conditions":{"price_type":"asking"}}})
+        profile = classify({"account_id":"account_e2e","structured_claims":{"market_context":{"currency":"TWD","server":"international","valuation_date":"2026-08-16"},"base_account":{"account_type":"permanent_wingless"},"season_profiles":[{"season_id":"season_gratitude","status":"complete"}],"collection":{"owned_item_ids":["item_anniversary_bass"]},"resources":{"values":{"white_candles":100}},"bindings":{"platforms":[{"platform":"google","status":"transferable"}]},"trade_conditions":{"offer_kind":"seller_listing","entity_kind":"single_account","price_type":"asking"}}})
         result = estimate(profile, self.rows)
         self.assertEqual(result["strict_candidate_count"], 3)
         self.assertEqual(result["status"], "insufficient_comparables")
@@ -174,7 +232,7 @@ class EstimatorRulesTest(unittest.TestCase):
         rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         target = {
             "base_account": {"account_type": "winged_or_unspecified"},
-            "currency": "TWD", "server": "international", "trade_conditions": {"price_type": "asking"},
+            "currency": "TWD", "server": "international", "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "asking"},
             "evidence_quality": {"listing_text": "high"}, "valuation_date": "2026-08-16",
         }
         hard = [row for row in rows if hard_pool(target, row)[0]]
