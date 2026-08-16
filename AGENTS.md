@@ -12,4 +12,5 @@ This repository is an offline-only static Sky account valuation knowledge base.
   - `python tools/validate/build_reports.py --root .`
   - `python tools/validate/release_check.py --root . --source-zip ../sky-valuation-v2.4-1022-complete-2026-08-16.zip`
 - Rebuild the offline ZIP only after validation succeeds.
-
+- For each user-authorized repository update, treat validation, commit, and push to `origin/main` as one completion flow unless the user explicitly requests a local-only change.
+- Do not run a background file watcher or auto-commit unreviewed working-tree changes.
