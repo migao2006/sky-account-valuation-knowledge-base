@@ -2,8 +2,8 @@
 
 ## 已確認
 
-- 季節 30、活動 24、物品 94、套組 8、別名 322、來源 24。
-- 1,022 筆來源與正規化資料、102 筆歷程均已遷移；`date_verified=true` 必須同時存在有效貼文日期。
+- 季節 30、活動 24、物品 94、套組 8、別名 322、來源 25。
+- 1,022 筆來源與正規化資料、102 筆 legacy 歷程均已遷移，另有 1 筆明示覆核恢復歷程；`date_verified=true` 必須同時存在有效貼文日期。
 - 季節／活動／物品／套組／來源／別名使用唯一 canonical ID，跨檔參照由離線驗證器檢查。
 - 大耳狗／耳狗映射至同一套組；歸巢與築巢是不同季節；極光／歐若拉、梵谷／梵高各自映射到單一季節 ID。
 - 估價相似度總分 100，季節 22、物品與套組 20，另含帳型、地圖、收藏、資源、綁定、任次、日期與證據品質；沒有單品固定加價。
@@ -14,7 +14,7 @@
 
 ## 尚未確認
 
-- canonical needs_review 分布為 {"seasons": 27, "events": 13, "items": 94, "sets": 8, "aliases": 308, "availability_events": 8}；另有類別缺口 queue 39 筆、隔離物品候選 622 筆、unmapped alias 13 筆、alias conflict 1 筆。這些集合可能重疊，不直接相加成唯一項目數。
+- canonical needs_review 分布為 {"seasons": 27, "events": 13, "items": 94, "sets": 8, "aliases": 308, "availability_events": 8}；另有類別缺口 queue 39 筆、隔離物品候選 622 筆、unmapped alias 14 筆、alias conflict 1 筆。這些集合可能重疊，不直接相加成唯一項目數。
 - 全物品 catalog 未完成。現有 94 筆是可追溯種子與節點目錄，不代表遊戲全部物品。
 - 物品 evidence tier：{"unverified_seed": 94}；模型白名單物品 0 筆。needs_review、候選與衝突別名均不得進入正式 Item Vector。
 - visual reference 0、真實 image evidence 0、可驗證成交 0；因此不宣稱圖示辨識準確率或成交價模型。

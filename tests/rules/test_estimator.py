@@ -44,6 +44,99 @@ class EstimatorRulesTest(unittest.TestCase):
         self.assertEqual(result["range_twd"]["median"], 8000)
         self.assertNotIn("fixture_wrong_server", {x["comparable_id"] for x in result["comparables"]})
 
+    def test_comparable_independence_rejects_all_positive_identity_matches(self):
+        target = dict(self.account)
+        target.update({
+            "account_id": "account_target",
+            "source_listing_ids": ["listing_target"],
+            "duplicate_cluster_id": "cluster_target",
+        })
+        cases = (
+            ("same_account_id", {"account_id": "account_target"}),
+            ("source_listing_id_overlap", {"account_id": "account_other", "source_listing_ids": ["listing_target"]}),
+            ("duplicate_cluster_id_match", {"account_id": "account_other", "source_listing_ids": ["listing_other"], "duplicate_cluster_id": "cluster_target"}),
+        )
+        for expected_reason, identity in cases:
+            with self.subTest(reason=expected_reason):
+                comparable = dict(self.rows[0])
+                comparable.update(identity)
+                accepted, reasons = hard_pool(target, comparable)
+                self.assertFalse(accepted)
+                self.assertIn(expected_reason, reasons)
+
+    def test_comparable_independence_does_not_treat_distinct_or_unknown_ids_as_same(self):
+        target = dict(self.account)
+        target.update({
+            "account_id": "account_target",
+            "source_listing_ids": ["listing_target"],
+            "duplicate_cluster_id": "unknown",
+        })
+        comparable = dict(self.rows[0])
+        comparable.update({
+            "account_id": "account_other",
+            "source_listing_ids": ["listing_other"],
+            "duplicate_cluster_id": "unknown",
+        })
+        accepted, reasons = hard_pool(target, comparable)
+        self.assertTrue(accepted)
+        self.assertFalse({"same_account_id", "source_listing_id_overlap", "duplicate_cluster_id_match"} & set(reasons))
+
+    def test_price_semantic_review_and_brokerage_are_hard_rejected_for_target(self):
+        target = dict(self.account)
+        target["price_semantic_review"] = {
+            "review_status": "needs_review",
+            "brokerage_included": True,
+        }
+        accepted, reasons = hard_pool(target, self.rows[0])
+        self.assertFalse(accepted)
+        self.assertIn("target_price_semantic_review_not_approved", reasons)
+        self.assertIn("target_brokerage_included", reasons)
+
+    def test_official_history_0036_brokerage_price_is_hard_rejected(self):
+        rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        comparable = next(row for row in rows if row["history_id"] == "history_0036")
+        target = {
+            "base_account": {"account_type": "winged_or_unspecified"},
+            "currency": "TWD",
+            "server": "international",
+            "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "asking"},
+        }
+        accepted, reasons = hard_pool(target, comparable)
+        self.assertFalse(accepted)
+        self.assertIn("price_semantic_review_not_approved", reasons)
+        self.assertIn("brokerage_included", reasons)
+
+    def test_identity_rejections_are_covered_by_estimate_output_accounting(self):
+        target = dict(self.account)
+        target.update({
+            "account_id": "account_target",
+            "source_listing_ids": ["listing_target"],
+            "duplicate_cluster_id": "cluster_target",
+        })
+        rows = []
+        for index, (field, value, expected_reason) in enumerate((
+            ("account_id", "account_target", "same_account_id"),
+            ("source_listing_ids", ["listing_target"], "source_listing_id_overlap"),
+            ("duplicate_cluster_id", "cluster_target", "duplicate_cluster_id_match"),
+        ), 1):
+            row = dict(self.rows[index - 1])
+            row["comparable_id"] = f"identity_{index}"
+            row["account_id"] = "account_other"
+            row["source_listing_ids"] = [f"listing_other_{index}"]
+            row["duplicate_cluster_id"] = f"cluster_other_{index}"
+            row[field] = value
+            row["expected_identity_rejection"] = expected_reason
+            rows.append(row)
+        result = estimate(target, rows)
+        rejected = {row["comparable_id"]: row["reasons"] for row in result["rejected_by_hard_pool"]}
+        self.assertEqual(set(rejected), {row["comparable_id"] for row in rows})
+        for row in rows:
+            self.assertIn(row["expected_identity_rejection"], rejected[row["comparable_id"]])
+        tracked = set()
+        for key in ("comparables", "rejected_by_hard_pool", "rejected_by_quality", "rejected_by_selection"):
+            tracked.update(row["comparable_id"] for row in result[key])
+        self.assertEqual(tracked, {row["comparable_id"] for row in rows})
+
     def test_fewer_than_three_never_priced(self):
         result = estimate(self.account, self.rows[:2])
         self.assertFalse(result["eligible"])

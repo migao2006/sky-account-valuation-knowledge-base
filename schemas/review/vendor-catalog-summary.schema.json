@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/vendor-catalog-summary.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "source_id", "snapshot_sha256", "canonical_item_count", "candidate_item_count", "vendor_item_count", "status_counts", "canonical_matched_count", "candidate_matched_count", "matched_count", "unmatched_collectible_count", "review_count", "field_evidence_count", "canonical_promotion", "matching_policy", "notes"],
+  "properties": {
+    "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
+    "source_id": {"const": "source_skygame_data_1_3_4"},
+    "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "canonical_item_count": {"type": "integer", "minimum": 0},
+    "candidate_item_count": {"type": "integer", "minimum": 0},
+    "vendor_item_count": {"type": "integer", "minimum": 1},
+    "status_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "matched_count": {"type": "integer", "minimum": 0},
+    "canonical_matched_count": {"type": "integer", "minimum": 0},
+    "candidate_matched_count": {"type": "integer", "minimum": 0},
+    "unmatched_collectible_count": {"type": "integer", "minimum": 0},
+    "review_count": {"type": "integer", "minimum": 0},
+    "field_evidence_count": {"type": "integer", "minimum": 0},
+    "canonical_promotion": {"const": "not_performed"},
+    "matching_policy": {"const": "exact_normalized_name_only_canonical_then_candidate"},
+    "notes": {"type": "string", "minLength": 1}
+  }
+}

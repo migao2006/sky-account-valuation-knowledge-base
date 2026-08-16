@@ -82,7 +82,7 @@ def validate(root: Path) -> dict:
     # production coverage gate applies to dimensions that the legacy snapshot
     # actually contains.
     coverage_complete = all(profile_coverage[key] > 0 for key in ("season_profiles", "map_completion_claims", "ownership_claims", "binding_claims"))
-    result["valid"] = result["source_listings"] == result["normalized_listings"] == result["account_profiles"] == 1022 and result["curated_histories"] == result["comparable_histories"] == result["comparable_accounts"] == 102 and not forbidden and not bad_dates and not bad_history_dates and not broken_lineage and not source_date_breaks and not profile_date_breaks and not date_history_breaks and not sold_semantic_breaks and result["price_type_review_rows"] > 0 and coverage_complete and same_history
+    result["valid"] = result["source_listings"] == result["normalized_listings"] == result["account_profiles"] == 1022 and result["curated_histories"] == result["comparable_histories"] == result["comparable_accounts"] == 103 and not forbidden and not bad_dates and not bad_history_dates and not broken_lineage and not source_date_breaks and not profile_date_breaks and not date_history_breaks and not sold_semantic_breaks and result["price_type_review_rows"] > 0 and coverage_complete and same_history
     return result
 
 

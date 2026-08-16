@@ -32,6 +32,9 @@ class _InternalProfile(dict[str, Any]):
 
 def normalize_price_type(row: dict[str, Any]) -> str:
     """Map legacy history labels without promoting a claimed sale to a sale."""
+    if isinstance(row, _InternalProfile):
+        value = row.get("price_type")
+        return value if value in PRICE_TYPES | {"unknown"} else "unknown"
     # Never trust an input marker as evidence that a profile was already
     # adapted.  A caller can supply arbitrary top-level fields, so the nested
     # transaction claim remains authoritative whenever it is present.
@@ -89,7 +92,14 @@ def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
         result["entity_kind"] = trade_conditions.get("entity_kind", result.get("entity_kind", "unknown"))
     evidence = row.get("evidence_quality", {})
     if isinstance(evidence, dict): result["evidence_quality"] = evidence.get("listing_text", "unknown")
-    result["price_type"] = normalize_price_type(row)
+    # A joined comparable's top-level price_type is the curated history fact;
+    # the nested profile still carries the source listing's older claim.  For
+    # user targets (no history_id), the nested structured claim remains
+    # authoritative and cannot be overridden by injected top-level fields.
+    if row.get("history_id") and "price_type" in row:
+        result["price_type"] = normalize_price_type({"price_type": row.get("price_type"), "sale_outcome": row.get("sale_outcome", {})})
+    else:
+        result["price_type"] = normalize_price_type(row)
     return result
 
 
@@ -140,6 +150,75 @@ def _account_family(value: Any) -> str:
     if value in {"short_id", "special_appearance"}:
         return value
     return "unknown"
+
+
+def _known_identifier(value: Any) -> str | None:
+    """Return an identifier only when it is explicitly known.
+
+    Identity fields are exclusion evidence, not similarity features.  In
+    particular, two missing/``unknown`` duplicate-cluster values must never
+    be interpreted as the same cluster.
+    """
+    if isinstance(value, str):
+        value = value.strip()
+        if value and value.lower() not in {"unknown", "null", "none"}:
+            return value
+    return None
+
+
+def _known_identifier_set(value: Any) -> set[str]:
+    """Return explicitly known IDs from a scalar or iterable identity field."""
+    if isinstance(value, (list, tuple, set)):
+        raw_values = value
+    else:
+        raw_values = (value,)
+    return {identifier for raw in raw_values if (identifier := _known_identifier(raw)) is not None}
+
+
+def _independence_reasons(account: dict[str, Any], comparable: dict[str, Any]) -> list[str]:
+    """Reject a comparable that can represent the target listing/account.
+
+    Reusing a listing, account or deduplication cluster as a market
+    comparable leaks the target into its own price pool.  Every comparison is
+    fail-closed only when there is positive identity evidence; absent IDs do
+    not create a match.
+    """
+    reasons: list[str] = []
+    account_id = _known_identifier(account.get("account_id"))
+    comparable_account_id = _known_identifier(comparable.get("account_id"))
+    if account_id is not None and account_id == comparable_account_id:
+        reasons.append("same_account_id")
+
+    account_sources = _known_identifier_set(account.get("source_listing_ids"))
+    comparable_sources = _known_identifier_set(comparable.get("source_listing_ids"))
+    if account_sources & comparable_sources:
+        reasons.append("source_listing_id_overlap")
+
+    account_cluster = _known_identifier(account.get("duplicate_cluster_id"))
+    comparable_cluster = _known_identifier(comparable.get("duplicate_cluster_id"))
+    if account_cluster is not None and account_cluster == comparable_cluster:
+        reasons.append("duplicate_cluster_id_match")
+    return reasons
+
+
+def _price_semantic_reasons(row: dict[str, Any], prefix: str = "") -> list[str]:
+    """Return fail-closed reasons for an explicitly flagged price semantic.
+
+    An absent review means no known price-semantic exception was imported.  A
+    present review is usable only after an explicit approval, and a price that
+    includes brokerage is never comparable until it is separated from the
+    account price.  This applies equally to an incoming target and a market
+    comparable.
+    """
+    review = row.get("price_semantic_review")
+    if not isinstance(review, dict):
+        return []
+    reasons: list[str] = []
+    if review.get("review_status") != "approved":
+        reasons.append(f"{prefix}price_semantic_review_not_approved")
+    if review.get("brokerage_included") is True:
+        reasons.append(f"{prefix}brokerage_included")
+    return reasons
 
 
 def _date_similarity(account: dict[str, Any], comparable: dict[str, Any]) -> float:
@@ -280,7 +359,9 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
 
 def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool, list[str]]:
     account, comparable = adapt_profile(account), adapt_profile(comparable)
-    reasons: list[str] = []
+    reasons = _independence_reasons(account, comparable)
+    reasons.extend(_price_semantic_reasons(account, "target_"))
+    reasons.extend(_price_semantic_reasons(comparable))
     for field in ("currency", "server"):
         a, b = _value(account, field), _value(comparable, field)
         if a in ("unknown", None):

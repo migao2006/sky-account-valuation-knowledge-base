@@ -14,6 +14,20 @@ MIGRATE_SPEC.loader.exec_module(MIGRATE)
 
 
 class MigrationContractTests(unittest.TestCase):
+    def test_explicit_urgent_claim_does_not_enter_normal_asking_line(self):
+        self.assertEqual("urgent_sale", MIGRATE.normalize_history_price_type("asking", "急售國際服帳號"))
+        self.assertEqual("asking", MIGRATE.normalize_history_price_type("asking", "一般售帳"))
+        self.assertEqual("sold_claim", MIGRATE.normalize_history_price_type("sold_explicit", "急售後已售"))
+
+    def test_brokerage_included_price_preserves_urgent_semantics_but_requires_review(self):
+        review = MIGRATE.price_semantic_review("急售國際服帳號；售價 18000 台幣（含仲）", "urgent_sale")
+        self.assertEqual(review, {
+            "urgency": "urgent_sale", "brokerage_included": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["brokerage_included_price"],
+        })
+        self.assertIsNone(MIGRATE.price_semantic_review("急售國際服帳號；售價 18000 台幣", "urgent_sale"))
+
     def test_snapshot_counts_dates_and_privacy(self):
         result = MODULE.validate(ROOT)
         self.assertTrue(result["valid"], result)
@@ -40,6 +54,114 @@ class MigrationContractTests(unittest.TestCase):
         by_id = {row["season_id"]: row for row in profiles}
         self.assertEqual(by_id["season_middle_a"]["status"], "unknown")
         self.assertEqual(by_id["season_middle_b"]["status"], "unknown")
+
+    def test_feature_summary_is_parsed_with_field_level_provenance(self):
+        aliases = {"表演": "season_performance"}
+        order = {"season_performance": 1}
+        listing, _ = MIGRATE.season_profile("未展開季節", aliases, order, "listing_text")
+        summary, _ = MIGRATE.season_profile("表演季卡", aliases, order, "normalized_feature_summary")
+        profiles = MIGRATE.merge_season_profiles(
+            {"listing_text": listing, "normalized_feature_summary": summary}, order
+        )
+        self.assertEqual(len(profiles), 1)
+        self.assertEqual(profiles[0]["season_id"], "season_performance")
+        self.assertEqual(profiles[0]["status"], "owned_not_complete")
+        self.assertEqual(profiles[0]["pass_owned"], "yes")
+        self.assertEqual(profiles[0]["evidence_state"], "text_claim")
+        self.assertEqual(
+            profiles[0]["evidence_sources"],
+            ["pass_owned:normalized_feature_summary", "status:normalized_feature_summary"],
+        )
+
+    def test_conflicting_feature_summary_claims_fail_closed(self):
+        aliases = {"表演": "season_performance"}
+        order = {"season_performance": 1}
+        listing, _ = MIGRATE.season_profile("表演畢業，表演季卡", aliases, order, "listing_text")
+        summary, _ = MIGRATE.season_profile("表演半畢，表演無卡", aliases, order, "normalized_feature_summary")
+        profile = MIGRATE.merge_season_profiles(
+            {"listing_text": listing, "normalized_feature_summary": summary}, order
+        )[0]
+        self.assertEqual(profile["status"], "unknown")
+        self.assertEqual(profile["pass_owned"], "unknown")
+        self.assertEqual(profile["evidence_state"], "conflict")
+        self.assertEqual(profile["review_status"], "needs_review")
+        self.assertIn("status:listing_text", profile["evidence_sources"])
+        self.assertIn("status:normalized_feature_summary", profile["evidence_sources"])
+
+    def test_base_profile_combines_listing_and_normalized_summary(self):
+        record = {
+            "listing_id": "listing_0001", "listing_text": "表演畢業",
+            "feature_summary": ["表演季卡"], "account_type_primary": "unknown",
+            "wing_state": "unknown", "offer_kind": "unknown", "entity_kind": "unknown",
+            "price_type": "unknown", "evidence_quality": "unknown", "bindings": [],
+        }
+        profile, unresolved = MIGRATE.base_profile(
+            record, "account_0001", {"表演": "season_performance"},
+            {"season_performance": 1}, {},
+        )
+        self.assertEqual(unresolved, [])
+        season = profile["season_profiles"][0]
+        self.assertEqual(season["status"], "complete")
+        self.assertEqual(season["pass_owned"], "yes")
+        self.assertEqual(
+            season["evidence_sources"],
+            ["pass_owned:normalized_feature_summary", "status:listing_text", "status:normalized_feature_summary"],
+        )
+
+    def test_feature_summary_only_claims_populate_structured_fields_with_provenance(self):
+        record = {
+            "listing_id": "listing_0001", "listing_text": "未完整列出帳號特徵",
+            "feature_summary": ["白蠟 50、全圖畢業、二級斗、二手"],
+            "account_type_primary": "unknown", "wing_state": "unknown",
+            "offer_kind": "unknown", "entity_kind": "unknown", "price_type": "unknown",
+            "evidence_quality": "unknown", "bindings": [],
+        }
+        profile, _ = MIGRATE.base_profile(record, "account_0001", {}, {}, {})
+        self.assertEqual(profile["resources"]["values"]["white_candles"], 50)
+        self.assertEqual(profile["map_completion"]["standard_maps"], "complete")
+        self.assertEqual(profile["map_completion"]["second_tier_capes"], "partial")
+        self.assertEqual(profile["ownership_history"], "second_owner")
+        for field in ("resources.values.white_candles", "map_completion.standard_maps", "map_completion.second_tier_capes", "ownership_history"):
+            self.assertEqual(profile["field_evidence"][field], {"sources": ["normalized_feature_summary"], "evidence_state": "text_claim"})
+
+    def test_feature_summary_conflicts_fail_closed_by_field(self):
+        record = {
+            "listing_id": "listing_0001", "listing_text": "白蠟 10、全圖畢業、一手",
+            "feature_summary": ["白蠟 20、幾乎全圖畢、二手"],
+            "account_type_primary": "unknown", "wing_state": "unknown",
+            "offer_kind": "unknown", "entity_kind": "unknown", "price_type": "unknown",
+            "evidence_quality": "unknown", "bindings": [],
+        }
+        profile, _ = MIGRATE.base_profile(record, "account_0001", {}, {}, {})
+        self.assertIsNone(profile["resources"]["values"]["white_candles"])
+        self.assertEqual(profile["resources"]["evidence_state"], "conflict")
+        self.assertEqual(profile["map_completion"]["standard_maps"], "unknown")
+        self.assertEqual(profile["map_completion"]["evidence_state"], "conflict")
+        self.assertEqual(profile["ownership_history"], "unknown")
+        self.assertEqual(profile["review_status"], "needs_review")
+        for field in ("resources.values.white_candles", "map_completion.standard_maps", "ownership_history"):
+            self.assertEqual(profile["field_evidence"][field]["evidence_state"], "conflict")
+            self.assertEqual(profile["field_evidence"][field]["sources"], ["listing_text", "normalized_feature_summary"])
+
+    def test_season_conflict_marks_profile_needs_review(self):
+        record = {
+            "listing_id": "listing_0001", "listing_text": "表演畢業",
+            "feature_summary": ["表演半畢"], "account_type_primary": "unknown",
+            "wing_state": "unknown", "offer_kind": "unknown", "entity_kind": "unknown",
+            "price_type": "unknown", "evidence_quality": "unknown", "bindings": [],
+        }
+        profile, _ = MIGRATE.base_profile(
+            record, "account_0001", {"表演": "season_performance"},
+            {"season_performance": 1}, {},
+        )
+        self.assertEqual(profile["season_profiles"][0]["evidence_state"], "conflict")
+        self.assertEqual(profile["review_status"], "needs_review")
+
+    def test_ambiguous_winter_term_is_not_auto_mapped(self):
+        aliases = {"凜冬": "season_should_not_be_used"}
+        profiles, unresolved = MIGRATE.season_profile("凜冬畢業", aliases, {})
+        self.assertEqual(profiles, [])
+        self.assertEqual(unresolved, ["凜冬"])
 
     def test_cjk_phrase_matching_does_not_depend_on_word_boundaries(self):
         self.assertTrue(MIGRATE.mentioned_without_negation("含TGC斗篷與白蠟", "TGC"))

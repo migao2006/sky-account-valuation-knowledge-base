@@ -49,7 +49,7 @@ class PackageIntegrityTests(unittest.TestCase):
         histories = {row["history_id"]: row for row in read_jsonl("data/curated/histories.jsonl")}
         profiles = {row["account_id"]: row for row in read_jsonl("data/normalized/account-profiles.jsonl")}
         accounts = read_jsonl("data/comparables/accounts.jsonl")
-        self.assertEqual(len(accounts), 102)
+        self.assertEqual(len(accounts), 103)
         self.assertEqual({row["history_id"] for row in accounts}, set(histories))
         for row in accounts:
             history = histories[row["history_id"]]

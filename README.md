@@ -1,10 +1,12 @@
-# Sky 光遇帳號估價知識庫 v3.1 P1
+# Sky 光遇帳號估價知識庫 v3.2 P2
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v3.1 P1 新增三態 Item Vector、嚴格價格清洗、Elastic Net／XGBoost 訓練框架、TreeSHAP 契約、條件式 Item Value Table 與模型估價入口。模型訓練採隔離的鎖版環境；所有正式工具仍只處理本機檔案，不主動連網。
+v3.2 P2 在 P1 模型基礎上加入固定、可重現的第三方 Catalog 快照與欄位級 review evidence、可重算的 strict-listing 人工恢復閘門，以及同帳號／同來源／同重複群組不可互相比價的獨立性規則。所有正式工具仍只處理本機檔案，不主動連網。
 
-目前資料不足以訓練可信模型：102 個可比歷程清洗後只有 3 筆正常刊登、0 筆急售；94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
+目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程，清洗後只有 3 筆正常刊登、0 筆可訓練急售；唯一明示急售價格含仲，保留為 `needs_review` 而不猜測仲介費。94 個 canonical item 仍全部待審核，正式模型物品白名單為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，94 列 Item Value Table 也全部為 `insufficient_support`，不會輸出虛構價值。
+
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。精確名稱比對得到 64 個 canonical 命中與 296 個 candidate 命中；candidate 命中只形成二級 `needs_review` 證據，沒有自動提升 canonical、alias 或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
 ## 快速入口
 
@@ -26,7 +28,7 @@ v3.1 P1 新增三態 Item Vector、嚴格價格清洗、Elastic Net／XGBoost �
 
 市場資料只保存匿名 ID 與必要的交易事實。不得加入玩家姓名、帳號、UID、電話、Email、付款資料、登入資訊、社群帳號或可回推至原貼文的 locator。
 
-本版本不把單件物品換算為固定價格。Item Value Table 是控制其他特徵後的條件歸因，不能逐件相加；未達持有、具證據的確認缺少、跨 refit fold 方向穩定度及模型 provenance 門檻時不顯示數值。單一模型內的 bootstrap 只作診斷，不能自行解鎖物品歸因。正式市場資料中，目前只有三筆同時確認幣別為 TWD 且伺服器為國際服，因此模型保持停用。
+本版本不把單件物品換算為固定價格。Item Value Table 是控制其他特徵後的條件歸因，不能逐件相加；未達持有、具證據的確認缺少、跨 refit fold 方向穩定度及模型 provenance 門檻時不顯示數值。單一模型內的 bootstrap 只作診斷，不能自行解鎖物品歸因。正式市場資料中，目前只有三筆正常刊登同時確認幣別為 TWD 且伺服器為國際服；唯一急售觀察含仲，尚不可作模型資料，因此模型保持停用。
 
 ## 分類、估價與證據
 
@@ -48,4 +50,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P1 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2 仍未完成全物品資料、圖片 evidence 的實際辨識、visual references 或 verified sales；已售聲稱不會被升級為 verified sale。

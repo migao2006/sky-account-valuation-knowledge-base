@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import ast
+import collections
 import hashlib
 import json
 import math
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
 from evidence import validate_evidence  # noqa: E402
 from schema_validator import OfflineSchemaValidator  # noqa: E402
+sys.path.insert(0, str(ROOT / "tools" / "normalize"))
+from build_comparables import deduplication_is_approved, predicate_hash, strict_recovery_predicates  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -49,6 +53,9 @@ SCHEMA_FILES = {
     "data/review/unmapped-item-aliases.jsonl": "schemas/review/unmapped-alias.schema.json",
     "data/review/unmapped-season-aliases.jsonl": "schemas/review/unmapped-alias.schema.json",
     "data/review/price-type-review.jsonl": "schemas/review/price-type-review.schema.json",
+    "data/review/strict-listing-recovery.jsonl": "schemas/review/strict-listing-recovery.schema.json",
+    "data/review/skygame-data-1.3.4-crosswalk.jsonl": "schemas/review/vendor-catalog-crosswalk.schema.json",
+    "data/review/skygame-data-1.3.4-item-evidence.jsonl": "schemas/review/vendor-catalog-item-evidence.schema.json",
     "reports/coverage/unmapped-aliases.jsonl": "schemas/reports/unmapped-coverage.schema.json",
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
@@ -63,6 +70,9 @@ JSON_SCHEMA_FILES = {
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/xgboost-normal_listing.json": "schemas/modeling/xgboost-artifact.schema.json",
     "modeling/artifacts/xgboost-urgent_sale.json": "schemas/modeling/xgboost-artifact.schema.json",
+    "data/source/vendor/skygame-data-1.3.4-items.json": "schemas/knowledge/vendor-catalog-snapshot.schema.json",
+    "data/source/vendor/skygame-data-1.3.4-metadata.json": "schemas/knowledge/vendor-catalog-metadata.schema.json",
+    "data/review/skygame-data-1.3.4-crosswalk-summary.json": "schemas/review/vendor-catalog-summary.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -91,6 +101,72 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
                 raise ValueError(f"{path}:{number} is not an object")
             records.append(value)
     return records
+
+
+def _vendor_claim_key(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return re.sub(r"[^\w]+", "", unicodedata.normalize("NFKC", value).casefold(), flags=re.UNICODE)
+
+
+def validate_vendor_evidence_links(vendor_metadata: dict[str, Any], vendor_snapshot: dict[str, Any], crosswalk: list[dict[str, Any]], candidates: dict[str, dict[str, Any]], evidence_rows: list[dict[str, Any]]) -> list[str]:
+    """Fail closed unless secondary candidate evidence is exactly source-bound."""
+    errors: list[str] = []
+    snapshot_by_pair = {(row.get("guid"), row.get("id")): row for row in vendor_snapshot.get("items", [])}
+    crosswalk_by_pair: dict[tuple[Any, Any], dict[str, Any]] = {}
+    candidate_match_pairs: set[tuple[Any, Any]] = set()
+    for row in crosswalk:
+        pair = (row.get("vendor_guid"), row.get("vendor_item_id"))
+        source = snapshot_by_pair.get(pair)
+        if pair in crosswalk_by_pair:
+            errors.append(f"vendor-catalog:{pair}: duplicate crosswalk row")
+            continue
+        crosswalk_by_pair[pair] = row
+        if not source:
+            continue
+        if row.get("vendor_name") != source.get("name") or row.get("vendor_item_type") != source.get("type"):
+            errors.append(f"vendor-catalog:{pair}: crosswalk name or type differs from snapshot")
+        if row.get("match_status") == "matched_candidate_name":
+            if row.get("canonical_item_ids") or len(row.get("candidate_item_ids", [])) != 1:
+                errors.append(f"vendor-catalog:{pair}: candidate match violates canonical-priority gate")
+            else:
+                candidate_match_pairs.add(pair)
+
+    evidence_pairs: set[tuple[Any, Any]] = set()
+    evidence_ids: set[str] = set()
+    for row in evidence_rows:
+        evidence_id = row.get("evidence_id")
+        pair = (row.get("locator"), row.get("vendor_item_id"))
+        if evidence_id in evidence_ids:
+            errors.append(f"vendor-evidence: duplicate evidence_id={evidence_id}")
+        evidence_ids.add(str(evidence_id))
+        if pair in evidence_pairs:
+            errors.append(f"vendor-evidence:{evidence_id}: duplicate candidate evidence pair={pair}")
+        evidence_pairs.add(pair)
+        source, linked = snapshot_by_pair.get(pair), crosswalk_by_pair.get(pair)
+        candidate_id = row.get("candidate_item_id")
+        if candidate_id not in candidates:
+            errors.append(f"vendor-evidence:{evidence_id}: dangling candidate")
+        if row.get("source_id") != vendor_metadata.get("source_id") or row.get("snapshot_id") != vendor_metadata.get("snapshot_id") or row.get("snapshot_sha256") != vendor_metadata.get("snapshot_sha256"):
+            errors.append(f"vendor-evidence:{evidence_id}: source or snapshot mismatch")
+        if not source or not linked:
+            errors.append(f"vendor-evidence:{evidence_id}: locator pair is not a snapshot/crosswalk pair")
+            continue
+        if linked.get("match_status") != "matched_candidate_name" or linked.get("candidate_item_ids") != [candidate_id]:
+            errors.append(f"vendor-evidence:{evidence_id}: missing exact candidate crosswalk linkage")
+        if row.get("claim_value") != linked.get("vendor_name") or row.get("claim_value") != source.get("name"):
+            errors.append(f"vendor-evidence:{evidence_id}: claim value differs from crosswalk or snapshot")
+        if row.get("vendor_item_type") != linked.get("vendor_item_type") or row.get("vendor_item_type") != source.get("type"):
+            errors.append(f"vendor-evidence:{evidence_id}: vendor item type differs from crosswalk or snapshot")
+        expected_hash = hashlib.sha256(_vendor_claim_key(source.get("name")).encode("utf-8")).hexdigest().upper()
+        if row.get("claim_value_hash") != expected_hash:
+            errors.append(f"vendor-evidence:{evidence_id}: claim hash differs from snapshot claim")
+        expected_id = "evidence_vendor_" + hashlib.sha256(f"vendor_skygame_data_1_3_4\0{candidate_id}\0{row.get('locator')}\0candidate_name_en".encode("utf-8")).hexdigest()[:24]
+        if evidence_id != expected_id:
+            errors.append(f"vendor-evidence:{evidence_id}: evidence ID is not deterministic for its candidate and locator")
+    if evidence_pairs != candidate_match_pairs:
+        errors.append(f"vendor-evidence: candidate crosswalk/evidence pairs differ missing={sorted(candidate_match_pairs - evidence_pairs)!r} extra={sorted(evidence_pairs - candidate_match_pairs)!r}")
+    return errors
 
 
 def validate(root: Path = ROOT) -> dict[str, Any]:
@@ -220,6 +296,76 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for alias_id in row.get("source_alias_ids", []):
             if alias_id in alias_ids:
                 errors.append(f"alias-conflict:{row.get('normalized_alias')}: unresolved alias remains canonical={alias_id}")
+    vendor_metadata = json.loads((root / "data/source/vendor/skygame-data-1.3.4-metadata.json").read_text(encoding="utf-8"))
+    if vendor_metadata.get("source_id") not in sources:
+        errors.append("vendor-catalog: metadata source_id is not canonical")
+    vendor_snapshot_path = root / "data/source/vendor/skygame-data-1.3.4-items.json"
+    vendor_tarball_path = root / "data/source/vendor/skygame-data-1.3.4.tgz"
+    vendor_snapshot = json.loads(vendor_snapshot_path.read_text(encoding="utf-8"))
+    if hashlib.sha256(vendor_snapshot_path.read_bytes()).hexdigest().upper() != vendor_metadata.get("snapshot_sha256"):
+        errors.append("vendor-catalog: snapshot SHA-256 mismatch")
+    if hashlib.sha256(vendor_tarball_path.read_bytes()).hexdigest().upper() != vendor_metadata.get("tarball_sha256"):
+        errors.append("vendor-catalog: tarball SHA-256 mismatch")
+    vendor_pairs = {(row.get("guid"), row.get("id")) for row in vendor_snapshot.get("items", [])}
+    vendor_guids = {guid for guid, _ in vendor_pairs}
+    vendor_ids = {item_id for _, item_id in vendor_pairs}
+    if len(vendor_guids) != len(vendor_snapshot.get("items", [])) or len(vendor_ids) != len(vendor_snapshot.get("items", [])):
+        errors.append("vendor-catalog: snapshot IDs or GUIDs are not unique")
+    crosswalk = read_jsonl(root / "data/review/skygame-data-1.3.4-crosswalk.jsonl")
+    if len(crosswalk) != len(vendor_snapshot.get("items", [])):
+        errors.append("vendor-catalog: crosswalk does not cover the exact snapshot")
+    candidates = {row.get("candidate_item_id"): row for row in read_jsonl(root / "data/review/item-candidates.jsonl")}
+    crosswalk_pairs: dict[tuple[Any, Any], dict[str, Any]] = {}
+    for row in crosswalk:
+        pair = (row.get("vendor_guid"), row.get("vendor_item_id"))
+        if pair in crosswalk_pairs:
+            errors.append(f"vendor-catalog:{pair}: duplicate crosswalk row")
+        crosswalk_pairs[pair] = row
+        if row.get("source_id") not in sources:
+            errors.append(f"vendor-catalog:{row.get('vendor_guid')}: dangling source")
+        if pair not in vendor_pairs:
+            errors.append(f"vendor-catalog:{row.get('vendor_guid')}: row not present in snapshot")
+        for item_id in row.get("canonical_item_ids", []):
+            if item_id not in items:
+                errors.append(f"vendor-catalog:{row.get('vendor_guid')}: dangling canonical item={item_id}")
+        for candidate_id in row.get("candidate_item_ids", []):
+            if candidate_id not in candidates:
+                errors.append(f"vendor-catalog:{row.get('vendor_guid')}: dangling candidate item={candidate_id}")
+        if row.get("match_status") == "matched_candidate_name" and (row.get("canonical_item_ids") or len(row.get("candidate_item_ids", [])) != 1):
+            errors.append(f"vendor-catalog:{row.get('vendor_guid')}: candidate match violates canonical-priority gate")
+    evidence_rows = read_jsonl(root / "data/review/skygame-data-1.3.4-item-evidence.jsonl")
+    evidence_ids: set[str] = set()
+    for row in evidence_rows:
+        evidence_id = row.get("evidence_id")
+        if evidence_id in evidence_ids:
+            errors.append(f"vendor-evidence: duplicate evidence_id={evidence_id}")
+        evidence_ids.add(str(evidence_id))
+        pair = (row.get("locator"), row.get("vendor_item_id"))
+        linked = crosswalk_pairs.get(pair)
+        if row.get("candidate_item_id") not in candidates:
+            errors.append(f"vendor-evidence:{evidence_id}: dangling candidate")
+        if row.get("source_id") != vendor_metadata.get("source_id") or row.get("snapshot_sha256") != vendor_metadata.get("snapshot_sha256"):
+            errors.append(f"vendor-evidence:{evidence_id}: source or snapshot mismatch")
+        claim = row.get("claim_value")
+        normalized_claim = "".join(char.casefold() for char in claim if char.isalnum()) if isinstance(claim, str) else ""
+        if not isinstance(claim, str) or hashlib.sha256(normalized_claim.encode("utf-8")).hexdigest().upper() != row.get("claim_value_hash"):
+            errors.append(f"vendor-evidence:{evidence_id}: claim hash mismatch")
+        if not linked or linked.get("match_status") != "matched_candidate_name" or linked.get("candidate_item_ids") != [row.get("candidate_item_id")]:
+            errors.append(f"vendor-evidence:{evidence_id}: missing exact candidate crosswalk linkage")
+    errors.extend(validate_vendor_evidence_links(vendor_metadata, vendor_snapshot, crosswalk, candidates, evidence_rows))
+    summary = json.loads((root / "data/review/skygame-data-1.3.4-crosswalk-summary.json").read_text(encoding="utf-8"))
+    status_counts = dict(sorted(collections.Counter(str(row.get("match_status")) for row in crosswalk).items()))
+    expected_summary = {
+        "vendor_item_count": len(vendor_pairs),
+        "canonical_matched_count": status_counts.get("matched_canonical_name", 0) + status_counts.get("matched_alias", 0),
+        "candidate_matched_count": status_counts.get("matched_candidate_name", 0),
+        "unmatched_collectible_count": status_counts.get("unmatched_vendor_item", 0),
+        "field_evidence_count": len(evidence_rows),
+        "status_counts": status_counts,
+    }
+    for key, expected in expected_summary.items():
+        if summary.get(key) != expected:
+            errors.append(f"vendor-catalog: summary {key} mismatch expected={expected!r} actual={summary.get(key)!r}")
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -239,6 +385,24 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     normalized_rows = read_jsonl(root / "data/normalized/listings.jsonl")
     normalized_by_id = {row["listing_id"]: row for row in normalized_rows}
     listing_ids = set(normalized_by_id)
+    legacy_history_rows = [row for row in read_jsonl(root / "data/curated/histories.jsonl") if "recovery" not in row]
+    used_listing_ids = {listing_id for history in legacy_history_rows for listing_id in history.get("source_listing_ids", [])}
+    recovery_decisions = read_jsonl(root / "data/review/strict-listing-recovery.jsonl")
+    if len({row.get("listing_id") for row in recovery_decisions}) != len(recovery_decisions):
+        errors.append("strict-recovery: duplicate listing decision")
+    for decision in recovery_decisions:
+        listing = normalized_by_id.get(decision.get("listing_id"))
+        if listing is None:
+            errors.append(f"strict-recovery:{decision.get('listing_id')}: dangling listing")
+            continue
+        predicates = strict_recovery_predicates(listing, used_listing_ids)
+        if decision.get("review_status") == "approved":
+            if predicates is None or decision.get("predicates") != predicates:
+                errors.append(f"strict-recovery:{decision.get('listing_id')}: approved predicates no longer hold")
+            elif not deduplication_is_approved(decision.get("deduplication")):
+                errors.append(f"strict-recovery:{decision.get('listing_id')}: deduplication review missing or unapproved")
+            elif decision.get("predicate_hash") != predicate_hash(listing, predicates, decision["deduplication"]):
+                errors.append(f"strict-recovery:{decision.get('listing_id')}: predicate hash mismatch")
     profiles = read_jsonl(root / "data/normalized/account-profiles.jsonl")
     account_ids: set[str] = set()
     for row in profiles:
@@ -408,7 +572,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         report_value = reported_market.get(key) if key in {"source_listings", "normalized_listings", "account_profiles", "curated_histories", "comparable_histories", "comparable_accounts"} else reported.get(key)
         if report_value != actual:
             errors.append(f"coverage count mismatch: {key} report={report_value!r} actual={actual}")
-    expected_market = {"source_listings": 1022, "normalized_listings": 1022, "account_profiles": 1022, "curated_histories": 102, "comparable_histories": 102, "comparable_accounts": 102}
+    expected_market = {"source_listings": 1022, "normalized_listings": 1022, "account_profiles": 1022, "curated_histories": 103, "comparable_histories": 103, "comparable_accounts": 103}
     for key, expected in expected_market.items():
         if formal_counts[key] != expected:
             errors.append(f"formal market coverage: expected {key}={expected}, found {formal_counts[key]}")
@@ -458,7 +622,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.1-p1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.2-p2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
