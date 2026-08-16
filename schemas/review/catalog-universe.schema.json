@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/catalog-universe.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["universe_id", "snapshot_id", "source_id", "snapshot_sha256", "vendor_item_id", "vendor_guid", "vendor_name", "vendor_item_type", "vendor_item_subtype", "vendor_item_group", "classification", "crosswalk_match_status", "canonical_item_ids", "candidate_item_ids", "review_status"],
+  "properties": {
+    "universe_id": {"type": "string", "pattern": "^catalog_vendor_[A-Za-z0-9_-]+$"},
+    "snapshot_id": {"const": "vendor_skygame_data_1_3_4"},
+    "source_id": {"const": "source_skygame_data_1_3_4"},
+    "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "vendor_item_id": {"type": "integer", "minimum": 0},
+    "vendor_guid": {"type": "string", "minLength": 1},
+    "vendor_name": {"type": "string", "minLength": 1},
+    "vendor_item_type": {"type": "string", "minLength": 1},
+    "vendor_item_subtype": {"type": ["string", "null"]},
+    "vendor_item_group": {"type": ["string", "null"]},
+    "classification": {"enum": ["canonical_linked", "candidate_linked", "unmatched", "explicitly_excluded"]},
+    "crosswalk_match_status": {"enum": ["matched_canonical_name", "matched_alias", "ambiguous_canonical_match", "matched_candidate_name", "ambiguous_candidate_match", "unmatched_vendor_item", "excluded_non_collectible"]},
+    "canonical_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "review_status": {"enum": ["needs_review", "not_required"]}
+  }
+}

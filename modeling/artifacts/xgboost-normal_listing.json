@@ -7,7 +7,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-normal.jsonl"
   ],
-  "input_snapshot_sha256": "23231F1EED0E9C5385CD03CAC9690E1084DF0E2449DB1D8B3F6255A33CF16451",
+  "input_snapshot_sha256": "52F3F2285D6619765544EBA542D7598F1808F0819580C1DF3E1025DBE9DC91B8",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -69,9 +69,14 @@
       "ownership_history=multiple_owners",
       "resources.capture_date=__unknown__",
       "resources.evidence_state=__unknown__",
+      "resources.evidence_state=text_claim",
+      "resources.values.hearts",
       "resources.values.hearts=__unknown__",
+      "resources.values.red_candles",
       "resources.values.red_candles=__unknown__",
+      "resources.values.season_candles",
       "resources.values.season_candles=__unknown__",
+      "resources.values.white_candles",
       "resources.values.white_candles=__unknown__",
       "season_profiles.__empty__",
       "season_profiles.season_abyss.capture_date=__unknown__",
@@ -234,6 +239,12 @@
     "unique_clusters": 3,
     "group_count": 3,
     "baseline_median_mae": null
+  },
+  "publication_gate": {
+    "status": "not_evaluated",
+    "required_independent_training_clusters": 300,
+    "required_time_forward_holdout_clusters": 100,
+    "reason": "no_independent_time_forward_holdout"
   },
   "prediction_contract": {
     "target": "log_price_twd",

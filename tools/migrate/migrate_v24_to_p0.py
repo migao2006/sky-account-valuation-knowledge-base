@@ -361,10 +361,19 @@ def season_summary(profiles: list[dict[str, Any]], order: dict[str, int]) -> dic
 def resource_vector(text: str) -> dict[str, Any]:
     labels = {"white_candles": r"(?:白蠟|白蜡)(?:燭|烛)?", "hearts": r"(?:愛心|爱心)", "red_candles": r"(?:紅蠟|红蜡)(?:燭|烛)?", "season_candles": r"(?:季蠟|季蜡)(?:燭|烛)?"}
     values: dict[str, Any] = {}
+    claim_kinds: dict[str, str | None] = {}
     for key, label in labels.items():
-        match = re.search(rf"{label}\s*[:：]?\s*(\d+)", text)
-        values[key] = int(match.group(1)) if match else None
-    return {"values": values, "capture_date": None, "evidence_state": "text_claim" if any(v is not None for v in values.values()) else "unknown"}
+        # Approximate point claims remain useful for coarse resource bands, but
+        # lower bounds such as "1000以上" / "超過1000" are deliberately not
+        # coerced to exact values by this static profile contract.
+        match = re.search(rf"{label}\s*[:：]?\s*(約|约|近)?\s*(\d+)(?!\d|\s*(?:以上|起|\+))", text)
+        if match:
+            values[key] = int(match.group(2))
+            claim_kinds[key] = "approximate" if match.group(1) else "exact"
+        else:
+            values[key] = None
+            claim_kinds[key] = None
+    return {"values": values, "claim_kinds": claim_kinds, "capture_date": None, "evidence_state": "text_claim" if any(v is not None for v in values.values()) else "unknown"}
 
 
 def merge_field_claims(
@@ -400,6 +409,13 @@ def merge_resources(
             None,
         )
         values[key] = value
+        accepted_kinds = [
+            source.get("claim_kinds", {}).get(key)
+            for source in (listing, summary)
+            if source["values"].get(key) == value and value is not None
+        ]
+        if provenance["evidence_state"] == "text_claim" and "approximate" in accepted_kinds:
+            provenance["claim_kind"] = "approximate"
         evidence[f"resources.values.{key}"] = provenance
     states = {row["evidence_state"] for row in evidence.values()}
     overall = "conflict" if "conflict" in states else "text_claim" if "text_claim" in states else "unknown"

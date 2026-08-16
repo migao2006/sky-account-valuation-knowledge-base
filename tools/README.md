@@ -1,4 +1,4 @@
-# 離線工具（v3.2 P2）
+# 離線工具（v3.3 P2.1）
 
 核心工具採 Python 3 標準函式庫，只處理本機 JSON／JSONL。`modeling/` 是獨立鎖版的可選科學運算環境；它也不含下載、HTTP、排程或背景能力。
 
@@ -34,7 +34,9 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 
 正式市場資料目前只有三筆正常刊登同時確認 TWD 與國際服；唯一急售觀察含仲，保留為 `needs_review`，不猜測或扣除仲介費。估價適用範圍有限。這一版新增固定 vendor catalog 的 review evidence 與一筆明示覆核恢復歷程，但不把二級來源自動升級 canonical，也不加入回測、校準或自動資料更新。
 
-## P2 模型資料流
+## P2.1 Catalog review 與模型資料流
+
+`tools/normalize/build_catalog_universe.py` 對固定 vendor snapshot 作全量封閉分類；`build_item_evidence_bundle.py` 與 `promote_items.py` 只產生可重播的 identity-only review evidence/ledger，不修改 canonical。`build_market_claim_review.py` 產生固定 20 筆匿名人工雙標 queue，gold 檔在真正人工標註與裁決前保持空白。
 
 `parse_item_vectors.py` 會為每個帳號與每個 canonical item 產生 `owned`、`confirmed_missing` 或 `unknown`；未提及永遠是 unknown。`clean_prices.py` 只保留已驗證 TWD、international、seller listing、single account，並將正常刊登與急售分開。
 

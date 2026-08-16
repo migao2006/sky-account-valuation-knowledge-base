@@ -4,7 +4,7 @@
   "title": "Offline P1 Elastic Net artifact",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "status", "price_line", "model_type", "random_seed", "input_snapshot_paths", "input_snapshot_sha256", "training", "feature_schema", "prediction_contract", "rejected_rows", "limitations", "artifact"],
+  "required": ["schema_version", "status", "price_line", "model_type", "random_seed", "input_snapshot_paths", "input_snapshot_sha256", "training", "publication_gate", "feature_schema", "prediction_contract", "rejected_rows", "limitations", "artifact"],
   "properties": {
     "schema_version": {"const": "3.1-p1"},
     "status": {"enum": ["trained", "insufficient_training_data", "dependency_unavailable", "training_failed"]},
@@ -14,6 +14,7 @@
     "input_snapshot_paths": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[^\\\\]+(?:/[^\\\\]+)*$"}, "uniqueItems": true},
     "input_snapshot_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "training": {"type": "object", "required": ["eligible_rows", "minimum_rows", "feature_group_count", "outer_cv_mae"], "properties": {"eligible_rows": {"type": "integer", "minimum": 0}, "minimum_rows": {"type": "integer", "minimum": 100}, "feature_group_count": {"type": "integer", "minimum": 0}, "outer_cv_mae": {"type": ["number", "null"], "minimum": 0}}},
+    "publication_gate": {"type": "object", "required": ["status"], "properties": {"status": {"const": "not_evaluated"}}},
     "feature_schema": {"type": "object"},
     "prediction_contract": {"type": "object"},
     "rejected_rows": {"type": "array"},

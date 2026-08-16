@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-claim-gold.schema.json",
+  "description": "Adjudicated gold requires two independent human annotations. Automated, model, or agent labels are never gold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["gold_id", "review_id", "listing_id", "listing_text_sha256", "annotation_protocol", "annotator_a", "annotator_b", "adjudication", "review_status"],
+  "properties": {
+    "gold_id": {"type": "string", "pattern": "^market_claim_gold_[0-9]{4}$"},
+    "review_id": {"type": "string", "pattern": "^market_claim_review_[0-9]{4}$"},
+    "listing_id": {"type": "string", "pattern": "^listing_[0-9]{4}$"},
+    "listing_text_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotation_protocol": {"const": "double_independent_human_annotation"},
+    "annotator_a": {"$ref": "#/$defs/human_annotation"},
+    "annotator_b": {"$ref": "#/$defs/human_annotation"},
+    "adjudication": {"$ref": "#/$defs/human_adjudication"},
+    "review_status": {"const": "approved_human_gold"}
+  },
+  "$defs": {
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offer_kind", "entity_kind", "server", "currency", "price_type", "price_twd", "status", "date_verified"],
+      "properties": {
+        "offer_kind": {"enum": ["seller_listing", "buyer_budget", "service", "exchange", "risk_report", "unknown"]},
+        "entity_kind": {"enum": ["single_account", "multi_account", "service", "product", "unknown"]},
+        "server": {"enum": ["international", "china", "unknown"]},
+        "currency": {"enum": ["TWD", "HKD", "RM", "CNY", "unknown"]},
+        "price_type": {"enum": ["asking", "reduced", "instant", "instant_price", "quick_sale", "buyout", "direct", "auction", "auction_floor", "buyer_budget", "buyer_demand", "buyer_offer", "exchange", "exchange_only", "non_cash_exchange", "multi_account", "multi_price", "multi_currency", "foreign_currency", "currency_unknown", "sold_explicit", "sold_last_ask", "market_claim", "unknown"]},
+        "price_twd": {"type": ["integer", "null"], "minimum": 0},
+        "status": {"enum": ["active", "wanted", "sold", "sold_claimed", "reported_sold", "unknown"]},
+        "date_verified": {"type": "boolean"}
+      }
+    },
+    "human_annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotator_id", "annotator_kind", "annotated_at", "labels"],
+      "properties": {
+        "annotator_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
+        "annotator_kind": {"const": "human"},
+        "annotated_at": {"type": "string", "format": "date"},
+        "labels": {"$ref": "#/$defs/labels"}
+      }
+    },
+    "human_adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adjudicator_id", "adjudicator_kind", "adjudicated_at", "decision", "final_labels"],
+      "properties": {
+        "adjudicator_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
+        "adjudicator_kind": {"const": "human"},
+        "adjudicated_at": {"type": "string", "format": "date"},
+        "decision": {"enum": ["agreement", "resolved_disagreement"]},
+        "final_labels": {"$ref": "#/$defs/labels"}
+      }
+    }
+  }
+}

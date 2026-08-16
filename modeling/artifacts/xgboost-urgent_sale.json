@@ -7,7 +7,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl"
   ],
-  "input_snapshot_sha256": "8266F6BCC8BC3B806F45F27EDBB52A35615854E4793728E417195A5A5ECDF07D",
+  "input_snapshot_sha256": "5CA3175B088E876549C248A4D7DC14A78C47543B4E8042F581C3305FA5FAA789",
   "feature_schema": {
     "version": "1",
     "feature_names": [],
@@ -28,6 +28,12 @@
     "unique_clusters": 0,
     "group_count": 0,
     "baseline_median_mae": null
+  },
+  "publication_gate": {
+    "status": "not_evaluated",
+    "required_independent_training_clusters": 300,
+    "required_time_forward_holdout_clusters": 100,
+    "reason": "no_independent_time_forward_holdout"
   },
   "prediction_contract": {
     "target": "log_price_twd",

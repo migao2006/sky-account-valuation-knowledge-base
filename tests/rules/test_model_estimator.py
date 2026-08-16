@@ -37,7 +37,8 @@ class ModelEstimatorTest(unittest.TestCase):
             "schema_version": "3.1-p1", "status": "trained", "model_type": model_type,
             "price_line": "normal_listing", "input_snapshot_paths": ["modeling/artifacts/snapshot.jsonl"],
             "input_snapshot_sha256": snapshot_hash,
-            "training": {"outer_cv_mae": 0.2, "threshold_met": True, "baseline_beaten": True, "eligible_rows": 100, "minimum_rows": 100, "group_count": 5, "folds": 3, "baseline_mae": 0.3},
+            "training": {"outer_cv_mae": 0.2, "threshold_met": True, "baseline_beaten": True, "eligible_rows": 300, "minimum_rows": 300, "group_count": 300, "folds": 3, "baseline_mae": 0.3},
+            "publication_gate": {"status": "passed", "independent_training_clusters": 300, "time_forward_holdout_clusters": 100, "time_forward_holdout": True, "metrics": {"mdape": 0.18, "p90_ape": 0.35, "median_baseline_mae_improvement": 0.16, "selector_mae_improvement": 0.11, "prediction_interval_80_coverage": 0.80, "median_interval_width_ratio": 0.45, "supported_case_rate": 0.82}},
             "feature_schema": {"features": [{"name": "resources.values.white_candles", "min": 0, "max": 1000}], "baselines": {"resources.values.white_candles": 50}},
             "prediction_contract": contract,
         }
@@ -63,24 +64,22 @@ class ModelEstimatorTest(unittest.TestCase):
             modified["model_sha256"] = hashlib.sha256(model_path.read_bytes()).hexdigest()
             (artifact_dir / "xgboost-normal_listing.json").write_text(json.dumps(modified), encoding="utf-8")
 
-    def test_two_valid_models_are_inverse_mae_weighted(self):
+    def test_self_reported_two_model_publication_gate_cannot_publish(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); self._write_artifacts(root)
             result = estimate_model(self._account(), root=root)
-        self.assertTrue(result["eligible"])
-        self.assertEqual(result["status"], "estimated")
-        self.assertEqual({row["model_type"] for row in result["model_selection"] if row["used"]}, {"elastic_net", "xgboost"})
-        self.assertTrue(result["range_twd"]["low"] < result["range_twd"]["point"] < result["range_twd"]["high"])
-        self.assertTrue(result["shap_drivers"])
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["status"], "insufficient_training_data")
+        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
         validator = OfflineSchemaValidator(ROOT / "schemas")
         self.assertEqual(validator.validate(result, ROOT / "schemas" / "model" / "model-estimate-result.schema.json"), [])
 
-    def test_single_valid_model_is_used(self):
+    def test_self_reported_single_model_publication_gate_cannot_publish(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); self._write_artifacts(root, xgb=False)
             result = estimate_model(self._account(), root=root)
-        self.assertTrue(result["eligible"])
-        self.assertEqual(len([row for row in result["model_selection"] if row["used"]]), 1)
+        self.assertFalse(result["eligible"])
+        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
 
     def test_no_trained_artifacts_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -96,11 +95,9 @@ class ModelEstimatorTest(unittest.TestCase):
             unknown_result = estimate_model(unknown, root=root)
             outlier = self._account(); outlier["resources"] = {"values": {"white_candles": 1001}}
             outlier_result = estimate_model(outlier, root=root)
-        # Elastic Net's declared missing-mask contract may estimate this input,
-        # but it must not silently encode unknown as an owned/missing item.
-        self.assertTrue(unknown_result["eligible"])
-        self.assertTrue(any("missingindicator" in row["feature"] for row in unknown_result["shap_drivers"]))
-        self.assertEqual(outlier_result["status"], "out_of_distribution")
+        self.assertFalse(unknown_result["eligible"])
+        self.assertFalse(outlier_result["eligible"])
+        self.assertIn("model_publication_disabled_in_p2_1", unknown_result["insufficiency_reasons"])
 
     def test_market_and_evidence_gates_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -119,7 +116,7 @@ class ModelEstimatorTest(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("snapshot_hash_mismatch", result["insufficiency_reasons"])
 
-    def test_xgboost_model_hash_tamper_is_rejected(self):
+    def test_xgboost_cannot_reach_model_loading_while_publication_is_disabled(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); self._write_artifacts(root, elastic=False)
             artifact_path = root / "modeling" / "artifacts" / "xgboost-normal_listing.json"
@@ -128,15 +125,15 @@ class ModelEstimatorTest(unittest.TestCase):
             artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
             result = estimate_model(self._account(), root=root)
         self.assertFalse(result["eligible"])
-        self.assertIn("xgboost_model_hash_mismatch", result["insufficiency_reasons"])
+        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
 
     def test_xgboost_sparse_feature_is_nan_not_unknown_rejection(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); self._write_artifacts(root, elastic=False)
             account = self._account(); account["resources"] = {"values": {}}
             result = estimate_model(account, root=root)
-        self.assertTrue(result["eligible"])
-        self.assertEqual([row["model_type"] for row in result["model_selection"] if row["used"]], ["xgboost"])
+        self.assertFalse(result["eligible"])
+        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
 
     def test_trained_artifact_without_quality_evidence_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -182,9 +179,8 @@ class ModelEstimatorTest(unittest.TestCase):
                 received, _, reasons = _predict_elastic_net(artifact["prediction_contract"], {"features": features}, {})
                 self.assertEqual(reasons, [])
                 self.assertTrue(math.isclose(received, expected, rel_tol=0, abs_tol=1e-10))
-        self.assertTrue(result["eligible"])
-        self.assertEqual(result["model_selection"][0]["model_type"], "elastic_net")
-        self.assertTrue(any(row["feature"] == "numeric__signal" for row in result["shap_drivers"]))
+        self.assertFalse(result["eligible"])
+        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
 
     def test_formal_p1_artifacts_are_present_but_insufficient(self):
         result = estimate_model(self._account(), root=ROOT)
