@@ -5,8 +5,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import sys
 import zipfile
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+from release_files import HASH_EXCLUSIONS, lf_violations, release_files
+
+
+PACKAGE_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def digest(path: Path) -> str:
@@ -24,21 +32,45 @@ def main() -> None:
     args = parser.parse_args()
     root = args.root.resolve()
     output = args.output.resolve()
-    files = [
-        path for path in sorted(root.rglob("*"))
-        if path.is_file() and ".git" not in path.parts and "__pycache__" not in path.parts and path.suffix != ".pyc" and "staging" not in path.parts
-    ]
-    if any("staging" in path.parts for path in files):
-        raise RuntimeError("research staging cannot enter the release")
+    residue = sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.name == "__pycache__" or path.suffix == ".pyc" or (path.is_dir() and path.name == "staging")
+    )
+    if residue:
+        raise RuntimeError(f"release root contains cache or staging residue: {residue}")
+    files = release_files(root)
+    violations = lf_violations(root)
+    if violations:
+        raise RuntimeError(f"release text files must use LF: {violations}")
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    package_id = manifest.get("package_id")
+    if (
+        not isinstance(package_id, str)
+        or not PACKAGE_ID_PATTERN.fullmatch(package_id)
+        or Path(package_id).is_absolute()
+        or Path(package_id).name != package_id
+    ):
+        raise RuntimeError(
+            "manifest package_id must be a safe single directory name "
+            "([a-z0-9][a-z0-9._-]*)"
+        )
     actual = {path.relative_to(root).as_posix() for path in files}
     declared = set(manifest.get("file_hashes", {})) | set(manifest.get("hash_exclusions", []))
+    if set(manifest.get("hash_exclusions", [])) != HASH_EXCLUSIONS:
+        raise RuntimeError("manifest hash exclusions must only contain generated self-references")
     if actual != declared:
         raise RuntimeError(f"release file set differs from manifest: extra={sorted(actual-declared)}, missing={sorted(declared-actual)}")
+    hash_mismatches = [
+        relative for relative, expected in manifest.get("file_hashes", {}).items()
+        if not (root / relative).is_file() or digest(root / relative) != expected
+    ]
+    if hash_mismatches:
+        raise RuntimeError(f"manifest hashes do not match release bytes: {hash_mismatches}")
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in files:
-            relative = Path(root.name) / path.relative_to(root)
+            relative = Path(package_id) / path.relative_to(root)
             info = zipfile.ZipInfo(relative.as_posix(), date_time=(2026, 8, 16, 12, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16

@@ -8,6 +8,7 @@
     "manifest_hashes": true,
     "source_zip_unchanged": true,
     "required_directory_structure": true,
+    "no_cache_or_staging_residue": true,
     "migration_1022": true,
     "histories_102": true,
     "verified_sales_remain_zero": true,
@@ -17,15 +18,16 @@
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 25,
+    "run": 54,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 103,
+    "hashed_files": 109,
     "mismatches": []
   },
+  "release_residue": [],
   "source_archive": {
     "checked": true,
     "unchanged": true,

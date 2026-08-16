@@ -1,0 +1,22 @@
+# Release content is hashed from the bytes of a standard LF checkout.
+* text=auto eol=lf
+
+# Archives and media are always copied byte-for-byte.
+*.zip -text
+*.7z -text
+*.rar -text
+*.gz -text
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.webp -text
+*.avif -text
+*.ico -text
+*.pdf -text
+*.mp3 -text
+*.mp4 -text
+*.webm -text
+*.woff -text
+*.woff2 -text
+*.pyc -text
