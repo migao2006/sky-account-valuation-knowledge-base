@@ -29,7 +29,8 @@
     "p2_2_fandom_same_lineage_only": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
-    "verified_identity_cohort_not_over_promoted_to_model": true
+    "verified_identity_cohort_not_over_promoted_to_model": true,
+    "fresh_lf_checkout": true
   },
   "schema_records_checked": 20501,
   "schema_errors": [],
@@ -99,5 +100,11 @@
     "P2.6 的 2476 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 10，model eligible 仍為 0。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
-  ]
+  ],
+  "fresh_lf_checkout": {
+    "checked": true,
+    "valid": true,
+    "commit": "1a75c2d42aecc2f2649e4bee79514a79067b1d91",
+    "result": "{\"valid\": true, \"tests\": {\"run\": 227, \"failures\": 0, \"errors\": 0, \"skipped\": 0}, \"manifest_mismatches\": 0, \"source_zip_unchanged\": true}"
+  }
 }
