@@ -23,7 +23,8 @@
     "p2_2_fandom_same_lineage_only": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
-    "no_model_eligible_items": true
+    "no_model_eligible_items": true,
+    "fresh_lf_checkout": true
   },
   "schema_records_checked": 17936,
   "schema_errors": [],
@@ -89,5 +90,11 @@
     "P2.2 固定 1,758 筆 vendor collectible registry 是 review-only 來源列母體，不是 1,758 個 canonical items；重名與跨類型衝突均隔離，模型白名單提升為 0。",
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。"
-  ]
+  ],
+  "fresh_lf_checkout": {
+    "checked": true,
+    "valid": true,
+    "commit": "a997bf57331ab9d759ca7cdca9697d5af8f2243e",
+    "result": "{\"valid\": true, \"tests\": {\"run\": 165, \"failures\": 0, \"errors\": 0, \"skipped\": 0}, \"manifest_mismatches\": 0, \"source_zip_unchanged\": true}"
+  }
 }
