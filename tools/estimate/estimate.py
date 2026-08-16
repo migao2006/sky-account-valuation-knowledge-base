@@ -22,19 +22,28 @@ WEIGHTS = {
 }
 PRICE_TYPES = {"normal_listing", "urgent_sale", "last_public_price", "verified_sale"}
 HARD_PRICE_TYPES = {"normal_listing", "urgent_sale", "last_public_price", "verified_sale"}
+MIN_SIMILARITY_SCORE = 40.0
+MIN_EFFECTIVE_CONTENT_DIMENSIONS = 3
 
 
 def normalize_price_type(row: dict[str, Any]) -> str:
     """Map legacy history labels without promoting a claimed sale to a sale."""
+    # `adapt_profile` stores the canonical value.  Do not consult an older
+    # nested claim again when an internal row is passed through hard-pool or
+    # reporting a second time.
+    if row.get("_estimator_internal") is True and row.get("price_type") in PRICE_TYPES | {"unknown"}:
+        return str(row["price_type"])
     sale = row.get("sale_outcome", {})
     if isinstance(sale, dict) and sale.get("verified") is True and sale.get("completed_sale_price_twd") is not None:
         return "verified_sale"
     raw = _value(row.get("trade_conditions", {}) if isinstance(row.get("trade_conditions"), dict) else row, "price_type", default=_value(row, "price_type"))
-    return {"asking": "normal_listing", "normal_listing": "normal_listing", "reduced": "urgent_sale", "instant": "urgent_sale", "quick_sale": "urgent_sale", "instant_price": "urgent_sale", "reduced_or_instant": "urgent_sale", "sold_last_ask": "last_public_price", "sold_explicit": "last_public_price", "last_public_price": "last_public_price", "verified_sale": "verified_sale", "buyout": "unknown"}.get(raw, "unknown")
+    return {"asking": "normal_listing", "normal_listing": "normal_listing", "reduced": "urgent_sale", "urgent_sale": "urgent_sale", "instant": "urgent_sale", "quick_sale": "urgent_sale", "instant_price": "urgent_sale", "reduced_or_instant": "urgent_sale", "sold_last_ask": "last_public_price", "sold_explicit": "last_public_price", "last_public_price": "last_public_price", "verified_sale": "verified_sale", "buyout": "unknown"}.get(raw, "unknown")
 
 
 def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
     """Flatten the canonical nested account-profile/history contract for scoring."""
+    if row.get("_estimator_internal") is True:
+        return row
     result = dict(row)
     base = row.get("base_account", {})
     if isinstance(base, dict) and base:
@@ -49,6 +58,7 @@ def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
         # These categories are distinct in source data but form one collection
         # feature; union so an empty collaboration list never hides bundles.
         result["collection_ids"] = list(dict.fromkeys(
+            list(collection.get("graduation_rewards", [])) +
             list(collection.get("collaboration_items", [])) +
             list(collection.get("bundle_item_ids", collection.get("bundle_ids", []))) +
             list(collection.get("event_limited_item_ids", []))))
@@ -70,6 +80,7 @@ def adapt_profile(row: dict[str, Any]) -> dict[str, Any]:
     evidence = row.get("evidence_quality", {})
     if isinstance(evidence, dict): result["evidence_quality"] = evidence.get("listing_text", "unknown")
     result["price_type"] = normalize_price_type(row)
+    result["_estimator_internal"] = True
     return result
 
 
@@ -191,6 +202,37 @@ def _binding_similarity(account: dict[str, Any], comparable: dict[str, Any]) -> 
     return _level_similarity(_value(account, "binding_state"), _value(comparable, "binding_state"))
 
 
+def _season_entries(row: dict[str, Any]) -> dict[str, str]:
+    raw = row.get("season_profile", row.get("seasons", []))
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items() if v not in (None, "unknown")}
+    return {str(x.get("season_id")): str(x.get("status")) for x in raw if isinstance(x, dict) and x.get("season_id") and x.get("status") not in (None, "unknown")} if isinstance(raw, list) else {}
+
+
+def _map_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:
+    if _number(account, "map_completion_ratio") is not None and _number(comparable, "map_completion_ratio") is not None:
+        return True
+    left, right = account.get("map_completion", account), comparable.get("map_completion", comparable)
+    return isinstance(left, dict) and isinstance(right, dict) and any(left.get(k) not in (None, "unknown") and right.get(k) not in (None, "unknown") for k in ("standard_maps", "second_tier_capes"))
+
+
+def _resources_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:
+    left, right = account.get("resources", account), comparable.get("resources", comparable)
+    return isinstance(left, dict) and isinstance(right, dict) and any(_number(left, key) is not None and _number(right, key) is not None for key in ("white_candles", "hearts", "red_candles", "season_candles"))
+
+
+def _bindings_known(account: dict[str, Any], comparable: dict[str, Any]) -> bool:
+    left, right = account.get("bindings", {}), comparable.get("bindings", {})
+    return isinstance(left, dict) and isinstance(right, dict) and any(left.get(k) not in (None, "unknown", "mentioned_unknown") and right.get(k) not in (None, "unknown", "mentioned_unknown") for k in set(left) | set(right))
+
+
+def _collection_features(row: dict[str, Any]) -> set[str]:
+    values: set[str] = set()
+    for name in ("ultimate_reward_item_ids", "collection_ids", "graduation_reward_season_ids"):
+        values.update(_list(row, name))
+    return values
+
+
 def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]:
     """Return all dimension scores. Unknown evidence is never treated as a match."""
     account, comparable = adapt_profile(account), adapt_profile(comparable)
@@ -201,9 +243,7 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
     mentioned_sets = _ratio(_list(account, "mentioned_set_ids"), _list(comparable, "mentioned_set_ids"))
     sets = complete_sets * 0.7 + mentioned_sets * 0.3
     map_score = _map_similarity(account, comparable)
-    collection_items = _ratio(_list(account, "ultimate_reward_item_ids", "collection_ids", "bundle_tags"), _list(comparable, "ultimate_reward_item_ids", "collection_ids", "bundle_tags"))
-    graduation_seasons = _ratio(_list(account, "graduation_reward_season_ids"), _list(comparable, "graduation_reward_season_ids"))
-    collection = (collection_items * .75 + graduation_seasons * .25) if collection_items or graduation_seasons else 0.0
+    collection = _ratio(_collection_features(account), _collection_features(comparable))
     evidence = _level_similarity(_value(account, "evidence_quality"), _value(comparable, "evidence_quality"))
     dimensions = {
         "account_type": type_score, "seasons": _season_similarity(account, comparable),
@@ -214,7 +254,19 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
         "date": _date_similarity(account, comparable), "evidence": evidence,
     }
     weighted = {name: round(dimensions[name] * weight, 4) for name, weight in WEIGHTS.items()}
-    return {"score": round(sum(weighted.values()), 4), "dimensions": weighted}
+    known = {
+        "account_type": atype not in (None, "unknown") and btype not in (None, "unknown"),
+        "seasons": bool(_season_entries(account)) and bool(_season_entries(comparable)),
+        "items_sets": bool(_list(account, "owned_item_ids", "item_ids") or _list(account, "complete_set_ids", "set_ids") or _list(account, "mentioned_set_ids")) and bool(_list(comparable, "owned_item_ids", "item_ids") or _list(comparable, "complete_set_ids", "set_ids") or _list(comparable, "mentioned_set_ids")),
+        "map_completion": _map_known(account, comparable),
+        "collection": bool(_collection_features(account)) and bool(_collection_features(comparable)),
+        "resources": _resources_known(account, comparable),
+        "bindings": _bindings_known(account, comparable),
+        "ownership": _value(account, "ownership_generation", "account_generation") not in (None, "unknown") and _value(comparable, "ownership_generation", "account_generation") not in (None, "unknown"),
+        "date": _value(account, "valuation_date", "valuation_as_of_date", default=None) not in (None, "unknown") and _value(comparable, "post_date", "listing_date", "date", default=None) not in (None, "unknown"),
+        "evidence": _value(account, "evidence_quality") not in (None, "unknown") and _value(comparable, "evidence_quality") not in (None, "unknown"),
+    }
+    return {"score": round(sum(weighted.values()), 4), "dimensions": weighted, "known_dimensions": known}
 
 
 def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -222,11 +274,14 @@ def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool
     reasons: list[str] = []
     for field in ("currency", "server"):
         a, b = _value(account, field), _value(comparable, field)
-        if a not in ("unknown", None):
-            if b in ("unknown", None):
-                reasons.append(f"{field}_unverified")
-            elif a != b:
-                reasons.append(f"{field}_mismatch")
+        if a in ("unknown", None):
+            # A target without a market cannot safely borrow a different
+            # currency/server pool merely because the comparable is verified.
+            reasons.append(f"target_{field}_unknown")
+        elif b in ("unknown", None):
+            reasons.append(f"{field}_unverified")
+        elif a != b:
+            reasons.append(f"{field}_mismatch")
     for field in ("currency_verified", "server_verified"):
         if comparable.get(field) is not True:
             reasons.append(f"{field}_required")
@@ -242,6 +297,8 @@ def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool
         elif _account_family(account_type) != _account_family(comparable_type):
             reasons.append("account_type_incompatible")
     target_type = normalize_price_type(account)
+    if target_type == "unknown":
+        reasons.append("target_price_type_unknown")
     actual_type = normalize_price_type(comparable)
     if target_type in HARD_PRICE_TYPES and actual_type != target_type:
         reasons.append("price_type_mismatch")
@@ -256,23 +313,32 @@ def _price(row: dict[str, Any]) -> float | None:
     return None
 
 
-def _describe(account: dict[str, Any], row: dict[str, Any], dimensions: dict[str, float]) -> dict[str, list[str]]:
+def _describe(account: dict[str, Any], row: dict[str, Any], dimensions: dict[str, float], known: dict[str, bool]) -> dict[str, list[str]]:
     same = [k for k, v in dimensions.items() if v >= WEIGHTS[k] * .75]
-    different = [k for k, v in dimensions.items() if v <= WEIGHTS[k] * .25]
-    unknown = [k for k, v in dimensions.items() if v == 0]
+    # A non-overlapping inventory/season/collection usually means the listing
+    # is incomplete, not that ownership is confirmed absent.  Only explicit,
+    # mutually exclusive categorical states may be described as differences.
+    # These dimensions have a shared, explicit observation and can therefore
+    # safely describe a low score as a confirmed difference.  Collections and
+    # seasons deliberately remain excluded: disjoint lists are not evidence
+    # that the other account lacks the item or season.
+    confirmed_mutually_exclusive = {"account_type", "map_completion", "resources", "bindings", "ownership"}
+    different = [k for k, v in dimensions.items() if k in confirmed_mutually_exclusive and known[k] and v <= WEIGHTS[k] * .25]
+    unknown = [k for k, v in dimensions.items() if not known[k] or (k not in confirmed_mutually_exclusive and v <= WEIGHTS[k] * .25)]
     return {"major_matches": same, "major_differences": different, "unconfirmed_dimensions": unknown}
 
 
 def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]]) -> dict[str, Any]:
     account = adapt_profile(account)
-    strict, rejected = [], []
+    strict, rejected, quality_rejected, selection_rejected = [], [], [], []
     for row in comparables:
-        ok, reasons = hard_pool(account, row)
+        comparable = adapt_profile(row)
+        ok, reasons = hard_pool(account, comparable)
         if not ok:
-            rejected.append({"comparable_id": _value(row, "comparable_id", "history_id", default="unknown"), "reasons": reasons})
+            rejected.append({"comparable_id": _value(comparable, "comparable_id", "history_id", default="unknown"), "reasons": reasons})
             continue
-        result = score(account, row)
-        strict.append((result["score"], row, result))
+        result = score(account, comparable)
+        strict.append((result["score"], comparable, result))
     stage = "strict"
     target_type = _value(account, "base_account_type", "account_type")
     chosen = [x for x in strict if _value(x[1], "base_account_type", "account_type") == target_type]
@@ -282,20 +348,50 @@ def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]]) -> 
         # any additional collection/season threshold beyond the score itself.
         stage = "expanded_same_account_family"
         chosen = [x for x in strict if _account_family(_value(x[1], "base_account_type", "account_type")) == _account_family(target_type)]
+    selected_row_ids = {id(row) for _, row, _ in chosen}
+    for _, row, _ in strict:
+        if id(row) not in selected_row_ids:
+            selection_rejected.append({"comparable_id": _value(row, "comparable_id", "history_id", default="unknown"), "reasons": ["account_type_not_selected"]})
     chosen.sort(key=lambda x: x[0], reverse=True)
+    qualified = []
+    for total, row, result in chosen:
+        effective = sum(result["known_dimensions"].get(name, False) for name in ("seasons", "items_sets", "map_completion", "collection", "resources", "bindings", "ownership"))
+        reasons = []
+        if total < MIN_SIMILARITY_SCORE:
+            reasons.append("below_minimum_similarity")
+        if effective < MIN_EFFECTIVE_CONTENT_DIMENSIONS:
+            reasons.append("insufficient_effective_content_dimensions")
+        if reasons:
+            quality_rejected.append({"comparable_id": _value(row, "comparable_id", "history_id", default="unknown"), "reasons": reasons, "similarity_score": total, "effective_content_dimensions": effective})
+        else:
+            qualified.append((total, row, result, effective))
     detail = []
-    for total, row, result in chosen[:5]:
+    for total, row, result, effective in qualified[:5]:
         price = _price(row)
         detail.append({
             "comparable_id": _value(row, "comparable_id", "history_id", default="unknown"),
             "similarity_score": total, "similarity_dimensions": result["dimensions"],
-            "retained_reason": f"{stage}; hard pool compatible", "price_type": _value(row, "price_type"),
+            "retained_reason": f"{stage}; hard pool compatible; meets static quality thresholds", "price_type": normalize_price_type(row),
             "market_date": _value(row, "post_date", "listing_date", default="unknown"),
             "market_evidence": _value(row, "market_evidence_quality", "evidence_quality", default="unknown"),
-            "price_twd": price, **_describe(account, row, result["dimensions"]),
+            "price_twd": price, "effective_content_dimensions": effective,
+            **_describe(account, row, result["dimensions"], result["known_dimensions"]),
+        })
+    for total, row, result, effective in qualified[5:]:
+        selection_rejected.append({
+            "comparable_id": _value(row, "comparable_id", "history_id", default="unknown"),
+            "reasons": ["lower_rank_not_retained"], "similarity_score": total,
+            "effective_content_dimensions": effective,
         })
     priced = [d["price_twd"] for d in detail if d["price_twd"] is not None]
-    eligible = len(detail) >= 3 and len(priced) >= 3
+    insufficiency = []
+    if len(strict) < 3:
+        insufficiency.append("fewer_than_three_hard_pool_compatible_comparables")
+    if len(qualified) < 3:
+        insufficiency.append("fewer_than_three_comparables_meet_similarity_and_content_thresholds")
+    if len(priced) < 3:
+        insufficiency.append("fewer_than_three_qualified_comparables_have_valid_prices")
+    eligible = not insufficiency
     price_range = None
     if eligible:
         values = sorted(priced)
@@ -306,9 +402,12 @@ def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]]) -> 
         "selection_stage": stage, "eligible": eligible,
         "status": "estimated" if eligible else "insufficient_comparables",
         "range_twd": price_range, "comparables": detail,
-        "strict_candidate_count": len(strict), "retained_count": len(detail),
+        "strict_candidate_count": len(strict), "quality_candidate_count": len(qualified), "retained_count": len(detail),
         "rejected_by_hard_pool": rejected,
-        "limitations": [] if eligible else ["Less than three price-compatible comparable accounts; no price range is produced."],
+        "rejected_by_quality": quality_rejected,
+        "rejected_by_selection": selection_rejected,
+        "insufficiency_reasons": insufficiency,
+        "limitations": [] if eligible else ["No price range is produced until the static hard-pool, similarity, effective-content, and valid-price thresholds are met."],
         "method": "Comparable-account selection only; no additive item pricing.",
     }
 
@@ -320,10 +419,13 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Offline Sky comparable estimator")
     parser.add_argument("account", type=Path)
-    parser.add_argument("comparables", type=Path)
+    parser.add_argument("comparables", type=Path, nargs="?", default=Path(__file__).resolve().parents[2] / "data" / "comparables" / "accounts.jsonl")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    result = estimate(json.loads(args.account.read_text(encoding="utf-8")), _read_jsonl(args.comparables))
+    comparables = _read_jsonl(args.comparables)
+    if not comparables or any(not isinstance(row.get("base_account"), dict) for row in comparables):
+        parser.error("comparables must be complete comparable account profiles (data/comparables/accounts.jsonl); history-only JSONL is not accepted")
+    result = estimate(json.loads(args.account.read_text(encoding="utf-8")), comparables)
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.write_text(text, encoding="utf-8")

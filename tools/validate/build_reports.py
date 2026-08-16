@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from release_files import HASH_EXCLUSIONS, release_files
+
 BUILT_AT = "2026-08-16T20:00:00+08:00"
 
 
@@ -29,6 +31,12 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest().upper()
+
+
+def write_utf8_lf(path: Path, content: str) -> None:
+    """Avoid Windows text-mode conversion so manifest bytes are platform-stable."""
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(content)
 
 
 def main() -> None:
@@ -67,7 +75,7 @@ def main() -> None:
         }
         for index, row in enumerate(migration_aliases, 1)
     ]
-    paths["unmapped"].write_text("".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in unmapped_rows), encoding="utf-8")
+    write_utf8_lf(paths["unmapped"], "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in unmapped_rows))
     rows = {name: read_jsonl(path) for name, path in paths.items()}
     migration = json.loads((root / "reports/migration/migration-summary.json").read_text(encoding="utf-8"))
     inventory = json.loads((root / "reports/migration/file-inventory.json").read_text(encoding="utf-8"))
@@ -147,7 +155,7 @@ def main() -> None:
         ],
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
-    coverage_path.write_text(json.dumps(coverage, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_utf8_lf(coverage_path, json.dumps(coverage, ensure_ascii=False, indent=2) + "\n")
 
     migration_md = f"""# P0 遷移報告
 
@@ -168,7 +176,7 @@ def main() -> None:
 
 逐檔 keep／migrate／replace／remove 清單見 `file-inventory.json`；被移除的執行能力見 `removed-features.md`。
 """
-    (root / "reports/migration/P0-MIGRATION-REPORT.md").write_text(migration_md, encoding="utf-8")
+    write_utf8_lf(root / "reports/migration/P0-MIGRATION-REPORT.md", migration_md)
 
     quality_md = f"""# P0 資料品質與限制
 
@@ -191,10 +199,11 @@ def main() -> None:
 - visual reference {len(rows['visual_references'])}、真實 image evidence {len(rows['image_evidence'])}、可驗證成交 {verified_sales}；因此不宣稱圖示辨識準確率或成交價模型。
 - 季節節點的繁中正式名、免費／季卡屬性、成本與取得狀態仍有 needs_review 記錄。
 """
-    (root / "reports/validation/data-quality.md").write_text(quality_md, encoding="utf-8")
+    write_utf8_lf(root / "reports/validation/data-quality.md", quality_md)
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["package_version"] = "3.0.1-p0.1"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
         "items": len(rows["items"]), "sets": len(rows["sets"]), "aliases": len(rows["aliases"]),
@@ -210,13 +219,13 @@ def main() -> None:
     }
     manifest["generated_at"] = BUILT_AT
     manifest["catalog_status"] = "partial_verified_catalog"
-    manifest["hash_exclusions"] = ["manifest.json", "reports/validation/p0-validation.json"]
+    manifest["hash_exclusions"] = sorted(HASH_EXCLUSIONS)
     manifest["file_hashes"] = {
         path.relative_to(root).as_posix(): sha256(path)
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and path != manifest_path and path != root / "reports/validation/p0-validation.json" and ".git" not in path.parts and "__pycache__" not in path.parts and path.suffix != ".pyc" and "staging" not in path.parts
+        for path in release_files(root)
+        if path.relative_to(root).as_posix() not in HASH_EXCLUSIONS
     }
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_utf8_lf(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
 
     print(json.dumps({"coverage": coverage["counts"], "migration": coverage["market_migration"], "manifest_hashes": len(manifest["file_hashes"])}, ensure_ascii=False))
 

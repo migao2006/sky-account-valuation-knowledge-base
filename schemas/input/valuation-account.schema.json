@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "input/valuation-account.schema.json",
+  "title": "Offline valuation account input",
+  "description": "A user-supplied structured claim profile. Unlike a market account profile, it is not required to identify a market listing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "account_id", "currency", "server", "valuation_date", "post_date", "date_verified", "date_evidence_state", "base_account", "season_profiles", "season_summary", "collection", "map_completion", "resources", "bindings", "ownership_history", "trade_conditions", "evidence_quality", "review_status"],
+  "properties": {
+    "schema_version": {"const": "3.0-p0"},
+    "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"},
+    "source_listing_ids": {"type": "array", "items": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "uniqueItems": true},
+    "currency": {"enum": ["TWD", "CNY", "RM", "unknown"]},
+    "server": {"enum": ["international", "unknown"]},
+    "valuation_date": {"type": ["string", "null"], "format": "date"},
+    "post_date": {"type": ["string", "null"], "format": "date"},
+    "date_verified": {"type": "boolean"},
+    "date_evidence_state": {"enum": ["verified", "unknown"]},
+    "base_account": {"$ref": "../market/account-profile.schema.json#/properties/base_account"},
+    "season_profiles": {"$ref": "../market/account-profile.schema.json#/properties/season_profiles"},
+    "season_summary": {"$ref": "../market/account-profile.schema.json#/properties/season_summary"},
+    "collection": {"type": "object", "additionalProperties": false, "required": ["owned_item_ids", "item_set_profiles", "graduation_rewards", "graduation_reward_season_ids", "collaboration_items", "bundle_item_ids", "event_limited_item_ids", "bundle_claim_level"], "properties": {"owned_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "item_set_profiles": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["set_id", "is_complete"], "properties": {"set_id": {"type": "string", "pattern": "^set_[a-z0-9_]+$"}, "is_complete": {"type": "boolean"}}}}, "graduation_rewards": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "graduation_reward_season_ids": {"type": "array", "items": {"type": "string", "pattern": "^season_[a-z0-9_]+$"}, "uniqueItems": true}, "collaboration_items": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "bundle_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "event_limited_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "bundle_claim_level": {"enum": ["none", "partial", "complete", "unknown"]}}},
+    "map_completion": {"$ref": "../market/account-profile.schema.json#/properties/map_completion"},
+    "resources": {"$ref": "../market/account-profile.schema.json#/properties/resources"},
+    "bindings": {"$ref": "../market/account-profile.schema.json#/properties/bindings"},
+    "ownership_history": {"$ref": "../market/account-profile.schema.json#/properties/ownership_history"},
+    "trade_conditions": {"type": "object", "additionalProperties": false, "required": ["offer_kind", "entity_kind", "price_type"], "properties": {"offer_kind": {"enum": ["seller_listing", "buyer_budget", "service", "exchange", "unknown"]}, "entity_kind": {"enum": ["single_account", "bundle", "service", "unknown"]}, "price_type": {"enum": ["normal_listing", "urgent_sale", "last_public_price", "verified_sale", "unknown"]}}},
+    "evidence_quality": {"$ref": "../market/account-profile.schema.json#/properties/evidence_quality"},
+    "review_status": {"enum": ["approved", "needs_review", "unknown"]}
+  }
+}
