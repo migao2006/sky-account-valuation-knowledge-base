@@ -36,7 +36,7 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 
 ## P2.3 Catalog reference 與市場證據資料流
 
-`tools/normalize/build_catalog_universe.py` 對固定 vendor snapshot 作全量封閉分類；`build_source_scoped_item_identities.py` 產生單一 1,758 筆 source-scoped reference identity 主檔，並禁止 canonical 與模型提升；Fandom import 工具只重播固定 revision 且不提供獨立 promotion evidence。`build_item_evidence_bundle.py` 與 `promote_items.py` 不修改 canonical。`build_market_claim_review.py` 產生固定 200 筆匿名人工雙標 queue；`build_market_near_miss_review.py` 產生 22 筆只缺單一硬證據群組的匿名 queue。兩條 evidence ledger 在真正人工標註與裁決前保持空白。
+`tools/normalize/build_catalog_universe.py` 對固定 vendor snapshot 作全量封閉分類；`build_source_scoped_item_identities.py` 產生單一 1,758 筆 source-scoped reference identity 主檔，並禁止 canonical 與模型提升；Fandom import 工具只重播固定 revision 且不提供獨立 promotion evidence。`build_item_evidence_bundle.py` 與 `promote_items.py` 不修改 canonical；`apply_nintendo_starter_pack.py` 分開重播官方描述性成分與 vendor 精確名稱，不推測未知欄位。`build_market_claim_review.py` 產生固定 200 筆匿名人工雙標 queue；`build_market_near_miss_review.py` 目前產生 16 筆只缺單一硬證據群組的匿名 queue。兩條市場 evidence ledger 在真正人工標註與裁決前保持空白。
 
 `parse_item_vectors.py` 會為每個帳號與每個 canonical item 產生 `owned`、`confirmed_missing` 或 `unknown`；未提及永遠是 unknown。`clean_prices.py` 只保留已驗證 TWD、international、seller listing、single account，並將正常刊登與急售分開。
 

@@ -52,6 +52,7 @@ class MarketNearMissReviewTests(unittest.TestCase):
         self.assertGreater(len(queue), 0)
         self.assertEqual(len({row["listing_id"] for row in queue}), len(queue))
         self.assertNotIn("listing_0260", {row["listing_id"] for row in queue})
+        self.assertNotIn("listing_0319", {row["listing_id"] for row in queue})
         rows_by_id = {row["listing_id"]: row for row in self.rows}
         for row in queue:
             self.assertEqual(row["selection_version"], SELECTION_VERSION)
@@ -83,7 +84,9 @@ class MarketNearMissReviewTests(unittest.TestCase):
         known_china = {**base, "listing_id": "listing_9003", "server": "china", "server_verified": True}
         known_reduced = {**base, "listing_id": "listing_9004", "price_type": "reduced"}
         known_sold = {**base, "listing_id": "listing_9005", "status": "sold"}
-        queue = build_queue([unknown_price_type, unknown_status, known_china, known_reduced, known_sold])
+        multi_price = {**base, "listing_id": "listing_9006", "server": "unknown", "server_verified": False, "price_semantic_review": {"multi_price": True, "review_status": "needs_review"}}
+        text_multi_price = {**base, "listing_id": "listing_9007", "server": "unknown", "server_verified": False, "listing_text": "不含勳章7萬、含勳章7.2萬，分期7.3至7.5萬"}
+        queue = build_queue([unknown_price_type, unknown_status, known_china, known_reduced, known_sold, multi_price, text_multi_price])
         self.assertEqual([row["listing_id"] for row in queue], ["listing_9001", "listing_9002"])
         self.assertEqual(queue[0]["required_fields"], ["price_type"])
         self.assertEqual(queue[1]["required_fields"], ["status"])

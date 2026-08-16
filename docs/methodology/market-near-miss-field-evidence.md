@@ -11,8 +11,8 @@ price type, or active status.
 listing ID, SHA-256 hash of existing anonymous listing text, required field
 names, and an opaque evidence domain. It contains no source text, URL, contact
 data, machine-proposed values, item inference, season inference, or automatic
-admission. Mixed brokerage pricing is permanently excluded from this queue;
-`listing_0260` is not eligible.
+admission. Mixed brokerage pricing and multi-price terms are permanently
+excluded from this queue; `listing_0260` and `listing_0319` are not eligible.
 
 `data/review/market-near-miss-approved-evidence.jsonl` is initially empty. An
 evidence row must link the exact listing/hash, a requested field and final

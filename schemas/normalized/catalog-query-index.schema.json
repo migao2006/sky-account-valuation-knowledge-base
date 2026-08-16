@@ -18,7 +18,7 @@
     "source_snapshot_sha256": {"type": ["string", "null"], "pattern": "^[A-F0-9]{64}$"},
     "resolution_eligibility": {"enum": ["canonical_resolved", "review_only"]},
     "review_status": {"enum": ["approved", "needs_review", "quarantined"]},
-    "model_feature_status": {"const": "excluded_pending_verification"}
+    "model_feature_status": {"enum": ["eligible", "excluded_pending_verification", "excluded_non_valuation"]}
   },
   "allOf": [
     {"if": {"properties": {"query_entity_type": {"const": "canonical_item"}}}, "then": {"properties": {"truth_level": {"const": "canonical_knowledge"}, "source_snapshot_sha256": {"const": null}}}},

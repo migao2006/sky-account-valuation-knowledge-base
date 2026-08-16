@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/canonical-item-field-evidence.schema.json",
+  "description": "Replayable, field-level evidence for an existing canonical item or set. It records no automatic catalog promotion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "target_type", "target_id", "field_path", "claim_value", "claim_hash", "source_id", "source_lineage_id", "source_tier", "source_snapshot_path", "source_snapshot_bytes", "source_snapshot_hash", "claim_locator", "claim_locator_hash", "evidence_role", "review_status", "reviewed_at"],
+  "properties": {
+    "evidence_id": {"type": "string", "pattern": "^canonical_evidence_[a-z0-9_]+$"},
+    "target_type": {"enum": ["item", "set"]},
+    "target_id": {"type": "string", "pattern": "^(?:item|set)_[a-z0-9_]+$"},
+    "field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "source_type", "set_membership", "set_required_item_ids", "availability_status", "free_or_premium", "permanent_account_item", "collaboration", "visual_reference"]},
+    "claim_value": {},
+    "claim_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
+    "source_lineage_id": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"},
+    "source_tier": {"enum": ["official_item_specific", "official_general", "secondary_reference"]},
+    "source_snapshot_path": {"type": "string", "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"},
+    "source_snapshot_bytes": {"type": "integer", "minimum": 1},
+    "source_snapshot_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "claim_locator": {"type": "string", "pattern": "^/"},
+    "claim_locator_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "evidence_role": {"enum": ["independent_identity", "independent_field", "secondary_field"]},
+    "review_status": {"const": "approved"},
+    "reviewed_at": {"type": "string", "format": "date"},
+    "notes": {"type": "string"}
+  }
+}

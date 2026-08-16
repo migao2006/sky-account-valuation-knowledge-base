@@ -20,6 +20,7 @@ TEMPLATE_MARKER = "printable template"
 TEMPLATE_ID_SUFFIX = re.compile(r"(?:_template|_token|_placeholder)(?:_\d+)?$")
 REQUIRED_FIELDS = frozenset({"canonical_identity", "canonical_name_en", "item_category"})
 MINIMUM_TIERS = {"official_item_specific"}
+PROMOTION_CONTRACT_VERSION = "p2.5-pinned-source-v1"
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -54,10 +55,81 @@ def claim_hash(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest().upper()
 
 
-def verify_replayable_sources(root: Path, evidence: list[dict[str, Any]], source_records: dict[str, dict[str, Any]]) -> set[str]:
+def _relative_source_path(root: Path, value: Any) -> Path:
+    """Resolve a repository-relative snapshot path without permitting escape."""
+    if not isinstance(value, str) or not value or Path(value).is_absolute():
+        raise ValueError(f"source snapshot path is not repository-relative: {value!r}")
+    path = (root / value).resolve()
+    if root != path and root not in path.parents:
+        raise ValueError(f"source snapshot path escapes repository: {value!r}")
+    if not path.is_file():
+        raise ValueError(f"source snapshot file is unavailable: {value!r}")
+    return path
+
+
+def _json_pointer(document: Any, pointer: str) -> Any:
+    """Resolve a small RFC-6901 JSON pointer; source extractors must be explicit."""
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValueError(f"claim locator is not a JSON pointer: {pointer!r}")
+    current = document
+    for encoded in pointer[1:].split("/"):
+        token = encoded.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, list):
+            if not token.isdigit():
+                raise ValueError(f"claim locator has non-index list token: {pointer!r}")
+            current = current[int(token)]
+        elif isinstance(current, dict) and token in current:
+            current = current[token]
+        else:
+            raise ValueError(f"claim locator does not resolve in snapshot: {pointer!r}")
+    return current
+
+
+def _strict_source_provenance(root: Path, row: dict[str, Any], source_records: dict[str, dict[str, Any]]) -> str:
+    """Verify the P2.5 strict claim contract against pinned bytes and registry."""
+    source = source_records.get(str(row.get("source_id")))
+    if source is None:
+        raise ValueError(f"evidence source_id is not canonical: {row.get('source_id')!r}")
+    tier = row.get("source_tier")
+    source_type = source.get("source_type")
+    if tier in {"official_item_specific", "official_general"} and source_type not in {"official_site", "official_news", "official_support", "thatgamecompany"}:
+        raise ValueError(f"official evidence tier disagrees with canonical source: {row.get('source_id')}")
+    if tier == "maintained_community" and source_type not in {"community_wiki", "community_database"}:
+        raise ValueError(f"community evidence tier disagrees with canonical source: {row.get('source_id')}")
+    lineage = row.get("source_lineage_id")
+    if not isinstance(lineage, str) or not lineage or source.get("source_lineage_id") != lineage:
+        raise ValueError(f"evidence source lineage is not registered: {row.get('source_id')!r}")
+    snapshot = _relative_source_path(root, row.get("source_snapshot_path"))
+    snapshot_bytes = snapshot.read_bytes()
+    if row.get("source_snapshot_bytes") != len(snapshot_bytes):
+        raise ValueError(f"evidence snapshot byte length mismatch: {snapshot.relative_to(root)}")
+    if hashlib.sha256(snapshot_bytes).hexdigest().upper() != row.get("source_snapshot_hash"):
+        raise ValueError(f"evidence source snapshot hash mismatch: {snapshot.relative_to(root)}")
+    try:
+        document = json.loads(snapshot_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"evidence snapshot is not UTF-8 JSON: {snapshot.relative_to(root)}") from exc
+    try:
+        located = _json_pointer(document, str(row.get("claim_locator")))
+    except (IndexError, ValueError, TypeError) as exc:
+        raise ValueError(str(exc)) from exc
+    if claim_hash(located) != row.get("claim_locator_hash"):
+        raise ValueError(f"evidence claim locator hash mismatch: {row.get('claim_locator')!r}")
+    if claim_hash(row.get("claim_value")) != row.get("claim_hash"):
+        raise ValueError(f"evidence claim hash mismatch: {row.get('evidence_id')!r}")
+    if located != row.get("claim_value"):
+        raise ValueError(f"evidence claim value differs from snapshot locator: {row.get('evidence_id')!r}")
+    return lineage
+
+
+def verify_replayable_sources(root: Path, evidence: list[dict[str, Any]], source_records: dict[str, dict[str, Any]], *, strict_contract: bool = False) -> set[str]:
     """Reject a ledger input whose claimed local source bytes no longer match."""
     verified: set[str] = set()
     for row in evidence:
+        if strict_contract:
+            _strict_source_provenance(root, row, source_records)
+            verified.add(str(row.get("evidence_id")))
+            continue
         locator = row.get("source_locator")
         if not isinstance(locator, str) or "#" not in locator or locator.startswith("fixture://"):
             raise ValueError(f"evidence source locator is not replayable: {locator!r}")
@@ -81,7 +153,7 @@ def verify_replayable_sources(root: Path, evidence: list[dict[str, Any]], source
     return verified
 
 
-def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflicts: list[dict[str, Any]], evidence: list[dict[str, Any]], *, mode: str = "strict", verified_evidence_ids: set[str] | None = None) -> list[dict[str, Any]]:
+def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflicts: list[dict[str, Any]], evidence: list[dict[str, Any]], *, mode: str = "strict", verified_evidence_ids: set[str] | None = None, source_records: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Return deterministic review ledger.  Every non-approved fact rejects."""
     evidence_by_candidate: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in evidence:
@@ -89,13 +161,12 @@ def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflict
     rows: list[dict[str, Any]] = []
     vendor_correlation = mode == "vendor_correlation"
     verified_evidence_ids = verified_evidence_ids or set()
+    source_records = source_records or {}
     for candidate in sorted(candidates, key=lambda row: row["candidate_item_id"]):
         candidate_id = candidate["candidate_item_id"]
         reasons: list[str] = []
         candidate_evidence = evidence_by_candidate[candidate_id]
         proposed_id = candidate_id
-        if not vendor_correlation:
-            reasons.append("strict_promotion_disabled_in_p2_1")
         if candidate_id in canonical_ids:
             reasons.append("candidate_id_already_canonical")
         if template_candidate(candidate, identity_only=vendor_correlation):
@@ -114,7 +185,7 @@ def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflict
         accepted_statuses = {"approved", "machine_correlated"} if vendor_correlation else {"approved"}
         if any(row.get("review_status") not in accepted_statuses for row in candidate_evidence):
             reasons.append("unapproved_or_unknown_evidence_present")
-        if any(not isinstance(row.get("source_locator"), str) or not row["source_locator"] or not isinstance(row.get("source_snapshot_hash"), str) or len(row["source_snapshot_hash"]) != 64 or row.get("claim_hash") != claim_hash(row.get("claim_value")) for row in candidate_evidence):
+        if vendor_correlation and any(not isinstance(row.get("source_locator"), str) or not row["source_locator"] or not isinstance(row.get("source_snapshot_hash"), str) or len(row["source_snapshot_hash"]) != 64 or row.get("claim_hash") != claim_hash(row.get("claim_value")) for row in candidate_evidence):
             reasons.append("unreplayable_or_tampered_evidence")
         wrong_identity = [row for row in candidate_evidence if row.get("proposed_canonical_item_id") != proposed_id]
         if wrong_identity:
@@ -131,8 +202,17 @@ def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflict
         if any(row.get("field_path") == "canonical_identity" and normalized(str(row.get("claim_value", ""))) != normalized(candidate["candidate_name_en"]) for row in approved):
             reasons.append("canonical_identity_evidence_conflicts_with_candidate")
         independent_sources = {row.get("source_id") for row in approved if row.get("source_tier") in ({"maintained_community"} if vendor_correlation else {"official_item_specific", "official_general", "maintained_community"})}
-        if not vendor_correlation and len(independent_sources) < 2:
-            reasons.append("fewer_than_two_independent_sources")
+        if not vendor_correlation:
+            lineages = {source_records.get(str(row.get("source_id")), {}).get("source_lineage_id") for row in approved}
+            lineages.discard(None)
+            identity_lineages = {source_records.get(str(row.get("source_id")), {}).get("source_lineage_id") for row in approved if row.get("field_path") == "canonical_identity"}
+            identity_lineages.discard(None)
+            if len(lineages) < 2 or len(identity_lineages) < 2:
+                reasons.append("fewer_than_two_independent_source_lineages")
+            if not any(row.get("field_path") == "canonical_identity" and row.get("source_tier") == "official_item_specific" for row in approved):
+                reasons.append("no_official_item_specific_identity")
+        else:
+            lineages = set()
         if vendor_correlation:
             for field in REQUIRED_FIELDS:
                 field_tiers = {row.get("source_tier") for row in approved if row.get("field_path") == field}
@@ -148,7 +228,8 @@ def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflict
                 reasons.append("missing_required_season_id_evidence")
             elif any(row.get("claim_value") != candidate["season_id"] for row in season_evidence):
                 reasons.append("season_evidence_conflicts_with_candidate")
-        decision = "vendor_correlated_template_candidate" if vendor_correlation and not reasons else "rejected_fail_closed"
+        decision = ("vendor_correlated_template_candidate" if vendor_correlation else "approved_for_canonical_promotion") if not reasons else "rejected_fail_closed"
+        field_coverage = {field: sorted({str(row.get("source_id")) for row in approved if row.get("field_path") == field}) for field in sorted(REQUIRED_FIELDS | ({"season_id"} if candidate.get("season_id") is not None else set()))}
         rows.append({
             "candidate_item_id": candidate_id,
             "proposed_canonical_item_id": proposed_id,
@@ -159,6 +240,13 @@ def evaluate(candidates: list[dict[str, Any]], canonical_ids: set[str], conflict
             "verification_status": "needs_review" if vendor_correlation else "unknown",
             "model_feature_status": "excluded_pending_verification",
             "unresolved_fields": ["canonical_identity", "season_id", "acquisition", "availability", "cost", "visual_reference"] if vendor_correlation else [],
+            **({
+                "promotion_contract_version": PROMOTION_CONTRACT_VERSION,
+                "promotion_ready": decision == "approved_for_canonical_promotion",
+                "source_lineage_ids": sorted(lineages),
+                "field_coverage": field_coverage,
+                "replay_status": "verified" if all(evidence_id in verified_evidence_ids for evidence_id in evidence_ids) else "unverified",
+            } if not vendor_correlation else {}),
         })
     return rows
 
@@ -179,19 +267,14 @@ def main() -> None:
     canonical_ids = {row["item_id"] for row in read_jsonl(path(args.canonical_items))}
     evidence = read_jsonl(path(args.evidence))
     source_records = {row["source_id"]: row for row in read_jsonl(root / "knowledge/sources/sources.jsonl")}
-    verified_evidence_ids = verify_replayable_sources(root, evidence, source_records)
+    verified_evidence_ids = verify_replayable_sources(root, evidence, source_records, strict_contract=args.mode == "strict")
     if args.mode == "vendor_correlation":
         from build_item_evidence_bundle import build as build_identity_evidence, sha as source_sha
         expected = build_identity_evidence(candidates, read_jsonl(root / "data/review/skygame-data-1.3.4-item-evidence.jsonl"), source_sha(path(args.candidates).read_bytes()))
         if evidence != expected:
             raise SystemExit("identity-only evidence differs from deterministic pinned-source bundle")
-    else:
-        # P2.1 has no item-specific official source extractor.  The strict
-        # reviewed-migration path therefore remains disabled rather than
-        # trusting caller-authored evidence metadata.
-        verified_evidence_ids = set()
-    ledger = evaluate(candidates, canonical_ids, read_jsonl(path(args.alias_conflicts)), evidence, mode=args.mode, verified_evidence_ids=verified_evidence_ids)
-    summary = {"dry_run": args.output is None, "mode": args.mode, "candidate_count": len(ledger), "vendor_correlated_template_candidates": sum(row["decision"] == "vendor_correlated_template_candidate" for row in ledger), "rejected_fail_closed": sum(row["decision"] == "rejected_fail_closed" for row in ledger), "canonical_writes": 0}
+    ledger = evaluate(candidates, canonical_ids, read_jsonl(path(args.alias_conflicts)), evidence, mode=args.mode, verified_evidence_ids=verified_evidence_ids, source_records=source_records)
+    summary = {"dry_run": args.output is None, "mode": args.mode, "candidate_count": len(ledger), "promotion_ready_count": sum(row["decision"] == "approved_for_canonical_promotion" for row in ledger), "vendor_correlated_template_candidates": sum(row["decision"] == "vendor_correlated_template_candidate" for row in ledger), "rejected_fail_closed": sum(row["decision"] == "rejected_fail_closed" for row in ledger), "canonical_writes": 0}
     if args.output:
         output = path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)

@@ -38,7 +38,7 @@ def _query_row(*, query_entity_type: str, query_entity_id: str, truth_level: str
                verification_status: str, source_ids: list[str], lookup_keys: list[str],
                canonical_item_ids: list[str], candidate_item_ids: list[str],
                source_snapshot_sha256: str | None, resolution_eligibility: str,
-               review_status: str) -> dict[str, Any]:
+               review_status: str, model_feature_status: str = "excluded_pending_verification") -> dict[str, Any]:
     return {
         "query_entity_type": query_entity_type,
         "query_entity_id": query_entity_id,
@@ -51,7 +51,7 @@ def _query_row(*, query_entity_type: str, query_entity_id: str, truth_level: str
         "source_snapshot_sha256": source_snapshot_sha256,
         "resolution_eligibility": resolution_eligibility,
         "review_status": review_status,
-        "model_feature_status": "excluded_pending_verification",
+        "model_feature_status": model_feature_status,
         "ambiguous_lookup_keys": [],
         "has_lookup_key_collision": False,
     }
@@ -95,7 +95,8 @@ def build_catalog_query_index(items: list[dict[str, Any]], aliases: list[dict[st
             lookup_keys=[item["item_id"], item.get("canonical_name_en", ""), item.get("canonical_name_zh_tw", ""), *item.get("aliases", []), *aliases_by_item[item["item_id"]]],
             canonical_item_ids=[item["item_id"]], candidate_item_ids=[], source_snapshot_sha256=None,
             resolution_eligibility="canonical_resolved" if verified else "review_only",
-            review_status="approved" if verified else "needs_review"))
+            review_status="approved" if verified else "needs_review",
+            model_feature_status=item.get("model_feature_status", "excluded_pending_verification")))
     for candidate in candidates:
         rows.append(_query_row(
             query_entity_type="review_candidate", query_entity_id=candidate["candidate_item_id"], truth_level="review_candidate",
@@ -144,7 +145,7 @@ def build_catalog_query_index(items: list[dict[str, Any]], aliases: list[dict[st
         "canonical_resolved_eligible_count": sum(row["resolution_eligibility"] == "canonical_resolved" for row in rows),
         "ambiguous_lookup_key_count": len(collisions),
         "rows_with_lookup_key_collisions": sum(row["has_lookup_key_collision"] for row in rows),
-        "model_feature_status": "excluded_pending_verification",
+        "model_feature_status": "mixed" if any(row["model_feature_status"] == "eligible" for row in rows) else "excluded_pending_verification",
         "notes": "Query results preserve distinct canonical, review-candidate, and source-observation truth levels. They do not establish ownership or model features.",
     }
     return rows, summary

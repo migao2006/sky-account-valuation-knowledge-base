@@ -27,7 +27,7 @@ class CatalogUniverseTests(unittest.TestCase):
         self.assertEqual({(row["vendor_guid"], row["vendor_item_id"]) for row in universe}, {(row["guid"], row["id"]) for row in snapshot})
         self.assertEqual(len({row["universe_id"] for row in universe}), len(universe))
         counts = {name: sum(row["classification"] == name for row in universe) for name in ("canonical_linked", "candidate_linked", "unmatched", "explicitly_excluded")}
-        self.assertEqual(counts, {"canonical_linked": 64, "candidate_linked": 296, "unmatched": 1398, "explicitly_excluded": 1508})
+        self.assertEqual(counts, {"canonical_linked": 67, "candidate_linked": 296, "unmatched": 1395, "explicitly_excluded": 1508})
         self.assertEqual(summary["expected_count"], sum(counts.values()))
         self.assertEqual(summary["vendor_item_count"], len(snapshot))
         self.assertEqual(summary["reconciliation_status"], "reconciled")

@@ -35,22 +35,35 @@ def normalize_text(value: str) -> str:
 def load_catalog(root: Path = ROOT) -> tuple[dict[str, dict[str, Any]], dict[str, set[str]]]:
     items = {row["item_id"]: row for row in _rows(root / "knowledge/items/items.jsonl")}
     aliases: dict[str, set[str]] = defaultdict(set)
+    verified_tokens: dict[str, set[str]] = defaultdict(set)
     for item_id, item in items.items():
         for value in [item.get("canonical_name_zh_tw"), item.get("canonical_name_en")]:
             if isinstance(value, str) and len(normalize_text(value)) >= 2:
                 aliases[normalize_text(value)].add(item_id)
+        # An entity-level verification can make its evidenced English
+        # canonical identity searchable for modeling.  Localized names and
+        # player aliases require their own approved alias record below.
+        if item.get("verification_status") == "verified" and isinstance(item.get("canonical_name_en"), str):
+            verified_tokens[item_id].add(normalize_text(item["canonical_name_en"]))
         for value in item.get("aliases", []):
-            if isinstance(value, str) and len(normalize_text(value)) >= 2 and (
-                item.get("verification_status") == "verified" or len(normalize_text(value)) >= 3
-            ):
+            # Verifying the entity does not promote its unreviewed player
+            # nicknames.  Short aliases require an approved alias-master row.
+            if isinstance(value, str) and len(normalize_text(value)) >= 3:
                 aliases[normalize_text(value)].add(item_id)
     for row in _rows(root / "knowledge/aliases/item-aliases.jsonl"):
         if row.get("target_type") == "item" and row.get("target_id") in items:
             value = row.get("normalized_alias") or row.get("alias_text")
             if isinstance(value, str) and len(normalize_text(value)) >= 2 and (
-                items[row["target_id"]].get("verification_status") == "verified" or len(normalize_text(value)) >= 3
+                row.get("verification_status") == "verified" or len(normalize_text(value)) >= 3
             ):
                 aliases[normalize_text(value)].add(row["target_id"])
+                if row.get("verification_status") == "verified" and items[row["target_id"]].get("verification_status") == "verified":
+                    verified_tokens[row["target_id"]].add(normalize_text(value))
+    for item_id, item in items.items():
+        # Runtime-only audit metadata.  It is never serialized into the
+        # canonical item master or vector, but prevents an unreviewed alias
+        # from turning a newly verified item into an owned model observation.
+        item["_model_verified_tokens"] = sorted(token for token in verified_tokens[item_id] if token)
     # Ambiguous spelling never identifies an item automatically.
     return items, {token: ids for token, ids in aliases.items() if len(ids) == 1}
 
@@ -96,9 +109,25 @@ def _text_matches(text: str, aliases: dict[str, set[str]], source: str) -> dict[
 
 def _item_state(item_id: str, item: dict[str, Any], owned: set[str], missing: set[str], text_matches: dict[str, dict[str, Any]]) -> dict[str, Any]:
     found = text_matches.get(item_id, {"aliases": set(), "negative": False, "positive": False, "sources": set()})
-    positive = item_id in owned or found["positive"]
-    negative = item_id in missing or found["negative"]
-    conflict = positive and negative
+    raw_positive = item_id in owned or found["positive"]
+    raw_negative = item_id in missing or found["negative"]
+    status = item.get("verification_status", "unknown")
+    feature_status = item.get("model_feature_status", "eligible" if status == "verified" else "excluded_pending_verification")
+    catalog_model_eligible = status == "verified" and feature_status == "eligible"
+    if catalog_model_eligible:
+        approved_tokens = set(item.get("_model_verified_tokens", []))
+        approved_match = bool(approved_tokens.intersection(found["aliases"]))
+        # Migrated profile item IDs were themselves derived from legacy alias
+        # matches and do not carry item-level identity evidence.  A verified
+        # item becomes known only when this vector observes an approved exact
+        # token; otherwise the claim remains unknown rather than inheriting a
+        # possibly unreviewed alias from the profile.
+        positive = found["positive"] and approved_match
+        negative = found["negative"] and approved_match
+        conflict = (positive and raw_negative) or (negative and raw_positive)
+    else:
+        positive, negative = raw_positive, raw_negative
+        conflict = positive and negative
     if conflict:
         state, evidence = "unknown", "conflict"
     elif positive:
@@ -116,11 +145,10 @@ def _item_state(item_id: str, item: dict[str, Any], owned: set[str], missing: se
     # Names are aliases by design; report canonical-name separately only when exact.
     canonical_tokens = {normalize_text(str(item.get(key, ""))) for key in ("canonical_name_zh_tw", "canonical_name_en")}
     if canonical_tokens.intersection(found["aliases"]): match_types.append("canonical_name")
-    status = item.get("verification_status", "unknown")
     # Catalog policy may additionally exclude a verified non-valuation item.
-    # Older fixtures without the policy field retain the verified default.
-    feature_status = item.get("model_feature_status", "eligible" if status == "verified" else "excluded_pending_verification")
-    model_feature = status == "verified" and feature_status == "eligible"
+    # ``model_feature`` denotes catalog eligibility; the state above still
+    # stays unknown unless its observation token is independently approved.
+    model_feature = catalog_model_eligible
     return {"item_id": item_id, "state": state, "evidence_state": evidence,
             "match_types": sorted(set(match_types)), "matched_aliases": sorted(found["aliases"]),
             "matched_sources": sorted(found["sources"]),

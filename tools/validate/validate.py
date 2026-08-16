@@ -33,6 +33,7 @@ from build_item_evidence_bundle import build as build_item_evidence, sha as item
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
 from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
+from apply_nintendo_starter_pack import verify as verify_nintendo_starter_pack  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
 CANONICAL_FILES = {
@@ -73,6 +74,7 @@ SCHEMA_FILES = {
     "data/review/catalog-universe.jsonl": "schemas/review/catalog-universe.schema.json",
     "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
+    "data/review/nintendo-starter-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
@@ -103,6 +105,7 @@ JSON_SCHEMA_FILES = {
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk-summary.json": "schemas/review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
     "data/normalized/source-scoped-item-identities-summary.json": "schemas/normalized/source-scoped-item-identities-summary.schema.json",
     "data/normalized/catalog-query-index-summary.json": "schemas/normalized/catalog-query-index-summary.schema.json",
+    "data/source/research/tgc-faq-823-nintendo-starter-pack.json": "schemas/knowledge/official-item-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -484,6 +487,8 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         errors.append("item-promotion: committed ledger differs from deterministic fail-closed evaluation")
     if any(row.get("canonical_write") != "not_performed" or row.get("model_feature_status") != "excluded_pending_verification" for row in promotion_ledger):
         errors.append("item-promotion: identity-only ledger attempted canonical/model promotion")
+    for problem in verify_nintendo_starter_pack(root):
+        errors.append(f"nintendo-starter-pack: {problem}")
     market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
     expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if market_claim_queue != expected_market_claim_queue:
@@ -778,7 +783,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.6-p2.4", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.7-p2.5", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

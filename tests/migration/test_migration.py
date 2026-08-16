@@ -61,6 +61,54 @@ class MigrationContractTests(unittest.TestCase):
         })
         self.assertIsNone(MIGRATE.price_semantic_review("急售國際服帳號；售價 18000 台幣", "urgent_sale"))
 
+    def test_explicit_sale_exchange_offer_fails_closed_before_strict_market_selection(self):
+        record = {
+            "listing_text": "售／換：夢想斷季帳；出價 5700 台幣。",
+            "offer_kind": "seller_listing", "entity_kind": "single_account",
+            "core_candidate": True, "exclusion_reason": "",
+        }
+        MIGRATE.apply_explicit_trade_semantics(record)
+        self.assertEqual(record["offer_kind"], "mixed")
+        self.assertEqual(record["entity_kind"], "unknown")
+        self.assertFalse(record["core_candidate"])
+        self.assertEqual(record["exclusion_reason"], "explicit_cash_and_exchange_offer_requires_review")
+
+    def test_badge_and_installment_price_alternatives_are_reviewed_not_collapsed(self):
+        text = "即付不含勳章7.0萬、含勳章7.2萬，分期7.3至7.5萬；台幣匯款。"
+        review = MIGRATE.price_semantic_review(text, "asking")
+        self.assertEqual(review, {
+            "urgency": "unknown", "multi_price": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants"],
+        })
+        self.assertIsNone(MIGRATE.price_semantic_review("含勳章 70000 台幣", "asking"))
+
+    def test_formal_mixed_exchange_and_multi_price_regressions_fail_closed(self):
+        listings = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/normalized/listings.jsonl")}
+        histories = {row["history_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/curated/histories.jsonl")}
+        mixed = listings["listing_0808"]
+        self.assertEqual((mixed["offer_kind"], mixed["entity_kind"]), ("mixed", "unknown"))
+        self.assertFalse(mixed["core_candidate"])
+        self.assertIn("explicit_cash_and_exchange_offer_requires_review", mixed["exclusion_reason"])
+        multi_price = histories["history_0062"]
+        self.assertEqual(multi_price["selected_price_twd"], 70000)  # historical observation is preserved, not replaced
+        self.assertTrue(multi_price["price_semantic_review"]["multi_price"])
+        self.assertEqual(multi_price["price_semantic_review"]["review_status"], "needs_review")
+
+    def test_verified_date_does_not_infer_server_evidence(self):
+        histories = {row["history_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/curated/histories.jsonl")}
+        dated = histories["history_0066"]
+        self.assertTrue(dated["date_verified"])
+        self.assertEqual(dated["server"], "unknown")
+        self.assertFalse(dated["server_verified"])
+
+    def test_mixed_exchange_listing_is_removed_from_near_miss_queue_without_fabricated_approval(self):
+        queue = MIGRATE.read_jsonl(ROOT / "data/review/market-near-miss-field-review.jsonl")
+        approvals = MIGRATE.read_jsonl(ROOT / "data/review/market-near-miss-approved-evidence.jsonl")
+        self.assertEqual(len(queue), 16)
+        self.assertNotIn("listing_0808", {row["listing_id"] for row in queue})
+        self.assertEqual(approvals, [])
+
     def test_snapshot_counts_dates_and_privacy(self):
         result = MODULE.validate(ROOT)
         self.assertTrue(result["valid"], result)

@@ -52,6 +52,21 @@ def has_positive_price(row: dict[str, Any]) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
 
 
+def has_disqualifying_price_semantics(row: dict[str, Any]) -> bool:
+    review = row.get("price_semantic_review")
+    if isinstance(review, dict) and (
+        review.get("review_status") != "approved"
+        or review.get("brokerage_included") is True
+        or review.get("multi_price") is True
+    ):
+        return True
+    text = str(row.get("listing_text") or "")
+    brokerage = "含仲" in text or "仲介費" in text
+    badge_variants = "含勳章" in text and "不含勳章" in text
+    installment_variants = "分期" in text and bool(re.search(r"\d+(?:\.\d+)?\s*(?:至|到|~|～|-|—)\s*\d+(?:\.\d+)?", text))
+    return brokerage or badge_variants or installment_variants
+
+
 def is_base_candidate(row: dict[str, Any]) -> bool:
     """Apply all eligibility facts that are not under near-miss review."""
     return (
@@ -62,9 +77,9 @@ def is_base_candidate(row: dict[str, Any]) -> bool:
         and has_positive_price(row)
         and not str(row.get("exclusion_reason") or "").strip()
         and row.get("duplicate_cluster_id") is None
-        # Brokerage is never a correctable missing field: a displayed amount
-        # including brokerage is mixed-price semantics, so fail closed.
-        and "含仲" not in str(row.get("listing_text") or "")
+        # Brokerage and multiple price terms are not correctable missing
+        # fields, so they must never enter this single-hard-gap workflow.
+        and not has_disqualifying_price_semantics(row)
     )
 
 

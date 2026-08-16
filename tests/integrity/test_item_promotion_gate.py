@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-from tools.normalize.promote_items import evaluate, read_jsonl, verify_replayable_sources
+from tools.normalize.promote_items import claim_hash, evaluate, read_jsonl, verify_replayable_sources
 from tools.normalize.build_item_evidence_bundle import build, sha
 from tools.validate.schema_validator import OfflineSchemaValidator
 
@@ -24,7 +24,7 @@ def evidence(field, value, source, tier="official_item_specific"):
 
 
 class ItemPromotionGateTests(unittest.TestCase):
-    def test_caller_authored_evidence_cannot_approve_strict_migration(self):
+    def test_unpinned_caller_authored_evidence_cannot_approve_strict_migration(self):
         rows = evaluate([candidate()], set(), [], [
             evidence("canonical_identity", "Test Cape", "source_official_item"),
             evidence("canonical_name_en", "Test Cape", "source_community", "maintained_community"),
@@ -33,7 +33,7 @@ class ItemPromotionGateTests(unittest.TestCase):
         ])
         self.assertEqual(rows[0]["decision"], "rejected_fail_closed")
         self.assertIn("unverified_evidence_provenance", rows[0]["reasons"])
-        self.assertIn("strict_promotion_disabled_in_p2_1", rows[0]["reasons"])
+        self.assertIn("fewer_than_two_independent_source_lineages", rows[0]["reasons"])
         self.assertEqual(rows[0]["canonical_write"], "not_performed")
 
     def test_unknown_or_single_secondary_evidence_fails_closed(self):
@@ -45,7 +45,7 @@ class ItemPromotionGateTests(unittest.TestCase):
         ])
         self.assertEqual(rows[0]["decision"], "rejected_fail_closed")
         self.assertIn("no_official_item_specific_identity", rows[0]["reasons"])
-        self.assertIn("fewer_than_two_independent_sources", rows[0]["reasons"])
+        self.assertIn("fewer_than_two_independent_source_lineages", rows[0]["reasons"])
 
     def test_alias_conflict_template_and_identity_conflict_reject(self):
         template = candidate("item_test_template")
@@ -99,7 +99,62 @@ class ItemPromotionGateTests(unittest.TestCase):
             evidence_path.write_text(json.dumps(evidence("canonical_identity", "Test Cape", "source_official_item")) + "\n", encoding="utf-8")
             result = subprocess.run([sys.executable, "tools/normalize/promote_items.py", "--root", str(ROOT), "--evidence", str(evidence_path)], cwd=ROOT, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("not replayable", result.stderr)
+            self.assertTrue("not canonical" in result.stderr or "not replayable" in result.stderr)
+
+    def _strict_evidence(self, root, source_id, lineage, field, value):
+        snapshot = root / "data/source/pinned.json"
+        document = {"identity": "Test Cape", "name": "Test Cape", "category": "cape", "season": "season_test"}
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot.write_text(json.dumps(document, ensure_ascii=False, sort_keys=True), encoding="utf-8", newline="\n")
+        key = {"canonical_identity": "identity", "canonical_name_en": "name", "item_category": "category", "season_id": "season"}[field]
+        snapshot_bytes = snapshot.read_bytes()
+        return {
+            "evidence_id": f"item_evidence_{source_id}_{field}", "candidate_item_id": "item_test_cape", "proposed_canonical_item_id": "item_test_cape",
+            "field_path": field, "claim_value": value, "claim_hash": claim_hash(value),
+            "source_id": source_id, "source_lineage_id": lineage, "source_tier": "official_item_specific" if source_id.endswith("official") else "maintained_community",
+            "source_snapshot_path": "data/source/pinned.json", "source_snapshot_bytes": len(snapshot_bytes),
+            "source_snapshot_hash": __import__("hashlib").sha256(snapshot_bytes).hexdigest().upper(),
+            "claim_locator": "/" + key, "claim_locator_hash": claim_hash(document[key]),
+            "evidence_role": "independent_identity" if field == "canonical_identity" else "independent_field", "review_status": "approved", "reviewed_at": "2026-08-17",
+        }
+
+    def test_strict_pinned_sources_create_replayable_promotion_ready_ledger_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = {
+                "source_official": {"source_id": "source_official", "source_type": "official_site", "source_lineage_id": "lineage_official"},
+                "source_crosscheck": {"source_id": "source_crosscheck", "source_type": "community_database", "source_lineage_id": "lineage_crosscheck"},
+            }
+            evidence_rows = []
+            for field, value in (("canonical_identity", "Test Cape"), ("canonical_name_en", "Test Cape"), ("item_category", "cape"), ("season_id", "season_test")):
+                evidence_rows.append(self._strict_evidence(root, "source_official", "lineage_official", field, value))
+                evidence_rows.append(self._strict_evidence(root, "source_crosscheck", "lineage_crosscheck", field, value))
+            validator = OfflineSchemaValidator(ROOT / "schemas")
+            self.assertEqual(validator.validate(evidence_rows[0], ROOT / "schemas/review/item-promotion-evidence.schema.json"), [])
+            invalid = dict(evidence_rows[0]); invalid.pop("claim_locator_hash")
+            self.assertTrue(validator.validate(invalid, ROOT / "schemas/review/item-promotion-evidence.schema.json"))
+            verified = verify_replayable_sources(root, evidence_rows, sources, strict_contract=True)
+            rows = evaluate([candidate()], set(), [], evidence_rows, verified_evidence_ids=verified, source_records=sources)
+            self.assertEqual(rows[0]["decision"], "approved_for_canonical_promotion")
+            self.assertTrue(rows[0]["promotion_ready"])
+            self.assertEqual(rows[0]["canonical_write"], "not_performed")
+            self.assertEqual(rows[0]["source_lineage_ids"], ["lineage_crosscheck", "lineage_official"])
+            self.assertEqual(rows[0]["replay_status"], "verified")
+            self.assertEqual(rows[0]["field_coverage"]["season_id"], ["source_crosscheck", "source_official"])
+            self.assertEqual(rows, evaluate([candidate()], set(), [], evidence_rows, verified_evidence_ids=verified, source_records=sources))
+
+    def test_strict_promotion_rejects_tampered_locator_and_single_lineage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = {"source_official": {"source_id": "source_official", "source_type": "official_site", "source_lineage_id": "lineage_one"}}
+            evidence_rows = [self._strict_evidence(root, "source_official", "lineage_one", field, value) for field, value in (("canonical_identity", "Test Cape"), ("canonical_name_en", "Test Cape"), ("item_category", "cape"), ("season_id", "season_test"))]
+            verified = verify_replayable_sources(root, evidence_rows, sources, strict_contract=True)
+            rows = evaluate([candidate()], set(), [], evidence_rows, verified_evidence_ids=verified, source_records=sources)
+            self.assertEqual(rows[0]["decision"], "rejected_fail_closed")
+            self.assertIn("fewer_than_two_independent_source_lineages", rows[0]["reasons"])
+            evidence_rows[0]["claim_locator_hash"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "locator hash mismatch"):
+                verify_replayable_sources(root, evidence_rows, sources, strict_contract=True)
 
 
 if __name__ == "__main__":
