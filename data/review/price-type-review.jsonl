@@ -1,0 +1,16 @@
+{"price_type":"auction","count":1,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"auction_floor","count":1,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"buyer_budget","count":55,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"buyer_demand","count":1,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"buyer_offer","count":4,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"currency_unknown","count":4,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"direct","count":1,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"exchange","count":14,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"exchange_only","count":4,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"foreign_currency","count":35,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"market_claim","count":1,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"multi_account","count":5,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"multi_currency","count":7,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"multi_price","count":4,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"non_cash_exchange","count":2,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}
+{"price_type":"unknown","count":533,"review_status":"needs_review","reason":"non-canonical market price type; must not enter a normal single-account asking pool without explicit review"}

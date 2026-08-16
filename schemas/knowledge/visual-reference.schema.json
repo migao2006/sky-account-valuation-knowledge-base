@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/visual-reference.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["visual_reference_id", "item_id", "reference_mode", "source_ids", "verification_status"],
+  "properties": {
+    "visual_reference_id": {"type": "string", "pattern": "^visual_[a-z0-9_]+$"}, "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "reference_mode": {"enum": ["offline_asset", "source_description", "unavailable"]}, "asset_sha256": {"type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$"}, "description": {"type": "string"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  }
+}

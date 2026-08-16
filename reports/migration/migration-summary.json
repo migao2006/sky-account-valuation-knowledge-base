@@ -1,0 +1,17 @@
+{
+  "schema_version": "3.0-p0",
+  "legacy_batches": 71,
+  "source_listings": 1022,
+  "normalized_listings": 1022,
+  "legacy_histories": 102,
+  "migrated_histories": 102,
+  "not_migrated_histories": 0,
+  "verified_dates_in_normalized": 28,
+  "verified_dates_repaired_in_histories": 5,
+  "unmapped_season_terms": 0,
+  "unmapped_item_terms": 13,
+  "price_type_review_terms": 16,
+  "legacy_group_names_sanitized": 63,
+  "offline_only": true,
+  "privacy": "source-group identity and locators removed; legacy keys are SHA-256 pseudonyms"
+}

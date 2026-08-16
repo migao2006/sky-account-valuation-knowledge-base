@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/season.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["season_id", "canonical_name_zh_tw", "canonical_name_en", "aliases", "order_index", "season_type", "collaboration", "related_event_ids", "pass_available", "ultimate_reward_item_ids", "source_ids", "last_verified_at", "verification_status"],
+  "properties": {
+    "season_id": {"type": "string", "pattern": "^season_[a-z0-9_]+$"},
+    "canonical_name_zh_tw": {"type": "string", "minLength": 1},
+    "canonical_name_en": {"type": "string", "minLength": 1},
+    "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "order_index": {"type": "integer", "minimum": 1},
+    "start_date": {"type": ["string", "null"], "format": "date"},
+    "end_date": {"type": ["string", "null"], "format": "date"},
+    "season_type": {"enum": ["standard", "collaboration", "special", "unknown"]},
+    "collaboration": {"type": "boolean"},
+    "collaboration_name": {"type": ["string", "null"]},
+    "related_event_ids": {"type": "array", "items": {"type": "string", "pattern": "^event_[a-z0-9_]+$"}, "uniqueItems": true},
+    "pass_available": {"enum": ["yes", "no", "unknown"]},
+    "ultimate_reward_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"},
+    "last_verified_at": {"type": "string", "format": "date"},
+    "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"},
+    "notes": {"type": "string"}
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/source.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["source_id", "source_name", "source_type", "url", "retrieved_at", "evidence_level"],
+  "properties": {
+    "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "source_name": {"type": "string", "minLength": 1}, "source_type": {"enum": ["official_site", "official_news", "official_support", "thatgamecompany", "community_wiki", "community_database", "other"]},
+    "url": {"type": "string", "format": "uri"}, "retrieved_at": {"type": "string", "format": "date"}, "evidence_level": {"enum": ["official_explicit", "official_correlated", "community_cross_checked", "single_secondary_needs_review"]}, "notes": {"type": "string"}
+  }
+}

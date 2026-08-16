@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/event.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "canonical_name_zh_tw", "canonical_name_en", "aliases", "event_type", "collaboration", "source_ids", "last_verified_at", "verification_status"],
+  "properties": {
+    "event_id": {"type": "string", "pattern": "^event_[a-z0-9_]+$"},
+    "canonical_name_zh_tw": {"type": "string", "minLength": 1},
+    "canonical_name_en": {"type": "string", "minLength": 1},
+    "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "event_type": {"enum": ["recurring_event", "limited_event", "anniversary", "collaboration", "platform", "special", "unknown"]},
+    "collaboration": {"type": "boolean"},
+    "start_date": {"type": ["string", "null"], "format": "date"},
+    "end_date": {"type": ["string", "null"], "format": "date"},
+    "notes": {"type": "string"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"},
+    "last_verified_at": {"type": "string", "format": "date"},
+    "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  }
+}

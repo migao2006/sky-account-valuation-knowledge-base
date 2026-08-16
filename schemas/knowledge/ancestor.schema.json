@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/ancestor.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ancestor_id", "season_id", "canonical_name_zh_tw", "canonical_name_en", "aliases", "entity_type", "order_in_season", "source_ids", "last_verified_at", "verification_status"],
+  "properties": {
+    "ancestor_id": {"type": "string", "pattern": "^ancestor_[a-z0-9_]+$"},
+    "season_id": {"type": "string", "pattern": "^season_[a-z0-9_]+$"},
+    "canonical_name_zh_tw": {"type": ["string", "null"]},
+    "canonical_name_en": {"type": "string", "minLength": 1},
+    "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "entity_type": {"enum": ["seasonal_spirit", "season_guide", "season_entity", "seasonal_entity", "unknown"]},
+    "order_in_season": {"type": "integer", "minimum": 0},
+    "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"},
+    "last_verified_at": {"type": "string", "format": "date"},
+    "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  }
+}

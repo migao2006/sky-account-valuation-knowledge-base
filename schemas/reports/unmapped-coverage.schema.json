@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/unmapped-coverage.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_id", "term", "kind", "occurrences", "status"],
+  "properties": {
+    "review_id": {"type": "string", "pattern": "^unmapped_[0-9]{4}$"},
+    "term": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["season_alias", "item_alias", "unknown"]},
+    "occurrences": {"type": "integer", "minimum": 1},
+    "status": {"const": "needs_review"}
+  }
+}

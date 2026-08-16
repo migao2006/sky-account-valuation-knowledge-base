@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/migration-ledger.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["legacy_history_id", "migration_status"],
+  "properties": {
+    "legacy_history_id": {"type": "string", "minLength": 1},
+    "history_id": {"type": "string", "pattern": "^history_[a-z0-9_]+$"},
+    "migration_status": {"enum": ["migrated", "not_migrated"]},
+    "source_listing_ids": {"type": "array", "items": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "uniqueItems": true},
+    "date_repaired": {"type": "boolean"},
+    "post_date": {"type": ["string", "null"], "format": "date"},
+    "reason": {"type": "string", "minLength": 1}
+  }
+}

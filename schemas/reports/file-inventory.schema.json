@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/file-inventory.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_zip", "source_zip_sha256", "source_file_count", "counts", "classification_total", "entries"],
+  "properties": {
+    "source_zip": {"type": "string", "minLength": 1},
+    "source_zip_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "source_file_count": {"type": "integer", "minimum": 1},
+    "counts": {"type": "object", "additionalProperties": false, "required": ["keep", "migrate", "replace", "remove"], "properties": {"keep": {"type": "integer", "minimum": 0}, "migrate": {"type": "integer", "minimum": 0}, "replace": {"type": "integer", "minimum": 0}, "remove": {"type": "integer", "minimum": 0}}},
+    "classification_total": {"type": "integer", "minimum": 1},
+    "entries": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["legacy_path", "action"], "properties": {"legacy_path": {"type": "string", "minLength": 1}, "action": {"enum": ["keep", "migrate", "replace", "remove"]}}}}
+  }
+}

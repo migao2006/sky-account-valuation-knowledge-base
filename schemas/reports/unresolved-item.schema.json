@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/unresolved-item.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_id", "scope", "status", "details"],
+  "properties": {
+    "review_id": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "status": {"const": "needs_review"},
+    "details": {"type": "object"}
+  }
+}

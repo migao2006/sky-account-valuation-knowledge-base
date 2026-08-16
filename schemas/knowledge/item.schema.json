@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/item.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["item_id", "canonical_name_zh_tw", "canonical_name_en", "aliases", "item_category", "item_subcategory", "source_type", "source_id", "season_id", "event_id", "ancestor_id", "set_ids", "free_or_premium", "pass_required", "ultimate_reward", "collaboration", "permanent_account_item", "consumable", "original_currency", "original_cost", "availability_status", "first_release_date", "availability_event_ids", "visual_reference_ids", "valuation_role", "source_ids", "last_verified_at", "verification_status", "notes"],
+  "properties": {
+    "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "canonical_name_zh_tw": {"type": "string", "minLength": 1}, "canonical_name_en": {"type": "string", "minLength": 1},
+    "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "item_category": {"enum": ["hair", "cape", "mask", "outfit", "shoes", "accessory", "instrument", "music_sheet", "prop", "furniture", "currency", "emote", "other", "unknown"]},
+    "item_subcategory": {"type": "string", "minLength": 1},
+    "source_type": {"enum": ["season_ancestor", "season_ultimate", "event", "shop", "traveling_spirit", "constellation", "map_completion", "platform", "collaboration", "gift", "other", "unknown"]},
+    "source_id": {"type": ["string", "null"]}, "season_id": {"type": ["string", "null"], "pattern": "^season_[a-z0-9_]+$"}, "event_id": {"type": ["string", "null"], "pattern": "^event_[a-z0-9_]+$"}, "ancestor_id": {"type": ["string", "null"], "pattern": "^ancestor_[a-z0-9_]+$"},
+    "set_ids": {"type": "array", "items": {"type": "string", "pattern": "^set_[a-z0-9_]+$"}, "uniqueItems": true},
+    "free_or_premium": {"enum": ["free", "premium", "mixed", "unknown"]}, "pass_required": {"enum": ["yes", "no", "unknown"]}, "ultimate_reward": {"type": "boolean"}, "collaboration": {"type": "boolean"}, "permanent_account_item": {"enum": ["yes", "no", "unknown"]}, "consumable": {"type": "boolean"},
+    "original_currency": {"type": ["string", "null"]}, "original_cost": {"type": ["number", "string", "null"]},
+    "availability_status": {"$ref": "common.schema.json#/$defs/availabilityStatus"}, "first_release_date": {"type": ["string", "null"], "format": "date"},
+    "availability_event_ids": {"type": "array", "items": {"type": "string", "pattern": "^availability_[a-z0-9_]+$"}, "uniqueItems": true}, "visual_reference_ids": {"type": "array", "items": {"type": "string", "pattern": "^visual_[a-z0-9_]+$"}, "uniqueItems": true},
+    "valuation_role": {"enum": ["identity", "set_member", "season_completion", "collection_structure", "non_valuation", "unknown"]}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "last_verified_at": {"type": "string", "format": "date"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}, "notes": {"type": "string"}
+  }
+}

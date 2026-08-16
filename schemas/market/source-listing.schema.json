@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/source-listing.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "listing_id", "legacy_key", "observed_at", "post_date", "date_verified", "date_evidence_state", "post_date_text", "listing_text", "price_twd", "price_type", "status", "account_features", "risk_features", "evidence_quality", "exclusion_reason"],
+  "properties": {
+    "schema_version": {"const": "3.0-p0"}, "listing_id": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "legacy_key": {"type": "string", "minLength": 1}, "observed_at": {"type": "string", "format": "date"}, "post_date": {"type": ["string", "null"], "format": "date"}, "date_verified": {"type": "boolean"}, "date_evidence_state": {"enum": ["verified", "unknown"]}, "post_date_text": {"type": ["string", "null"]}, "listing_text": {"type": "string"}, "price_twd": {"type": ["number", "null"]}, "price_type": {"type": "string"}, "status": {"type": "string"}, "account_features": {"type": "string"}, "risk_features": {"type": "string"}, "evidence_quality": {"type": "string"}, "exclusion_reason": {"type": ["string", "null"]}
+  }
+}

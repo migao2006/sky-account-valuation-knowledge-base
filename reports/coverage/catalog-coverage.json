@@ -1,0 +1,135 @@
+{
+  "schema_version": "3.0-p0",
+  "as_of_date": "2026-08-16",
+  "catalog_claim": "partial_verified_catalog",
+  "full_item_catalog_complete": false,
+  "counts": {
+    "seasons": 30,
+    "events": 24,
+    "ancestors": 132,
+    "items": 94,
+    "sets": 8,
+    "aliases": 324,
+    "availability_events": 12,
+    "sources": 24,
+    "visual_references": 0,
+    "unresolved": 39,
+    "unmapped": 13,
+    "item_candidates": 622
+  },
+  "review_state": {
+    "canonical_needs_review_by_entity": {
+      "seasons": 27,
+      "events": 13,
+      "items": 94,
+      "sets": 8,
+      "aliases": 310,
+      "availability_events": 8
+    },
+    "canonical_needs_review_total": 460,
+    "unresolved_queue_records": 39,
+    "item_candidate_records": 622,
+    "unmapped_terms": 13,
+    "overlap_note": "各欄分開計數，可能描述同一知識缺口，不直接相加為唯一項目數。"
+  },
+  "item_coverage": {
+    "by_category": {
+      "accessory": 13,
+      "cape": 19,
+      "hair": 26,
+      "instrument": 13,
+      "mask": 7,
+      "music_sheet": 3,
+      "other": 1,
+      "outfit": 6,
+      "prop": 6
+    },
+    "by_source_type": {
+      "collaboration": 15,
+      "constellation": 32,
+      "event": 13,
+      "map_completion": 3,
+      "other": 3,
+      "platform": 5,
+      "season_ancestor": 16,
+      "season_ultimate": 3,
+      "shop": 4
+    },
+    "by_verification_status": {
+      "needs_review": 94
+    },
+    "by_availability_status": {
+      "limited_time": 3,
+      "permanent": 44,
+      "recurring_event": 13,
+      "temporarily_unavailable": 17,
+      "traveling_spirit_rotation": 16,
+      "unknown": 1
+    },
+    "with_visual_reference": 0,
+    "with_canonical_zh_tw_name_confirmed": 0
+  },
+  "season_coverage": {
+    "total": 30,
+    "with_one_or_more_items": 4,
+    "without_items": [
+      "season_gratitude",
+      "season_lightseekers",
+      "season_belonging",
+      "season_rhythm",
+      "season_enchantment",
+      "season_sanctuary",
+      "season_prophecy",
+      "season_dreams",
+      "season_assembly",
+      "season_flight",
+      "season_abyss",
+      "season_performance",
+      "season_shattering",
+      "season_remembrance",
+      "season_passage",
+      "season_moments",
+      "season_revival",
+      "season_nesting",
+      "season_duets",
+      "season_radiance",
+      "season_blue_bird",
+      "season_two_embers_part_1",
+      "season_migration",
+      "season_lightmending",
+      "season_carnival",
+      "season_dear_van_gogh"
+    ]
+  },
+  "source_coverage": {
+    "by_type": {
+      "community_wiki": 16,
+      "official_news": 4,
+      "official_support": 1,
+      "thatgamecompany": 3
+    },
+    "official_source_records": 8,
+    "community_or_other_source_records": 16
+  },
+  "market_migration": {
+    "source_listings": 1022,
+    "normalized_listings": 1022,
+    "account_profiles": 1022,
+    "curated_histories": 102,
+    "comparable_histories": 102,
+    "comparable_accounts": 102,
+    "unmigrated_histories": 0,
+    "verified_normalized_dates": 28,
+    "verified_history_dates_repaired": 5,
+    "verified_completed_sales": 0,
+    "image_evidence_records": 0,
+    "profiles_with_mapped_items": 24,
+    "profiles_with_set_claims": 10
+  },
+  "known_limitations": [
+    "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
+    "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
+    "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
+    "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/item-set.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["set_id", "canonical_name_zh_tw", "canonical_name_en", "set_type", "required_item_ids", "optional_item_ids", "source_ids", "last_verified_at", "verification_status"],
+  "properties": {
+    "set_id": {"type": "string", "pattern": "^set_[a-z0-9_]+$"}, "canonical_name_zh_tw": {"type": "string", "minLength": 1}, "canonical_name_en": {"type": "string", "minLength": 1},
+    "set_type": {"enum": ["collaboration", "bundle", "season", "event", "outfit", "other", "unknown"]},
+    "required_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true}, "optional_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "last_verified_at": {"type": "string", "format": "date"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  }
+}

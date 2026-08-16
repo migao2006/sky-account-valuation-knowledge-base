@@ -1,0 +1,16 @@
+{
+  "account_id": "fixture_account",
+  "base_account_type": "permanent_wingless",
+  "currency": "TWD",
+  "server": "international",
+  "price_type": "normal_listing",
+  "valuation_date": "2026-08-16",
+  "season_profile": [{"season_id": "season_example", "status": "complete"}],
+  "owned_item_ids": ["item_example_a", "item_example_b"],
+  "complete_set_ids": ["set_example"],
+  "map_completion_ratio": 0.8,
+  "resources": {"white_candles": 100, "hearts": 50, "red_candles": 10},
+  "bindings": {"google": "transferable", "apple": "unbound"},
+  "ownership_generation": "first_hand",
+  "evidence_quality": "high"
+}

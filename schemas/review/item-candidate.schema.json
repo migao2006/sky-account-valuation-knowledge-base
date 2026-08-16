@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "review/item-candidate.schema.json", "type": "object", "additionalProperties": false,
+  "required": ["candidate_category", "candidate_item_id", "candidate_name_en", "reason", "review_status", "season_id", "source_ids"],
+  "properties": {"candidate_category": {"type": "string"}, "candidate_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "candidate_name_en": {"type": "string"}, "reason": {"type": "string", "minLength": 1}, "review_status": {"const": "needs_review"}, "season_id": {"type": ["string", "null"], "pattern": "^season_[a-z0-9_]+$"}, "source_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "uniqueItems": true}}
+}

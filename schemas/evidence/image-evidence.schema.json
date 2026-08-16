@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence/image-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "image_sha256", "image_role", "ui_language", "capture_date", "detected_item_id", "bounding_box", "recognition_method", "confidence", "evidence_state", "conflict", "review_status", "wardrobe_coverage"],
+  "properties": {
+    "case_id": {"type": "string", "pattern": "^(listing|account|history)_[a-z0-9_]+$"},
+    "detection_id": {"type": ["string", "null"], "pattern": "^detection_[a-z0-9_]+$"},
+    "image_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "image_role": {"enum": ["listing_post", "wardrobe", "season_progress", "resources", "bindings", "map_completion"]},
+    "ui_language": {"enum": ["zh_tw", "zh_cn", "en", "ja", "ko", "other", "unknown"]},
+    "capture_date": {"type": ["string", "null"], "format": "date"},
+    "detected_item_id": {"type": ["string", "null"], "pattern": "^item_[a-z0-9_]+$"},
+    "bounding_box": {"type": ["object", "null"], "additionalProperties": false, "required": ["x", "y", "width", "height"], "properties": {"x": {"type": "number", "minimum": 0, "maximum": 1}, "y": {"type": "number", "minimum": 0, "maximum": 1}, "width": {"type": "number", "minimum": 0, "maximum": 1}, "height": {"type": "number", "minimum": 0, "maximum": 1}}},
+    "recognition_method": {"enum": ["manual", "ocr_text", "icon_match", "imported_annotation"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "evidence_state": {"enum": ["confirmed", "claimed", "unknown", "conflicting"]},
+    "conflict": {"type": "boolean"},
+    "review_status": {"enum": ["approved", "needs_review", "rejected", "unknown"]},
+    "page_group_id": {"type": ["string", "null"], "pattern": "^page_[a-z0-9_]+$"},
+    "page_index": {"type": ["integer", "null"], "minimum": 0},
+    "duplicate_of_image_sha256": {"type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$"},
+    "overlaps_detection_ids": {"type": "array", "items": {"type": "string", "pattern": "^detection_[a-z0-9_]+$"}, "uniqueItems": true},
+    "wardrobe_coverage": {"enum": ["complete", "partial", "unknown"]}
+  }
+}

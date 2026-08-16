@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/comparable.schema.json",
+  "title": "Offline estimator result (data/comparables/histories.jsonl uses history.schema.json)",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "offline_only", "price_type", "selection_stage", "eligible", "status", "range_twd", "comparables", "strict_candidate_count", "retained_count", "rejected_by_hard_pool", "limitations", "method"],
+  "properties": {
+    "schema_version": {"const": "3.0-p0"}, "offline_only": {"const": true}, "price_type": {"type": "string"}, "selection_stage": {"enum": ["strict", "expanded_same_account_family"]}, "eligible": {"type": "boolean"}, "status": {"enum": ["estimated", "insufficient_comparables"]}, "range_twd": {"type": ["object", "null"]},
+    "comparables": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["comparable_id", "similarity_score", "similarity_dimensions", "retained_reason", "price_type", "market_date", "market_evidence", "price_twd", "major_matches", "major_differences", "unconfirmed_dimensions"], "properties": {"comparable_id": {"type": "string"}, "similarity_score": {"type": "number", "minimum": 0, "maximum": 100}, "similarity_dimensions": {"type": "object"}, "retained_reason": {"type": "string"}, "price_type": {"type": "string"}, "market_date": {"type": ["string", "null"]}, "market_evidence": {"type": "string"}, "price_twd": {"type": ["number", "null"]}, "major_matches": {"type": "array", "items": {"type": "string"}}, "major_differences": {"type": "array", "items": {"type": "string"}}, "unconfirmed_dimensions": {"type": "array", "items": {"type": "string"}}}}}, "strict_candidate_count": {"type": "integer", "minimum": 0}, "retained_count": {"type": "integer", "minimum": 0}, "rejected_by_hard_pool": {"type": "array", "items": {"type": "object"}}, "limitations": {"type": "array", "items": {"type": "string"}}, "method": {"const": "Comparable-account selection only; no additive item pricing."}
+  }
+}

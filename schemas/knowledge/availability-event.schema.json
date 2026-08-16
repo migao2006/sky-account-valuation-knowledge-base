@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/availability-event.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["availability_id", "item_id", "availability_status", "source_ids", "last_verified_at", "verification_status"],
+  "properties": {
+    "availability_id": {"type": "string", "pattern": "^availability_[a-z0-9_]+$"}, "item_id": {"type": ["string", "null"], "pattern": "^item_[a-z0-9_]+$"},
+    "availability_status": {"$ref": "common.schema.json#/$defs/availabilityStatus"}, "start_date": {"type": ["string", "null"], "format": "date"}, "end_date": {"type": ["string", "null"], "format": "date"}, "event_id": {"type": ["string", "null"], "pattern": "^event_[a-z0-9_]+$"},
+    "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "last_verified_at": {"type": "string", "format": "date"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  }
+}

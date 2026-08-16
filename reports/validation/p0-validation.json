@@ -1,0 +1,73 @@
+{
+  "schema_version": "3.0-p0",
+  "offline_only": true,
+  "valid": true,
+  "checks": {
+    "schema_and_integrity": true,
+    "unit_tests": true,
+    "manifest_hashes": true,
+    "source_zip_unchanged": true,
+    "required_directory_structure": true,
+    "migration_1022": true,
+    "histories_102": true,
+    "verified_sales_remain_zero": true,
+    "catalog_claim_is_partial": true
+  },
+  "schema_records_checked": 4825,
+  "schema_errors": [],
+  "schema_warnings": [],
+  "unit_tests": {
+    "run": 25,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "manifest": {
+    "hashed_files": 103,
+    "mismatches": []
+  },
+  "source_archive": {
+    "checked": true,
+    "unchanged": true,
+    "expected_sha256": "6AEEBE997E31B65EF4A7FC70E4905CF4AFAFED01FCA986DD55AB22F63EB98DA3",
+    "path_identity": "sky-valuation-v2.4-1022-complete-2026-08-16.zip",
+    "actual_sha256": "6AEEBE997E31B65EF4A7FC70E4905CF4AFAFED01FCA986DD55AB22F63EB98DA3"
+  },
+  "migration": {
+    "schema_version": "3.0-p0",
+    "legacy_batches": 71,
+    "source_listings": 1022,
+    "normalized_listings": 1022,
+    "legacy_histories": 102,
+    "migrated_histories": 102,
+    "not_migrated_histories": 0,
+    "verified_dates_in_normalized": 28,
+    "verified_dates_repaired_in_histories": 5,
+    "unmapped_season_terms": 0,
+    "unmapped_item_terms": 13,
+    "price_type_review_terms": 16,
+    "legacy_group_names_sanitized": 63,
+    "offline_only": true,
+    "privacy": "source-group identity and locators removed; legacy keys are SHA-256 pseudonyms"
+  },
+  "catalog_counts": {
+    "seasons": 30,
+    "events": 24,
+    "ancestors": 132,
+    "items": 94,
+    "sets": 8,
+    "aliases": 324,
+    "availability_events": 12,
+    "sources": 24,
+    "visual_references": 0,
+    "unresolved": 39,
+    "unmapped": 13,
+    "item_candidates": 622
+  },
+  "known_limitations": [
+    "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
+    "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
+    "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
+    "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。"
+  ]
+}

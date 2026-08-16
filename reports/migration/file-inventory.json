@@ -1,0 +1,962 @@
+{
+  "source_zip": "sky-valuation-v2.4-1022-complete-2026-08-16.zip",
+  "source_zip_sha256": "6AEEBE997E31B65EF4A7FC70E4905CF4AFAFED01FCA986DD55AB22F63EB98DA3",
+  "source_file_count": 237,
+  "counts": {
+    "keep": 0,
+    "migrate": 75,
+    "replace": 131,
+    "remove": 31
+  },
+  "classification_total": 237,
+  "entries": [
+    {
+      "legacy_path": "V2-FULL-RELEASE.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "V2-WORKING-SNAPSHOT.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "V2.1-RELEASE.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "V2.2-RELEASE.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "V2.3-RELEASE.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "V2.4-RELEASE.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "analysis-notes-1.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "analysis-notes-2.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "analysis-notes-3.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "analysis-notes-4.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "analysis-notes-5.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "behavior-tests-v2.1.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "behavior-tests-v2.2.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "behavior-tests-v2.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "behavior-tests.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "case-audit.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "curation-report.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/README.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/batch-01.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-02.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-03.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-04.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-05.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-06.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-07.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-08.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-09.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-10.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-11.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-12.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-13.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-14.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-15.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-16.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-17.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-18.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-19.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-20.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-21.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-22.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-23.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-24.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-25.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-28.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-29.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-30.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-31.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-32.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-33.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-34.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-35.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-36.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-37.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-38.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-39.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-40.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-41.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-42.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-43.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-44.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-45.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-46.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-47.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-48.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-49.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-50.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-51.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-52.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-53.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-54.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-55.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-56.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-57.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-58.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-59.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-60.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-61.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-62.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-63.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-64.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-65.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-66.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-67.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-68.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-69.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-70.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-71.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-72.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/batch-73.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/curated-priced-core.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/templates/v2.2-backtest-template.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/templates/v2.2-evidence-template.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/templates/v2.3-followup-import-template.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/templates/v2.4-followup-cases-template.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/templates/v2.4-multi-image-manifest.example.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/templates/v2.4-sales-observations-template.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/templates/v2.4-timeline-event-template.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/mock-v2.4-followup-provider-path.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/mock-v2.4-followup-provider-pii.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/mock-v2.4-followup-provider.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/v2.1-fixtures.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.2-fixtures.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.2-mock-ocr-provider.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/v2.2-workflow-fixture.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.3-mock-ocr-provider.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/v2.3-text-evidence.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.3-tracking-fixtures.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.3-tracking-pii-invalid.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.4-class-timeline-fixture.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.4-mock-multi-image-provider.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/tests/v2.4-sales-cases.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.4-sales-observations.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/tests/v2.4-workbench-fixtures.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.2/normalized-listings.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/v2.2/strict-sale-pool.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.3/backtest.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.3/calibration.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.3/drift.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.3/evidence-grade-report.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.3/evidence-queue-75.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.3/followup-ledger.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.3/market-comparables.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.3/prediction-outcomes.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.3/strict-sales.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/account-lifecycles.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.4/classifications.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/v2.4/followup-schedule.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "data/v2.4/g3-candidates.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/market-comparables.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/v2.4/market-timeline.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/sales-report.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/workbench-audit.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/workbench-import-template.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2.4/workbench-queues.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/buyer-budget.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/curated-listing-histories.jsonl",
+      "action": "migrate"
+    },
+    {
+      "legacy_path": "data/v2/dedupe-review.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/foreign-currency.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/normalized-listings.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/reduced-and-instant-pool.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/service-and-risk.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/sold-last-ask-pool.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/strict-asking-pool.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/strict-twd-international-candidates.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "data/v2/valuation-comparables.jsonl",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "date-scope-audit.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "duplicate-audit.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "handoff-prompt.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "research-method.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/apply-multi-image-review-v2.4.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/apply-ocr-review-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/backtest-v2.2.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/backtest-v2.3.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/build-v2.1-comparables.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.2-normalized.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.3-ledger.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.3-market.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.4-followup-schedule.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/build-v2.4-market.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.4-sales-ledger.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.4-timeline.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/build-v2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/calibrate-v2.3.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/classify-v2.4-class.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/complete-v2.4-followup.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/curate-v2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/drift-v2.3.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/estimate-v2.1.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/estimate-v2.2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/estimate-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/estimate-v2.4.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/execute-v2.4-followup-query.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/import-v2.2-evidence.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/import-v2.3-followups.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/ocr-batch-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/ocr-image-v2.2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/ocr-multi-image-v2.4.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/release-check-v2.2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/release-check-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/release-check-v2.4.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/run-v2.4-followup-cycle.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/run-v2.4-followup-due.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/test-v2.1.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.2-negative.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.2-workflows.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.3-market-integration.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.3-ocr.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.3-tracking.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.4-canonical-e2e.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.4-class-timeline.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.4-ocr.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.4-sales.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.4-workbench.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/test-v2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/track-v2.2-sales.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/transition-v2.3-followup.ps1",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "scripts/v2.4-workbench-adapters.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/v2.4-workbench.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/validate-v2.2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/validate-v2.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "scripts/windows-ocr-v2.2-helper.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "sky-account-valuation-rulebook.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "sold-price-audit.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.3/behavior-spec.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.3/fixtures/backtest-fixtures.jsonl",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "test-v2.3/fixtures/estimate-account.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.3/fixtures/integration-followups.json",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "test-v2.3/run-v2.3.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.4-estimator.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.4/behavior-spec.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "test-v2.4/run-v2.4.ps1",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2-collection-status.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2-implementation.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.1-estimator-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.2-data-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.2-estimator-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.2-sales-ocr-backtest.md",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "v2.3-estimator-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.3-ocr-pipeline.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.3-sales-tracking-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.4-classification-timeline.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.4-estimator-schema.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.4-multi-image-ocr.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "v2.4-sales-followup-schema.md",
+      "action": "remove"
+    },
+    {
+      "legacy_path": "v2.4-workbench.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-report.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.1.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.2.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.3-release.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.3.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.4-integration.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.4-release.json",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.4.md",
+      "action": "replace"
+    },
+    {
+      "legacy_path": "validation-v2.md",
+      "action": "replace"
+    }
+  ]
+}
