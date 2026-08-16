@@ -1,0 +1,1 @@
+{"normalized_alias":"姆明耳尾","alias_texts":["姆明耳尾"],"candidate_targets":[{"target_type":"item","target_id":"item_moomin_tail"},{"target_type":"set","target_id":"set_moomin_iap"}],"reason":"同一正規化別名在既有資料同時指向單一物品與套組；在取得可區分用語的物品級證據前，不保留任何 canonical mapping。","review_status":"needs_review","source_alias_ids":["alias_99c05ce0eee9331d0d78","alias_9f048d68a07dbd847969"]}

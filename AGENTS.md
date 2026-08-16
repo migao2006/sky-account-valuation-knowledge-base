@@ -2,7 +2,7 @@
 
 This repository is an offline-only static Sky account valuation knowledge base.
 
-- Use Python 3 standard-library tools only.
+- Core tools use Python 3 standard library only. The isolated `modeling/` environment may use only the exact pinned scientific packages in `modeling/requirements-modeling.lock`; it must not auto-install or access the network.
 - Do not add HTTP clients, crawlers, providers, schedulers, background services, or automatic update code.
 - Repository tools must never initiate network access. An external researcher may use the network outside this repository; any resulting formal data must enter review before it can become canonical.
 - Keep canonical knowledge under `knowledge/`; derived market data must remain reproducible from canonical/source data.
@@ -13,7 +13,7 @@ This repository is an offline-only static Sky account valuation knowledge base.
 - Classifier output for a user's valuation is governed by `schemas/input/valuation-account.schema.json` and may omit a market listing ID. The classifier accepts structured claims only; image support is an evidence contract, not OCR or visual-item recognition.
 - Unknown is not a match and is not confirmed absence. Keep confirmed differences separate from unconfirmed dimensions.
 - Estimation must require at least three hard-pool-compatible cases, at least three valid prices, a minimum similarity of 40/100, and at least three effective content dimensions. Otherwise return `insufficient_comparables` without a price range and explain exclusions and limitations.
-- P0.1 is not a full-item release. Do not claim completion of all items, image evidence, visual references, or verified sales. Current formal market coverage has only three cases with both TWD and international-server values confirmed, so the applicable range is limited.
+- P1 is not a full-item or trained-model release. Do not claim completion of all items, image evidence, visual references, verified sales, Item Value Table values, or model estimates while the formal artifacts are `insufficient_training_data`.
 
 ## Release verification
 

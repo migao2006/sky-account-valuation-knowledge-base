@@ -60,7 +60,8 @@ class PackageIntegrityTests(unittest.TestCase):
 
     def test_tools_have_no_network_imports(self):
         forbidden = {"requests", "socket", "http.client", "urllib.request", "aiohttp", "httpx"}
-        for path in (ROOT / "tools").rglob("*.py"):
+        paths = list((ROOT / "tools").rglob("*.py")) + list((ROOT / "modeling").rglob("*.py"))
+        for path in paths:
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = set()
             for node in ast.walk(tree):

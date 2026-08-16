@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/price-exclusion.schema.json",
+  "title": "Offline price-cleaning exclusion or review record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "history_id", "account_id", "reason_codes", "disposition", "price_line", "selected_price_twd"],
+  "properties": {
+    "schema_version": {"const": "3.1-p1"},
+    "history_id": {"type": "string", "pattern": "^history_[a-z0-9_]+$"},
+    "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"},
+    "reason_codes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9_]+$"}},
+    "disposition": {"enum": ["excluded", "needs_review"]},
+    "price_line": {"enum": ["normal_listing", "urgent_sale", "unknown"]},
+    "selected_price_twd": {"type": ["number", "null"]}
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": "3.1-p1",
+  "model_type": "xgboost",
+  "status": "insufficient_training_data",
+  "price_line": "urgent_sale",
+  "input_snapshot_paths": [
+    "data/modeling/account-item-vectors.jsonl",
+    "data/modeling/price-cleaned-urgent.jsonl"
+  ],
+  "input_snapshot_sha256": "276E5672150D5D4D7CAAF25EC23CAB2FD447A51BCD53619BA27169C49305A985",
+  "feature_schema": {
+    "version": "1",
+    "feature_names": [],
+    "feature_groups": []
+  },
+  "training": {
+    "records": 0,
+    "total_eligible_records": 0,
+    "min_required_records": 300,
+    "effective_feature_groups": 0,
+    "min_effective_feature_groups": 1,
+    "seed": 20260816,
+    "threshold_met": false,
+    "baseline_beaten": false,
+    "outer_cv_mae": null,
+    "outer_cv_folds": 0,
+    "outer_cv_grouping": "cluster_id",
+    "unique_clusters": 0,
+    "group_count": 0,
+    "baseline_median_mae": null
+  },
+  "prediction_contract": {
+    "target": "log_price_twd",
+    "transform": "exp",
+    "interval_supported": false,
+    "missing_feature_encoding": "NaN",
+    "unknown_is_not_confirmed_missing": true
+  },
+  "model_file": null,
+  "explanation_contract": {
+    "method": "xgboost_pred_contribs_and_pred_interactions",
+    "unit": "log_price_twd",
+    "conditional_attribution_only": true
+  }
+}

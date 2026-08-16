@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/xgboost-explanation.schema.json",
+  "title": "Verified offline TreeSHAP explanation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "account_id", "model_type", "price_line", "artifact_sha256", "model_sha256", "input_snapshot_sha256", "method", "unit", "conditional_attribution_only", "base_value_log_price", "main_effects", "top_interactions"],
+  "properties": {
+    "schema_version": {"const": "3.1-p1"}, "account_id": {"type": "string"}, "model_type": {"const": "xgboost"},
+    "price_line": {"enum": ["normal_listing", "urgent_sale"]},
+    "artifact_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "model_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "input_snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "method": {"const": "xgboost_pred_contribs_and_pred_interactions"}, "unit": {"const": "log_price_twd"}, "conditional_attribution_only": {"const": true},
+    "base_value_log_price": {"type": "number"}, "main_effects": {"type": "object"}, "top_interactions": {"type": "array"}
+  }
+}

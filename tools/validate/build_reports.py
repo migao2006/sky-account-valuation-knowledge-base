@@ -65,6 +65,12 @@ def main() -> None:
         "unresolved": root / "reports/coverage/unresolved-items.jsonl",
         "unmapped": root / "reports/coverage/unmapped-aliases.jsonl",
         "item_candidates": root / "data/review/item-candidates.jsonl",
+        "alias_conflicts": root / "data/review/alias-conflicts.jsonl",
+        "item_vectors": root / "data/modeling/account-item-vectors.jsonl",
+        "clean_normal": root / "data/modeling/price-cleaned-normal.jsonl",
+        "clean_urgent": root / "data/modeling/price-cleaned-urgent.jsonl",
+        "model_exclusions": root / "data/modeling/model-exclusions.jsonl",
+        "item_value_table": root / "data/modeling/item-value-table.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -89,19 +95,20 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.0-p0",
+        "schema_version": "3.1-p1",
         "as_of_date": "2026-08-16",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
         "counts": {name: len(rows[name]) for name in (
             "seasons", "events", "ancestors", "items", "sets", "aliases",
-            "availability_events", "sources", "visual_references", "unresolved", "unmapped", "item_candidates"
+            "availability_events", "sources", "visual_references", "unresolved", "unmapped", "item_candidates", "alias_conflicts"
         )},
         "review_state": {
             "canonical_needs_review_by_entity": canonical_needs_review,
             "canonical_needs_review_total": sum(canonical_needs_review.values()),
             "unresolved_queue_records": len(rows["unresolved"]),
             "item_candidate_records": len(rows["item_candidates"]),
+            "alias_conflict_records": len(rows["alias_conflicts"]),
             "unmapped_terms": len(rows["unmapped"]),
             "overlap_note": "各欄分開計數，可能描述同一知識缺口，不直接相加為唯一項目數。",
         },
@@ -109,6 +116,9 @@ def main() -> None:
             "by_category": count(rows["items"], "item_category"),
             "by_source_type": count(rows["items"], "source_type"),
             "by_verification_status": count(rows["items"], "verification_status"),
+            "by_evidence_tier": count(rows["items"], "evidence_tier"),
+            "by_model_feature_status": count(rows["items"], "model_feature_status"),
+            "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
             "by_availability_status": count(rows["items"], "availability_status"),
             "with_visual_reference": sum(bool(row.get("visual_reference_ids")) for row in rows["items"]),
             "with_canonical_zh_tw_name_confirmed": sum(
@@ -147,8 +157,20 @@ def main() -> None:
             "profiles_with_mapped_items": sum(bool(row.get("collection", {}).get("owned_item_ids")) for row in rows["account_profiles"]),
             "profiles_with_set_claims": sum(bool(row.get("collection", {}).get("item_set_profiles")) for row in rows["account_profiles"]),
         },
+        "modeling": {
+            "account_item_vectors": len(rows["item_vectors"]),
+            "canonical_items_per_vector": len(rows["items"]),
+            "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
+            "clean_normal_rows": len(rows["clean_normal"]),
+            "clean_urgent_rows": len(rows["clean_urgent"]),
+            "excluded_or_review_rows": len(rows["model_exclusions"]),
+            "item_value_rows": len(rows["item_value_table"]),
+            "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
+            "model_status": "insufficient_training_data",
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
+            "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
             "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
@@ -194,8 +216,9 @@ def main() -> None:
 
 ## 尚未確認
 
-- canonical needs_review 分布為 {json.dumps(canonical_needs_review, ensure_ascii=False)}；另有類別缺口 queue {len(rows['unresolved'])} 筆、隔離物品候選 {len(rows['item_candidates'])} 筆、unmapped alias {len(rows['unmapped'])} 筆。這些集合可能重疊，不直接相加成唯一項目數。
+- canonical needs_review 分布為 {json.dumps(canonical_needs_review, ensure_ascii=False)}；另有類別缺口 queue {len(rows['unresolved'])} 筆、隔離物品候選 {len(rows['item_candidates'])} 筆、unmapped alias {len(rows['unmapped'])} 筆、alias conflict {len(rows['alias_conflicts'])} 筆。這些集合可能重疊，不直接相加成唯一項目數。
 - 全物品 catalog 未完成。現有 {len(rows['items'])} 筆是可追溯種子與節點目錄，不代表遊戲全部物品。
+- 物品 evidence tier：{json.dumps(count(rows['items'], 'evidence_tier'), ensure_ascii=False)}；模型白名單物品 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])} 筆。needs_review、候選與衝突別名均不得進入正式 Item Vector。
 - visual reference {len(rows['visual_references'])}、真實 image evidence {len(rows['image_evidence'])}、可驗證成交 {verified_sales}；因此不宣稱圖示辨識準確率或成交價模型。
 - 季節節點的繁中正式名、免費／季卡屬性、成本與取得狀態仍有 needs_review 記錄。
 """
@@ -203,7 +226,8 @@ def main() -> None:
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_version"] = "3.0.1-p0.1"
+    manifest["package_id"] = "sky-valuation-v3-p1"
+    manifest["package_version"] = "3.1.0-p1"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
         "items": len(rows["items"]), "sets": len(rows["sets"]), "aliases": len(rows["aliases"]),
@@ -211,12 +235,29 @@ def main() -> None:
         "canonical_needs_review_by_entity": canonical_needs_review,
         "unresolved_queue_records": len(rows["unresolved"]),
         "item_candidate_records": len(rows["item_candidates"]),
+        "alias_conflict_records": len(rows["alias_conflicts"]),
         "unmapped_aliases": len(rows["unmapped"]),
         "source_listings": len(rows["source_listings"]), "normalized_listings": len(rows["normalized_listings"]),
         "curated_histories": len(rows["curated_histories"]), "verified_completed_sales": verified_sales,
         "comparable_accounts": len(rows["comparable_accounts"]),
         "image_evidence_records": len(rows["image_evidence"]),
+        "account_item_vectors": len(rows["item_vectors"]),
+        "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
+        "clean_normal_rows": len(rows["clean_normal"]),
+        "clean_urgent_rows": len(rows["clean_urgent"]),
+        "model_exclusion_rows": len(rows["model_exclusions"]),
+        "item_value_rows": len(rows["item_value_table"]),
+        "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
     }
+    manifest["derived_paths"] = [
+        "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
+        "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
+        "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
+        "data/modeling/item-value-table.jsonl",
+        "modeling/artifacts/elastic-net-normal_listing.json", "modeling/artifacts/elastic-net-urgent_sale.json",
+        "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
+        "reports/coverage/catalog-coverage.json", "reports/validation/p0-validation.json",
+    ]
     manifest["generated_at"] = BUILT_AT
     manifest["catalog_status"] = "partial_verified_catalog"
     manifest["hash_exclusions"] = sorted(HASH_EXCLUSIONS)

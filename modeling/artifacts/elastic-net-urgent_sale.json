@@ -1,0 +1,46 @@
+{
+  "schema_version": "3.1-p1",
+  "status": "insufficient_training_data",
+  "price_line": "urgent_sale",
+  "model_type": "elastic_net",
+  "random_seed": 1729,
+  "input_snapshot_paths": [
+    "data/modeling/account-item-vectors.jsonl",
+    "data/modeling/price-cleaned-urgent.jsonl"
+  ],
+  "input_snapshot_sha256": "276e5672150d5d4d7caaf25ec23cab2fd447a51bcd53619ba27169c49305a985",
+  "training": {
+    "eligible_rows": 0,
+    "minimum_rows": 100,
+    "feature_group_count": 0,
+    "group_count": 0,
+    "threshold_met": false,
+    "baseline_beaten": false,
+    "outer_cv_mae": null,
+    "outer_cv_mae_ci95": [
+      null,
+      null
+    ],
+    "baseline_mae": null,
+    "folds": 0
+  },
+  "feature_schema": {
+    "feature_names": [],
+    "feature_groups": [],
+    "categorical_columns": [],
+    "continuous_columns": [],
+    "missing_mask_columns": [],
+    "target": "log_twd_price"
+  },
+  "prediction_contract": {
+    "kind": "unavailable",
+    "required_feature_columns": [],
+    "unknown_handling": "missing_mask",
+    "target_transform": "log_twd_price"
+  },
+  "rejected_rows": [],
+  "limitations": [
+    "fewer_than_minimum_training_rows"
+  ],
+  "artifact": null
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/alias-conflict.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["normalized_alias", "alias_texts", "candidate_targets", "reason", "review_status", "source_alias_ids"],
+  "properties": {
+    "normalized_alias": {"type": "string", "minLength": 1},
+    "alias_texts": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "candidate_targets": {"type": "array", "minItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["target_type", "target_id"], "properties": {"target_type": {"enum": ["season", "event", "item", "set", "ancestor"]}, "target_id": {"type": "string", "pattern": "^(season|event|item|set|ancestor)_[a-z0-9_]+$"}}}},
+    "reason": {"type": "string", "minLength": 1},
+    "review_status": {"const": "needs_review"},
+    "source_alias_ids": {"type": "array", "minItems": 2, "items": {"type": "string", "pattern": "^alias_[a-z0-9_]+$"}, "uniqueItems": true}
+  }
+}

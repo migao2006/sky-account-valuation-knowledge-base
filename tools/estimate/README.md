@@ -12,4 +12,6 @@ python tools/estimate/estimate.py input-account.json data/comparables/accounts.j
 
 目標帳號的 `trade_conditions` 必須明確為 `offer_kind: seller_listing` 與 `entity_kind: single_account`。買方預算、服務、交換、套組及未知交易型態不會借用單帳賣方價格池。
 
+`model_estimator.py` 是 P1 的離線模型入口，讀取同一個結構化帳號 JSON，並只接受通過資料快照、分組交叉驗證、baseline 與模型雜湊門檻的 artifact。物品模型欄位使用可選的 `item_states` 三態向量；只有 catalog 核准且帳號證據已覆核的狀態可成為正式物品特徵。未提供的 item state 保持 unknown。正式 P1 僅有 3 筆正常刊登、0 筆急售，四個 artifact 皆停用，因此模型入口會回傳資料不足，而不是產生模型價格。
+
 `evidence.py` 只提供圖片證據資料契約與驗證。`ocr_text` 只可表示文字觀察，不能直接聲稱偵測到物品；物品圖示需獨立的 `icon_match` 或人工標註 row，並指定已存在的 `item_*` canonical ID。正式 evidence 禁止原始 OCR 內容、玩家資料、網址及本機圖片路徑。
