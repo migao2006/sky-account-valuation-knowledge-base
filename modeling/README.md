@@ -35,5 +35,5 @@ python modeling/evaluate.py --artifact modeling/artifacts/elastic-net-normal_lis
 
 Formal P2 data has 3 normal-listing rows, 0 urgent-sale rows, and 0
 model-eligible canonical items. Both trainers therefore publish only
-`insufficient_training_data`; the 94-row Item Value Table is entirely
+`insufficient_training_data`; every canonical Item Value Table row is
 `insufficient_support` and contains no numerical item attribution.

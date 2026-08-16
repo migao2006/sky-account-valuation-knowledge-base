@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"knowledge/journey-pack-fact-snapshot.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["snapshot_format","snapshot_id","source_id","source_url","retrieved_at","capture_policy","facts","non_claims"],
+  "properties":{
+    "snapshot_format":{"const":"fact_limited_official_support_snapshot_v1"},
+    "snapshot_id":{"const":"tgc_faq_1308_journey_pack_2026_08_17"},
+    "source_id":{"const":"source_tgc_faq_1308_journey_pack"},
+    "source_url":{"const":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1308/"},
+    "retrieved_at":{"type":"string","format":"date"},"capture_policy":{"type":"string","minLength":1},
+    "facts":{"type":"object","additionalProperties":false,"required":["pack_description_en","included_component_descriptions_en","included_component_values","historical_price_usd","cross_platform_account_access"],"properties":{
+      "pack_description_en":{"const":"Journey Pack"},
+      "included_component_descriptions_en":{"type":"object","additionalProperties":false,"required":["item_journey_pack_cape","item_journey_hair","item_journey_mask"],"properties":{"item_journey_pack_cape":{"const":"cape"},"item_journey_hair":{"const":"hood"},"item_journey_mask":{"const":"mask"}}},
+      "included_component_values":{"const":["cape","hood","mask"]},
+      "historical_price_usd":{"const":24.99},
+      "cross_platform_account_access":{"const":"In-app purchases are available across platforms."}
+    }},
+    "non_claims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}

@@ -108,3 +108,15 @@ its own trust root:
 ```powershell
 python tools/normalize/apply_aurora_faq968_cohort.py --root .
 ```
+
+`apply_journey_pack_cohort.py` replays the bounded FAQ 1308 Journey Pack
+cohort. It requires the official source to have been registered separately,
+then binds the fact-only snapshot and the pinned vendor catalog by byte hash,
+source lineage, JSON pointer, and claim hash. The $24.99 statement is retained
+only as an historical pack-level fact: each component remains `bundle_only`.
+Current availability, permanence, formal Traditional Chinese names, images,
+and model eligibility remain unknown or excluded.
+
+```powershell
+python tools/normalize/apply_journey_pack_cohort.py --root .
+```

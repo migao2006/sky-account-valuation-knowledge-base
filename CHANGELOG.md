@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.9.0-p2.7 — 2026-08-17
+
+- 新增 Journey Pack 三件可重播官方／獨立 vendor identity cohort；新增 Journey Hair、Journey Mask，並驗證 Journey Cape 與三件套組。
+- 單件價格維持 `bundle_only`；只保存歷史套組 USD 24.99，現時供應、永久性、正式繁中名與圖片身份仍為 unknown，模型仍排除。
+- 修正中文頓號造成的跨平台綁定污染、「無法轉出／註銷／被封」高風險漏判，以及「半畢業」誤升完整畢業。
+- 發布契約改為資料衍生的一致性 gate，不再把空人工 gold、空核准 evidence、固定 1,022／103／3／0 或永遠 insufficient 模型當作未來版本成功條件。
+- 模型 evaluator 在沒有獨立 time-forward publication evidence 時拒絕 trained artifact；正式三筆價格仍不足，估價維持 `insufficient_comparables`。
+
 ## 3.8.0-p2.6 — 2026-08-17
 
 - 新增 FAQ 968 六件 AURORA 官方證據 cohort；固定 fact-limited transcription 與獨立 vendor snapshot，保留目前供應、永久性、正式繁中名與視覺身份為 unknown。

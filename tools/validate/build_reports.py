@@ -39,6 +39,13 @@ def write_utf8_lf(path: Path, content: str) -> None:
         handle.write(content)
 
 
+def derived_model_status(artifacts: list[dict[str, Any]]) -> str:
+    """Describe the published model state without trusting self-attested publication fields."""
+    if artifacts and all(artifact.get("status") == "insufficient_training_data" for artifact in artifacts):
+        return "insufficient_training_data"
+    return "publication_evaluator_required"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -79,6 +86,7 @@ def main() -> None:
         "item_promotion_ledger": root / "data/review/item-promotion-ledger.jsonl",
         "nintendo_canonical_evidence": root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl",
         "aurora_canonical_evidence": root / "data/review/aurora-faq968-canonical-evidence.jsonl",
+        "journey_canonical_evidence": root / "data/review/journey-pack-canonical-evidence.jsonl",
         "market_claim_review": root / "data/review/market-claim-review.jsonl",
         "market_claim_gold": root / "data/review/market-claim-gold.jsonl",
         "market_near_miss_review": root / "data/review/market-near-miss-field-review.jsonl",
@@ -98,6 +106,17 @@ def main() -> None:
     ]
     write_utf8_lf(paths["unmapped"], "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in unmapped_rows))
     rows = {name: read_jsonl(path) for name, path in paths.items()}
+    model_artifacts = [
+        json.loads((root / "modeling/artifacts" / name).read_text(encoding="utf-8"))
+        for name in (
+            "elastic-net-normal_listing.json", "elastic-net-urgent_sale.json",
+            "xgboost-normal_listing.json", "xgboost-urgent_sale.json",
+        )
+    ]
+    canonical_promotions = sum(
+        row.get("canonical_write") not in {None, "not_performed"}
+        for row in rows["item_promotion_ledger"]
+    )
     migration = json.loads((root / "reports/migration/migration-summary.json").read_text(encoding="utf-8"))
     inventory = json.loads((root / "reports/migration/file-inventory.json").read_text(encoding="utf-8"))
 
@@ -110,7 +129,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "3.8-p2.6",
+        "schema_version": "3.9-p2.7",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -183,7 +202,7 @@ def main() -> None:
             "excluded_or_review_rows": len(rows["model_exclusions"]),
             "item_value_rows": len(rows["item_value_table"]),
             "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
-            "model_status": "insufficient_training_data",
+            "model_status": derived_model_status(model_artifacts),
         },
         "p2_evidence": {
             "vendor_snapshot_items": 3266,
@@ -192,7 +211,7 @@ def main() -> None:
             "candidate_exact_name_matches": sum(row.get("match_status") == "matched_candidate_name" for row in rows["vendor_crosswalk"]),
             "candidate_field_evidence_rows": len(rows["vendor_item_evidence"]),
             "approved_strict_listing_recoveries": sum(row.get("review_status") == "approved" for row in rows["strict_recovery_reviews"]),
-            "canonical_promotions": 0,
+            "canonical_promotions": canonical_promotions,
         },
         "p2_1_review_infrastructure": {
             "catalog_universe_rows": len(rows["catalog_universe"]),
@@ -235,18 +254,19 @@ def main() -> None:
             "visual_source_descriptions": sum(row.get("reference_mode") == "source_description" for row in rows["visual_references"]),
             "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
         },
-        "p2_6_verified_identity_slice": {
+        "p2_7_verified_identity_slice": {
             "verified_canonical_items": sum(row.get("verification_status") == "verified" for row in rows["items"]),
             "verified_cohorts": {
                 "nintendo_starter_pack": len(rows["nintendo_canonical_evidence"]),
                 "aurora_faq968": len(rows["aurora_canonical_evidence"]),
+                "journey_pack": len(rows["journey_canonical_evidence"]),
             },
-            "field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]),
+            "field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]) + len(rows["journey_canonical_evidence"]),
             "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
         },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-            "P2.6 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件及 AURORA FAQ 968 六件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+            "P2.7 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件、AURORA FAQ 968 六件及 Journey Pack 三件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
             "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
@@ -255,8 +275,8 @@ def main() -> None:
             "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
             "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
             "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-            f"P2.6 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
-            f"P2.6 的 {len(rows['catalog_query_index'])} 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
+            f"P2.7 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；沒有任何案例因缺乏核准 evidence 而自動進入可比池。",
+            f"P2.7 的 {len(rows['catalog_query_index'])} 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
             "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
             "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。",
         ],
@@ -315,13 +335,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "3.8-p2.6"
+    previous_validation["schema_version"] = "3.9-p2.7"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v3-p26"
-    manifest["package_version"] = "3.8.0-p2.6"
+    manifest["package_id"] = "sky-valuation-v3-p27"
+    manifest["package_version"] = "3.9.0-p2.7"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -364,7 +384,8 @@ def main() -> None:
         "verified_canonical_items": sum(row.get("verification_status") == "verified" for row in rows["items"]),
         "nintendo_canonical_field_evidence_rows": len(rows["nintendo_canonical_evidence"]),
         "aurora_canonical_field_evidence_rows": len(rows["aurora_canonical_evidence"]),
-        "canonical_field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]),
+        "journey_canonical_field_evidence_rows": len(rows["journey_canonical_evidence"]),
+        "canonical_field_evidence_rows": len(rows["nintendo_canonical_evidence"]) + len(rows["aurora_canonical_evidence"]) + len(rows["journey_canonical_evidence"]),
         "catalog_scope_needs_review_rows": sum(row.get("scope_disposition") != "collectible_item" for row in rows["catalog_universe"]),
     }
     manifest["derived_paths"] = [
@@ -388,6 +409,7 @@ def main() -> None:
     manifest["human_review_paths"] = [
         "data/review/nintendo-starter-pack-canonical-evidence.jsonl",
         "data/review/aurora-faq968-canonical-evidence.jsonl",
+        "data/review/journey-pack-canonical-evidence.jsonl",
         "data/review/market-claim-gold.jsonl",
         "data/review/market-near-miss-approved-evidence.jsonl",
     ]

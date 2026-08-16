@@ -10,7 +10,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "2406CB3DEF9ECFAA481A509C2A340E37F7B30DCD0AFE436B36BCE889DBFEAC4C",
+  "input_snapshot_sha256": "AD5FDE07DD7D46B42241436C183AC8E6EEC0A19AE103BD0E7E1924AEDA5E4161",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -28,7 +28,6 @@
       "bindings.platforms.game_center.evidence_state=text_claim",
       "bindings.platforms.game_center.status=__unknown__",
       "bindings.platforms.game_center.status=high_risk",
-      "bindings.platforms.game_center.status=mentioned_unknown",
       "bindings.platforms.google.evidence_state=__unknown__",
       "bindings.platforms.google.evidence_state=text_claim",
       "bindings.platforms.google.status=__unknown__",
@@ -93,7 +92,7 @@
       "season_profiles.season_blue_bird.evidence_state=text_claim",
       "season_profiles.season_blue_bird.pass_owned=yes",
       "season_profiles.season_blue_bird.review_status=needs_review",
-      "season_profiles.season_blue_bird.status=partial",
+      "season_profiles.season_blue_bird.status=owned_not_complete",
       "season_profiles.season_blue_bird.ultimate_reward_owned=__unknown__",
       "season_profiles.season_carnival.capture_date=__unknown__",
       "season_profiles.season_carnival.completion_ratio=__unknown__",
@@ -102,7 +101,7 @@
       "season_profiles.season_carnival.evidence_state=text_claim",
       "season_profiles.season_carnival.pass_owned=__unknown__",
       "season_profiles.season_carnival.review_status=needs_review",
-      "season_profiles.season_carnival.status=partial",
+      "season_profiles.season_carnival.status=owned_not_complete",
       "season_profiles.season_carnival.ultimate_reward_owned=__unknown__",
       "season_profiles.season_flight.capture_date=__unknown__",
       "season_profiles.season_flight.completion_ratio=__unknown__",
@@ -129,7 +128,7 @@
       "season_profiles.season_moomin.evidence_state=text_claim",
       "season_profiles.season_moomin.pass_owned=yes",
       "season_profiles.season_moomin.review_status=needs_review",
-      "season_profiles.season_moomin.status=partial",
+      "season_profiles.season_moomin.status=owned_not_complete",
       "season_profiles.season_moomin.ultimate_reward_owned=__unknown__",
       "season_profiles.season_nesting.capture_date=__unknown__",
       "season_profiles.season_nesting.completion_ratio=__unknown__",
@@ -245,12 +244,12 @@
     "conditional_attribution_only": true
   },
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "F9E7699BB40037D979D514FC746245959B00ED8C67CDC382AEEAC359186E1480",
+    "canonical_item_ids_sha256": "C44EDA54D17FCF86679C4F2BF6BFF8770AD2686CDC533E9DD61CC785E771E3AE",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "AA9969E5FEEF91F92F40815FE093E2208FA8AC5E4986EEEBFEBDFBE3929381C9"
+    "pinned_catalog_sha256": "3174A61A106B49B11BBFC2C91773179447AFE636A59B7DAAE56B09872B732F51"
   }
 }

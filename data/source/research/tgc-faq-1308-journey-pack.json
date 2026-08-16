@@ -1,0 +1,20 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1308_journey_pack_2026_08_17",
+  "source_id":"source_tgc_faq_1308_journey_pack",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1308/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1308's Journey Pack name, three descriptive components, stated historical USD price, and cross-platform account-access statement. No HTML, image, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "pack_description_en":"Journey Pack",
+    "included_component_descriptions_en":{"item_journey_pack_cape":"cape","item_journey_hair":"hood","item_journey_mask":"mask"},
+    "included_component_values":["cape","hood","mask"],
+    "historical_price_usd":24.99,
+    "cross_platform_account_access":"In-app purchases are available across platforms."
+  },
+  "non_claims":[
+    "This historical FAQ statement does not establish current storefront availability or a return policy.",
+    "The FAQ does not provide vendor-aligned exact component titles, individual item prices, permanent-account property, image assets, or formal Traditional Chinese names.",
+    "The pack price is not allocated to individual items."
+  ]
+}
