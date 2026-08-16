@@ -4,7 +4,11 @@
   "type": "object", "additionalProperties": false,
   "required": ["index_version", "canonical_item_count", "review_candidate_count", "source_reference_count", "query_row_count", "source_snapshot_sha256", "canonical_resolved_eligible_count", "ambiguous_lookup_key_count", "rows_with_lookup_key_collisions", "model_feature_status", "notes"],
   "properties": {
-    "index_version": {"const": "1.0"}, "canonical_item_count": {"const": 94}, "review_candidate_count": {"const": 622}, "source_reference_count": {"const": 1758}, "query_row_count": {"const": 2474},
+    "index_version": {"const": "1.0"},
+    "canonical_item_count": {"type": "integer", "minimum": 0},
+    "review_candidate_count": {"type": "integer", "minimum": 0},
+    "source_reference_count": {"type": "integer", "minimum": 0},
+    "query_row_count": {"type": "integer", "minimum": 0},
     "source_snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "canonical_resolved_eligible_count": {"type": "integer", "minimum": 0},
     "ambiguous_lookup_key_count": {"type": "integer", "minimum": 0}, "rows_with_lookup_key_collisions": {"type": "integer", "minimum": 0},
     "model_feature_status": {"enum": ["excluded_pending_verification", "mixed"]}, "notes": {"type": "string", "minLength": 1}

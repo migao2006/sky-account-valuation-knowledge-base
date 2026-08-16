@@ -33,6 +33,7 @@ from build_item_evidence_bundle import build as build_item_evidence, sha as item
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
 from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
+from apply_aurora_faq968_cohort import verify as verify_aurora_faq968  # noqa: E402
 from apply_nintendo_starter_pack import verify as verify_nintendo_starter_pack  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 
@@ -75,6 +76,7 @@ SCHEMA_FILES = {
     "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/nintendo-starter-pack-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
+    "data/review/aurora-faq968-canonical-evidence.jsonl": "schemas/review/canonical-item-field-evidence.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
@@ -106,6 +108,7 @@ JSON_SCHEMA_FILES = {
     "data/normalized/source-scoped-item-identities-summary.json": "schemas/normalized/source-scoped-item-identities-summary.schema.json",
     "data/normalized/catalog-query-index-summary.json": "schemas/normalized/catalog-query-index-summary.schema.json",
     "data/source/research/tgc-faq-823-nintendo-starter-pack.json": "schemas/knowledge/official-item-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-968-aurora-remaining-iap.json": "schemas/knowledge/aurora-faq-968-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -134,6 +137,71 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
                 raise ValueError(f"{path}:{number} is not an object")
             records.append(value)
     return records
+
+
+def validate_canonical_field_evidence(
+    evidence_groups: list[tuple[str, list[dict[str, Any]]]],
+    items: dict[str, dict[str, Any]],
+    sets: dict[str, dict[str, Any]],
+    sources: dict[str, dict[str, Any]],
+) -> list[str]:
+    """Validate target, source-lineage, value-type, and canonical agreement."""
+    problems: list[str] = []
+    seen: set[str] = set()
+    item_fields = {
+        "canonical_name_en", "identity_description", "item_category", "source_type",
+        "set_membership", "availability_status", "availability_history", "original_cost",
+        "original_currency", "first_release_date", "free_or_premium",
+        "permanent_account_item", "collaboration", "visual_reference",
+    }
+    set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition"}
+    string_fields = item_fields - {"original_cost", "collaboration"}
+    official_source_types = {"official_site", "official_news", "official_support", "thatgamecompany"}
+    for label, rows in evidence_groups:
+        for row in rows:
+            evidence_id = str(row.get("evidence_id", "unknown"))
+            prefix = f"canonical-evidence:{label}:{evidence_id}"
+            if evidence_id in seen:
+                problems.append(f"{prefix}: duplicate evidence_id across cohorts")
+            seen.add(evidence_id)
+            target_type, target_id = row.get("target_type"), row.get("target_id")
+            field, value = row.get("field_path"), row.get("claim_value")
+            if target_type == "item":
+                if not isinstance(target_id, str) or not target_id.startswith("item_") or target_id not in items:
+                    problems.append(f"{prefix}: item target is not a canonical item")
+                if field not in item_fields:
+                    problems.append(f"{prefix}: field {field!r} is not valid for an item")
+            elif target_type == "set":
+                if not isinstance(target_id, str) or not target_id.startswith("set_") or target_id not in sets:
+                    problems.append(f"{prefix}: set target is not a canonical set")
+                if field not in set_fields:
+                    problems.append(f"{prefix}: field {field!r} is not valid for a set")
+            source = sources.get(row.get("source_id"))
+            if source is None:
+                problems.append(f"{prefix}: source_id is not registered")
+            else:
+                if source.get("source_lineage_id") != row.get("source_lineage_id"):
+                    problems.append(f"{prefix}: source lineage differs from source registry")
+                is_official = source.get("source_type") in official_source_types
+                tier = row.get("source_tier")
+                if tier in {"official_item_specific", "official_general"} and not is_official:
+                    problems.append(f"{prefix}: non-official source claims an official tier")
+                if tier == "secondary_reference" and is_official:
+                    problems.append(f"{prefix}: official source is mislabeled as secondary")
+            if field in string_fields and not isinstance(value, str):
+                problems.append(f"{prefix}: {field} claim must be a string")
+            if field == "original_cost" and (isinstance(value, bool) or not isinstance(value, (int, float))):
+                problems.append(f"{prefix}: original_cost claim must be numeric")
+            if field == "collaboration" and not isinstance(value, bool):
+                problems.append(f"{prefix}: collaboration claim must be boolean")
+            if field in {"set_required_item_ids", "scope_definition"} and not isinstance(value, list):
+                problems.append(f"{prefix}: {field} claim must be an array")
+            target = items.get(target_id) if target_type == "item" else sets.get(target_id)
+            if target is not None and field in {"canonical_name_en", "original_cost"} and target.get(field) != value:
+                problems.append(f"{prefix}: approved claim differs from canonical {field}")
+            if target is not None and field == "item_category" and str(target.get(field, "")).casefold() != str(value).casefold():
+                problems.append(f"{prefix}: approved category differs from canonical item_category")
+    return problems
 
 
 def _vendor_claim_key(value: Any) -> str:
@@ -487,8 +555,16 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         errors.append("item-promotion: committed ledger differs from deterministic fail-closed evaluation")
     if any(row.get("canonical_write") != "not_performed" or row.get("model_feature_status") != "excluded_pending_verification" for row in promotion_ledger):
         errors.append("item-promotion: identity-only ledger attempted canonical/model promotion")
+    source_records = {row["source_id"]: row for row in read_jsonl(root / "knowledge/sources/sources.jsonl")}
+    evidence_groups = [
+        ("nintendo", read_jsonl(root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl")),
+        ("aurora-faq968", read_jsonl(root / "data/review/aurora-faq968-canonical-evidence.jsonl")),
+    ]
+    errors.extend(validate_canonical_field_evidence(evidence_groups, items, sets, source_records))
     for problem in verify_nintendo_starter_pack(root):
         errors.append(f"nintendo-starter-pack: {problem}")
+    for problem in verify_aurora_faq968(root):
+        errors.append(f"aurora-faq968: {problem}")
     market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
     expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if market_claim_queue != expected_market_claim_queue:
@@ -783,7 +859,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "3.7-p2.5", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "3.8-p2.6", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

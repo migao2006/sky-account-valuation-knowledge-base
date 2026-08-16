@@ -152,8 +152,15 @@ SEASON_RE = re.compile(
     r"感恩|追光|歸屬|归属|音韻|音韵|魔法|聖島|圣岛|預言|预言|夢想|梦想|重組|重组|"
     r"小王子|風行|风行|深淵|深渊|表演|破曉|破晓|歐若拉|欧若拉|極光|极光|追憶|追忆|"
     r"緬懷|缅怀|夜行|拾光|九色鹿|築巢|筑巢|巢穴|二重奏|姆明|彩染|遷徙|迁徙|"
-    r"青鳥|青鸟|雙星|双星|織光|织光|狂歡|狂欢|梵高|梵谷|梵谷季|歸巢|归巢|凜冬|凛冬"
+    r"青鳥|青鸟|雙星|双星|織光|织光|狂歡|狂欢|梵高|梵谷|梵谷季|歸巢|归巢|"
+    r"集結|集结|破碎|凜冬|凛冬"
 )
+
+# These short forms are also ordinary Chinese words.  They can represent a
+# canonical season only when the surrounding listing actually presents them as
+# a season claim.  In particular, a bare ``破碎`` in an item/service sentence
+# must not become account ownership merely because the alias exists.
+CONTEXT_GATED_SEASON_TERMS = frozenset({"集結", "集结", "破碎"})
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -464,8 +471,45 @@ def enrich_collection_from_canonical(
     return values, evidence
 
 
+def season_term_has_context(text: str, match: re.Match[str]) -> bool:
+    """Return whether a short ambiguous alias is used as a season claim.
+
+    The catalog deliberately keeps the aliases for review and lookup, while
+    migration needs a stricter rule: only season-list, completion/pass, or
+    explicit season-range contexts may establish account ownership.  A
+    neighbouring season name without a delimiter (for example
+    ``表演破碎畢業``) is also rejected because it can be a compressed heading
+    rather than a separable claim for this account.
+    """
+    term = match.group(0)
+    if term not in CONTEXT_GATED_SEASON_TERMS:
+        return True
+    before = text[max(0, match.start() - 24):match.start()]
+    after = text[match.end():min(len(text), match.end() + 16)]
+    context = before + term + after
+    if re.search(r"(?:不含|不包|無|无|缺)\s*$", before):
+        return False
+    # A directly adjacent known season name has no list/range delimiter.
+    if any(previous.end() == len(before) for previous in SEASON_RE.finditer(before)):
+        return False
+    if after.startswith("季"):
+        return True
+    if re.search(r"(?:季節|季节|畢業季節|毕业季节)\s*[:：\-—]?\s*(?:[^\n]{0,20})$", before):
+        return True
+    if re.search(r"(?:畢業|毕业|季卡|有卡|無卡|无卡|半畢|半毕)", context):
+        return True
+    # A delimited season range is an explicit seasonal context even when the
+    # term itself omits the trailing ``季``.
+    if re.search(r"(?:～|~|至|到|—|-)\s*$", before) or re.match(r"^\s*(?:～|~|至|到|—|-)", after):
+        return True
+    return False
+
+
 def season_terms(text: str) -> list[str]:
-    return list(dict.fromkeys(match.group(0) for match in SEASON_RE.finditer(text)))
+    return list(dict.fromkeys(
+        match.group(0) for match in SEASON_RE.finditer(text)
+        if season_term_has_context(text, match)
+    ))
 
 
 def season_profile(
@@ -481,7 +525,7 @@ def season_profile(
     combined by :func:`merge_season_profiles` so disagreement remains visible
     as a conflict instead of silently overriding the listing wording.
     """
-    matches = [match for match in SEASON_RE.finditer(text)]
+    matches = [match for match in SEASON_RE.finditer(text) if season_term_has_context(text, match)]
     profiles_by_id: dict[str, dict[str, Any]] = {}
     unresolved: list[str] = []
     terms_by_id: dict[str, str] = {}
@@ -509,11 +553,53 @@ def season_profile(
 
     for season_id, term in terms_by_id.items():
         escaped = re.escape(term)
-        complete = re.search(rf"{escaped}.{{0,8}}(?:畢業|毕业)|(?:畢業|毕业).{{0,8}}{escaped}", text)
+        # Completion is scoped to the same punctuation-delimited clause as the
+        # season term. This prevents a preceding clause such as ``狂歡畢業，``
+        # from completing the next claim ``梵谷有卡未畢``. Direct negations
+        # (未畢業／尚未畢業／沒有畢業) always suppress the completion mention.
+        negative_pattern = (
+            rf"{escaped}[^，,。；;！!？?、\n]{{0,10}}(?:未|尚未|沒有|没有|無法|无法|無|无)(?:畢|毕)(?:業|业)?"
+            rf"|(?:未|尚未|沒有|没有|無法|无法|無|无)(?:畢|毕)(?:業|业)?[^，,。；;！!？?、\n]{{0,10}}{escaped}"
+            rf"|差[^，,。；;！!？?、\n]{{0,6}}{escaped}[^，,。；;！!？?、\n]{{0,10}}(?:畢|毕)(?:業|业)?"
+        )
+        negative_completion = bool(re.search(negative_pattern, text, re.I))
+        positive_completion = False
+        for term_match in re.finditer(escaped, text, re.I):
+            left = max((text.rfind(mark, 0, term_match.start()) for mark in "，,。；;！!？?、\n"), default=-1) + 1
+            right_candidates = [text.find(mark, term_match.end()) for mark in "，,。；;！!？?、\n"]
+            right_candidates = [position for position in right_candidates if position >= 0]
+            right = min(right_candidates, default=len(text))
+            clause = text[left:right]
+            clause_is_negative = bool(re.search(negative_pattern, clause, re.I))
+            if not clause_is_negative:
+                for mention in re.finditer(r"畢業|毕业", clause):
+                    prefix = clause[max(0, mention.start() - 6):mention.start()]
+                    if not re.search(r"(?:未|尚未|沒有|没有|無法|无法|無|无|不算)\s*$", prefix):
+                        positive_completion = True
+                        break
+            # Explicit headings such as ``畢業季節：...`` and ``畢業季含...``
+            # apply to their following list until a strong clause boundary.
+            strong_left = max((text.rfind(mark, 0, term_match.start()) for mark in "。；;！!？?\n"), default=-1) + 1
+            heading_prefix = text[strong_left:term_match.start()]
+            if not clause_is_negative and re.search(r"(?:畢業季節|毕业季节|畢業季|毕业季)\s*(?:[:：]|含)?[^。；;！!？?\n]*$", heading_prefix):
+                positive_completion = True
+        explicit_completion_conflict = negative_completion and positive_completion
+        complete = positive_completion and not negative_completion
         partial = re.search(rf"{escaped}.{{0,8}}(?:半畢|半毕|[1-9]\s*/\s*[2-9]|進度|进度)|(?:半畢|半毕|[1-9]\s*/\s*[2-9]).{{0,8}}{escaped}", text)
         missing = re.search(rf"(?:缺|缺少|斷|断)\s*{escaped}|{escaped}\s*(?:缺|缺少|斷季|断季)", text)
-        status = "confirmed_missing" if missing else "complete" if complete else "partial" if partial else "owned_not_complete"
-        profile = make_profile(season_id, status)
+        status = (
+            "confirmed_missing" if missing else
+            "unknown" if explicit_completion_conflict else
+            "owned_not_complete" if negative_completion else
+            "complete" if complete else
+            "partial" if partial else
+            "owned_not_complete"
+        )
+        profile = make_profile(season_id, status, "conflict" if explicit_completion_conflict else "text_claim")
+        if negative_completion:
+            profile["evidence_sources"].append(f"status_completion_negative:{evidence_source}")
+        if positive_completion:
+            profile["evidence_sources"].append(f"status_completion_positive:{evidence_source}")
         if re.search(rf"{escaped}.{{0,5}}(?:季卡|有卡|卡有)|(?:季卡|有卡).{{0,5}}{escaped}", text):
             profile["pass_owned"] = "yes"
             profile["evidence_sources"].append(f"pass_owned:{evidence_source}")
@@ -590,6 +676,19 @@ def merge_season_profiles(
     merged: list[dict[str, Any]] = []
     for season_id, rows in grouped.items():
         status, status_conflict = _merge_status([str(row.get("status", "unknown")) for row in rows])
+        explicit_negative = any(
+            source.startswith("status_completion_negative:")
+            for row in rows for source in row.get("evidence_sources", [])
+        )
+        explicit_positive = any(
+            source.startswith("status_completion_positive:")
+            for row in rows for source in row.get("evidence_sources", [])
+        )
+        if explicit_negative:
+            if explicit_positive or any(row.get("status") == "confirmed_missing" for row in rows):
+                status, status_conflict = "unknown", True
+            else:
+                status, status_conflict = "owned_not_complete", False
         pass_owned, pass_conflict = _merge_enum([str(row.get("pass_owned", "unknown")) for row in rows])
         ultimate, ultimate_conflict = _merge_enum([str(row.get("ultimate_reward_owned", "unknown")) for row in rows])
         sources = sorted({source for row in rows for source in row.get("evidence_sources", []) if isinstance(source, str)})
@@ -786,18 +885,36 @@ def merge_map_completion(
     return values, evidence
 
 
+def _platform_scoped_ownership_claim(text: str, match: re.Match[str]) -> bool:
+    """Whether an ordinal describes a login binding rather than the account."""
+    # Only the explicit "platform ... first holder/binding" construction is
+    # platform-scoped. A nearby earlier binding sentence must not swallow a
+    # later account-level "第三任" claim.
+    if match.group(1) not in {"1", "一"}:
+        return False
+    before = text[max(0, match.start() - 24):match.start()]
+    after = text[match.end():min(len(text), match.end() + 10)]
+    platform = r"(?:google|gg|apple|ios|gc|game\s*center|facebook|fb|nintendo|steam|ps|playstation|華為|华为|平台)"
+    return bool(re.search(platform + r".{0,16}(?:為|为|是)?\s*$", before, re.I) and re.match(r"\s*(?:持有|綁定|绑定)", after))
+
+
 def ownership_history(text: str) -> str:
-    ordinal = re.search(r"第\s*([0-9一二三四五六七八九十]+)\s*任", text)
-    if ordinal:
+    chinese = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+    claims: list[int] = []
+    for ordinal in re.finditer(r"第\s*([0-9一二三四五六七八九十]+)\s*(?:任|手)", text):
+        if _platform_scoped_ownership_claim(text, ordinal):
+            continue
         value = ordinal.group(1)
-        chinese = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
         number = int(value) if value.isdigit() else chinese.get(value)
-        if number == 1:
+        if number is not None:
+            claims.append(number)
+    if claims:
+        highest = max(claims)
+        if highest == 1:
             return "first_owner"
-        if number == 2:
+        if highest == 2:
             return "second_owner"
-        if number is not None and number >= 3:
-            return "multiple_owners"
+        return "multiple_owners"
     if re.search(r"(?:三手|四手|五手|多任|多手)", text): return "multiple_owners"
     if re.search(r"二手|前號主|前号主", text): return "second_owner"
     if re.search(r"一手|自創|自创", text): return "first_owner"
@@ -818,6 +935,8 @@ def merge_ownership_history(
 def graduation_claims(text: str, aliases: dict[str, str]) -> list[str]:
     result = set()
     for match in SEASON_RE.finditer(text):
+        if not season_term_has_context(text, match):
+            continue
         season_id = aliases.get(match.group(0).casefold())
         context = text[max(0, match.start() - 6): min(len(text), match.end() + 8)]
         if season_id and re.search(r"畢業禮|毕业礼", context): result.add(season_id)

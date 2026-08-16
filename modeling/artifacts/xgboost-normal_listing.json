@@ -10,7 +10,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "780FC27BCAB7E3A70842978DD6247A2793748E9C1FFA9DA13E7C4991D2103959",
+  "input_snapshot_sha256": "2406CB3DEF9ECFAA481A509C2A340E37F7B30DCD0AFE436B36BCE889DBFEAC4C",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -76,6 +76,8 @@
       "season_profiles.season_aurora.evidence_sources.__empty__",
       "season_profiles.season_aurora.evidence_sources.status:listing_text",
       "season_profiles.season_aurora.evidence_sources.status:normalized_feature_summary",
+      "season_profiles.season_aurora.evidence_sources.status_completion_positive:listing_text",
+      "season_profiles.season_aurora.evidence_sources.status_completion_positive:normalized_feature_summary",
       "season_profiles.season_aurora.evidence_state=__unknown__",
       "season_profiles.season_aurora.evidence_state=text_claim",
       "season_profiles.season_aurora.pass_owned=__unknown__",
@@ -243,12 +245,12 @@
     "conditional_attribution_only": true
   },
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "548A6549150A9A8C36CB41700A4747547A6426CAE7984634AD379A318101FA4B",
+    "canonical_item_ids_sha256": "F9E7699BB40037D979D514FC746245959B00ED8C67CDC382AEEAC359186E1480",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "3F7A0DDD5B38C471840BE0A2B0D8D4F9BEA461EC51CC914F34A7FC363C67949F"
+    "pinned_catalog_sha256": "AA9969E5FEEF91F92F40815FE093E2208FA8AC5E4986EEEBFEBDFBE3929381C9"
   }
 }

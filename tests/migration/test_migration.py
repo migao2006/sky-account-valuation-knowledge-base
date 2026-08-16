@@ -136,6 +136,34 @@ class MigrationContractTests(unittest.TestCase):
         self.assertEqual(by_id["season_middle_a"]["status"], "unknown")
         self.assertEqual(by_id["season_middle_b"]["status"], "unknown")
 
+    def test_context_gated_assembly_and_shattering_aliases_cover_formal_listings_only(self):
+        aliases = MIGRATE.catalog_aliases(ROOT)
+        order = {row["season_id"]: int(row["order_index"]) for row in MIGRATE.read_jsonl(ROOT / "knowledge/seasons/seasons.jsonl")}
+        source = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/source/listings.jsonl")}
+
+        expected = {
+            "listing_0177": "season_assembly",  # 畢業季節：集結
+            "listing_0307": "season_assembly",  # 季节清单中的集结季
+            "listing_0600": "season_shattering",  # 破碎季無翼
+        }
+        for listing_id, season_id in expected.items():
+            with self.subTest(listing_id=listing_id):
+                profiles, unresolved = MIGRATE.season_profile(source[listing_id]["listing_text"], aliases, order)
+                self.assertIn(season_id, {row["season_id"] for row in profiles})
+                self.assertEqual(unresolved, [])
+
+        for listing_id in ("listing_0061", "listing_0166"):
+            with self.subTest(negative_listing_id=listing_id):
+                profiles, _ = MIGRATE.season_profile(source[listing_id]["listing_text"], aliases, order)
+                self.assertNotIn("season_shattering", {row["season_id"] for row in profiles})
+
+    def test_context_gated_season_aliases_do_not_turn_negation_or_unknown_into_ownership(self):
+        aliases = {"集結": "season_assembly", "集结": "season_assembly", "破碎": "season_shattering"}
+        profiles, unresolved = MIGRATE.season_profile("不含破碎、試煉；集結材料已收齊", aliases, {})
+        self.assertEqual(profiles, [])
+        self.assertEqual(unresolved, [])
+        self.assertEqual(MIGRATE.season_terms("不含破碎、試煉；集結材料已收齊"), [])
+
     def test_feature_summary_is_parsed_with_field_level_provenance(self):
         aliases = {"表演": "season_performance"}
         order = {"season_performance": 1}
@@ -186,7 +214,12 @@ class MigrationContractTests(unittest.TestCase):
         self.assertEqual(season["pass_owned"], "yes")
         self.assertEqual(
             season["evidence_sources"],
-            ["pass_owned:normalized_feature_summary", "status:listing_text", "status:normalized_feature_summary"],
+            [
+                "pass_owned:normalized_feature_summary",
+                "status:listing_text",
+                "status:normalized_feature_summary",
+                "status_completion_positive:listing_text",
+            ],
         )
 
     def test_feature_summary_only_claims_populate_structured_fields_with_provenance(self):
@@ -351,6 +384,45 @@ class MigrationContractTests(unittest.TestCase):
         self.assertEqual(MIGRATE.ownership_history("第2任"), "second_owner")
         self.assertEqual(MIGRATE.ownership_history("到買方第六任"), "multiple_owners")
         self.assertEqual(MIGRATE.map_completion("常駐圖畢業")["standard_maps"], "complete")
+
+    def test_platform_first_binding_is_not_account_first_owner(self):
+        source = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/source/listings.jsonl")}
+        self.assertEqual(MIGRATE.ownership_history("Google 與 Apple 為第一任持有"), "unknown")
+        for listing_id in ("listing_0239", "listing_0467", "listing_0544", "listing_0669"):
+            with self.subTest(listing_id=listing_id):
+                self.assertEqual(MIGRATE.ownership_history(source[listing_id]["listing_text"]), "multiple_owners")
+                if listing_id in {"listing_0544", "listing_0669"}:
+                    self.assertEqual(MIGRATE.ownership_history(source[listing_id]["account_features"]), "multiple_owners")
+
+    def test_directly_negated_season_completion_never_becomes_complete(self):
+        aliases = MIGRATE.catalog_aliases(ROOT)
+        order = {row["season_id"]: int(row["order_index"]) for row in MIGRATE.read_jsonl(ROOT / "knowledge/seasons/seasons.jsonl")}
+        source = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/source/listings.jsonl")}
+        expected = {
+            "listing_0057": ("season_blue_bird", "season_lightmending", "season_dear_van_gogh"),
+            "listing_0298": ("season_carnival",),
+            "listing_0314": ("season_prophecy",),
+            "listing_0380": ("season_radiance",),
+            "listing_0414": ("season_carnival",),
+            "listing_0664": ("season_shattering", "season_nesting"),
+            "listing_0719": ("season_dear_van_gogh",),
+            "listing_0950": ("season_nine_colored_deer",),
+        }
+        for listing_id, season_ids in expected.items():
+            profiles, _ = MIGRATE.season_profile(source[listing_id]["listing_text"], aliases, order)
+            by_id = {row["season_id"]: row for row in profiles}
+            for season_id in season_ids:
+                with self.subTest(listing_id=listing_id, season_id=season_id):
+                    self.assertIn(season_id, by_id)
+                    self.assertEqual(by_id[season_id]["status"], "owned_not_complete")
+
+    def test_same_source_completion_contradiction_fails_closed(self):
+        profiles, _ = MIGRATE.season_profile("表演畢業；表演未畢業", {"表演": "season_performance"}, {})
+        self.assertEqual(len(profiles), 1)
+        self.assertEqual(profiles[0]["status"], "unknown")
+        self.assertEqual(profiles[0]["evidence_state"], "conflict")
+        self.assertIn("status_completion_positive:listing_text", profiles[0]["evidence_sources"])
+        self.assertIn("status_completion_negative:listing_text", profiles[0]["evidence_sources"])
 
     def test_canonical_collection_enrichment_uses_only_owned_items_and_strict_event_availability(self):
         metadata = MIGRATE.canonical_collection_metadata(

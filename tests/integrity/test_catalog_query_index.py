@@ -16,9 +16,24 @@ class CatalogQueryIndexTests(unittest.TestCase):
     def test_committed_index_has_closed_truth_layers_and_no_premature_promotion(self):
         rows = read_jsonl(ROOT / "data/normalized/catalog-query-index.jsonl")
         summary = json.loads((ROOT / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(rows), 2474); self.assertEqual(len({row["query_entity_id"] for row in rows}), len(rows))
-        self.assertEqual(Counter(row["query_entity_type"] for row in rows), Counter({"source_reference": 1758, "review_candidate": 622, "canonical_item": 94}))
         items = read_jsonl(ROOT / "knowledge/items/items.jsonl")
+        candidates = read_jsonl(ROOT / "data/review/item-candidates.jsonl")
+        references = read_jsonl(ROOT / "data/normalized/source-scoped-item-identities.jsonl")
+        expected_counts = Counter({
+            "canonical_item": len(items),
+            "review_candidate": len(candidates),
+            "source_reference": len(references),
+        })
+        self.assertEqual(len(rows), sum(expected_counts.values()))
+        self.assertEqual(len({row["query_entity_id"] for row in rows}), len(rows))
+        self.assertEqual(Counter(row["query_entity_type"] for row in rows), expected_counts)
+        self.assertEqual(summary["canonical_item_count"], expected_counts["canonical_item"])
+        self.assertEqual(summary["review_candidate_count"], expected_counts["review_candidate"])
+        self.assertEqual(summary["source_reference_count"], expected_counts["source_reference"])
+        self.assertEqual(summary["query_row_count"], sum(expected_counts.values()))
+        for key in ("canonical_item_count", "review_candidate_count", "source_reference_count", "query_row_count"):
+            self.assertIsInstance(summary[key], int)
+            self.assertNotIsInstance(summary[key], bool)
         verified = {row["item_id"] for row in items if row["verification_status"] == "verified"}
         resolved = {row["query_entity_id"] for row in rows if row["resolution_eligibility"] == "canonical_resolved"}
         self.assertEqual(summary["canonical_resolved_eligible_count"], len(resolved))

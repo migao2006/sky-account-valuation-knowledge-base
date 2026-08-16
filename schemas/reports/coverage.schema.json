@@ -1,5 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "reports/coverage.schema.json", "type": "object", "additionalProperties": true,
   "required": ["schema_version", "as_of_date", "catalog_claim", "full_item_catalog_complete", "counts", "market_migration", "known_limitations"],
-  "properties": {"schema_version": {"const": "3.7-p2.5"}, "as_of_date": {"type": "string", "format": "date"}, "catalog_claim": {"enum": ["partial_verified_catalog", "complete_verified_catalog"]}, "full_item_catalog_complete": {"type": "boolean"}, "counts": {"type": "object"}, "market_migration": {"type": "object"}, "known_limitations": {"type": "array", "items": {"type": "string"}}}
+  "properties": {"schema_version": {"const": "3.8-p2.6"}, "as_of_date": {"type": "string", "format": "date"}, "catalog_claim": {"enum": ["partial_verified_catalog", "complete_verified_catalog"]}, "full_item_catalog_complete": {"type": "boolean"}, "counts": {"type": "object"}, "market_migration": {"type": "object"}, "known_limitations": {"type": "array", "items": {"type": "string"}}}
 }

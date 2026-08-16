@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.8.0-p2.6 — 2026-08-17
+
+- 新增 FAQ 968 六件 AURORA 官方證據 cohort；固定 fact-limited transcription 與獨立 vendor snapshot，保留目前供應、永久性、正式繁中名與視覺身份為 unknown。
+- 新增 To The Love Outfit、Giving In Cape 兩筆 canonical；FAQ 968 套組只表示四件 remaining seasonal IAP，明確不宣稱完整 AURORA 付費物 catalog。
+- Canonical 總數 96、verified identity 10、model eligible 0；Catalog query index 2,476，vendor relation 69／296／1,393。
+- 補上 evidence target／field／value／source lineage 語義 gate，並移除發布鏈對 94 件與 Nintendo 唯一 cohort 的硬編碼。
+- 季節 parser 僅在明確季節上下文解析「集結／集结／破碎」；平台綁定的「第一任」不再污染整帳任次。正式價格維持正常 3、急售 0、verified sale 0，四模型仍停用。
+
 ## 3.7.0-p2.5 — 2026-08-17
 
 - 以固定 TGC FAQ 823 fact snapshot 重播官方描述性套組成分，再以獨立 SkyGame-Data snapshot 支持精確英文名稱與類別；不把 vendor 名稱轉錄成官方原文，未證實的繁中名、供應、永久性與價格維持 unknown。
