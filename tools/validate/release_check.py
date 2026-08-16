@@ -181,6 +181,7 @@ def main() -> None:
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
+    account_catalog_resolution = [json.loads(line) for line in (root / "data/review/account-catalog-resolution.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     vendor_item_evidence = [json.loads(line) for line in (root / "data/review/skygame-data-1.3.4-item-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     canonical_item_ids = {row["item_id"] for row in items}
@@ -231,6 +232,14 @@ def main() -> None:
         "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == len(source_reference_ids) and all(row.get("link_status") in {"canonical_link", "candidate_link", "unresolved"} and row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
         "p2_4_near_miss_evidence_integrity": len({row.get("review_id") for row in market_near_miss_review}) == len(market_near_miss_review),
         "p2_5_catalog_query_truth_layers": len(catalog_query_index) == len(canonical_item_ids) + len(candidate_item_ids) + len(source_reference_ids) and len({row.get("query_entity_id") for row in catalog_query_index}) == len(catalog_query_index) and query_ids_by_type["canonical_item"] == canonical_item_ids and query_ids_by_type["review_candidate"] == candidate_item_ids and query_ids_by_type["source_reference"] == source_reference_ids and resolved_query_ids == verified_item_ids and catalog_query_summary.get("canonical_item_count") == len(canonical_item_ids) and catalog_query_summary.get("review_candidate_count") == len(candidate_item_ids) and catalog_query_summary.get("source_reference_count") == len(source_reference_ids) and catalog_query_summary.get("query_row_count") == len(catalog_query_index),
+        "p2_9_account_catalog_resolution_review_only": (
+            len(account_catalog_resolution) == len(vectors)
+            and len({row.get("account_id") for row in account_catalog_resolution}) == len(account_catalog_resolution)
+            and all(row.get("review_only") is True and row.get("model_feature") is False and all(match.get("review_only") is True and match.get("model_feature") is False for match in row.get("matches", [])) for row in account_catalog_resolution)
+            and coverage.get("p2_9_account_catalog_lexical_review", {}).get("account_rows") == len(account_catalog_resolution)
+            and coverage.get("p2_9_account_catalog_lexical_review", {}).get("review_match_rows") == sum(len(row.get("matches", [])) for row in account_catalog_resolution)
+            and coverage.get("p2_9_account_catalog_lexical_review", {}).get("ownership_or_model_promotions") == 0
+        ),
         "canonical_evidence_registry_replayed": not registry_problems and bool(release_cohorts) and all(row.get("cohort_id") in registry_ledgers for row in release_cohorts),
         "canonical_evidence_registry_reported": coverage.get("p2_7_verified_identity_slice", {}).get("verified_cohorts") == registry_counts,
         "p2_4_catalog_scope_is_auditable": bool(catalog_universe) and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe),
@@ -245,7 +254,7 @@ def main() -> None:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.0-p2.8", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.1-p2.9", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

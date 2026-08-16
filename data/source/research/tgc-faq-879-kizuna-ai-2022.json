@@ -1,0 +1,23 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_879_kizuna_ai_2022_2026_08_17",
+  "source_id":"source_tgc_faq_879_kizuna_ai_2022",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/879/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 879's 2022 Kizuna AI hairstyle, bow, cape, pack price, Secret Area location, historical window, and free bow-spell statement. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "included_component_descriptions_en":{"item_kizuna_ai_hair":"hairstyle","item_kizuna_ai_bow":"bow","item_kizuna_ai_cape":"cape"},
+    "included_component_values":["hairstyle","bow","cape"],
+    "historical_price_usd":19.99,
+    "historical_location_en":"Secret Area",
+    "historical_window_start_date":"2022-02-25",
+    "historical_window_end_date":"2022-03-10",
+    "bow_free_spell":"The bow is available as a free spell."
+  },
+  "non_claims":[
+    "The FAQ does not provide a formal pack title; the canonical set is an internal bounded scope label, not a quoted official name.",
+    "This historical FAQ statement does not establish current storefront availability, a return policy, or permanent-account property.",
+    "The FAQ does not provide vendor-aligned exact component titles, individual item prices, image assets, or formal Traditional Chinese names.",
+    "The pack price is not allocated to individual items."
+  ]
+}

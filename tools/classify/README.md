@@ -32,3 +32,12 @@ Unknown is not missing; contradictory owned/missing claims fail closed.
 ```powershell
 python tools/classify/resolve_catalog_claims.py catalog-claims.json --output catalog-resolution.json
 ```
+
+`build_account_catalog_resolution.py` 另行建立 P2.9 的 1,022 帳號 lexical review
+sidecar。它只掃描 profile 與 listing 都確認為 `seller_listing + single_account`
+的 CJK 名稱，抑制碰撞與短詞，且所有命中一律 `review_only`／`model_feature=false`。
+它不呼叫 structured resolver、不輸出 ownership，也不改寫 profile 或 Item Vector。
+
+```powershell
+python tools/classify/build_account_catalog_resolution.py --root .
+```

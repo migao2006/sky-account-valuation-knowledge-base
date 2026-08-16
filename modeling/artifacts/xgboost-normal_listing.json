@@ -10,7 +10,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "19D0F34E079FEA2D9770FFB7EBA64B8E106A09CBD17213DF6652EC4A535AB4D2",
+  "input_snapshot_sha256": "D68FA42F58922A5E143CB0436A7F5ED7C88F5E5699284C97A2F30CC617C4C62F",
   "feature_schema": {
     "version": "1",
     "feature_names": [
@@ -21,16 +21,12 @@
       "bindings.platforms.apple.evidence_state=__unknown__",
       "bindings.platforms.apple.status=__unknown__",
       "bindings.platforms.facebook.evidence_state=__unknown__",
-      "bindings.platforms.facebook.evidence_state=text_claim",
       "bindings.platforms.facebook.status=__unknown__",
-      "bindings.platforms.facebook.status=mentioned_unknown",
       "bindings.platforms.game_center.evidence_state=__unknown__",
       "bindings.platforms.game_center.evidence_state=text_claim",
       "bindings.platforms.game_center.status=__unknown__",
       "bindings.platforms.game_center.status=high_risk",
-      "bindings.platforms.google.evidence_state=__unknown__",
       "bindings.platforms.google.evidence_state=text_claim",
-      "bindings.platforms.google.status=__unknown__",
       "bindings.platforms.google.status=high_risk",
       "bindings.platforms.huawei.evidence_state=__unknown__",
       "bindings.platforms.huawei.status=__unknown__",
@@ -42,7 +38,6 @@
       "bindings.platforms.steam.status=__unknown__",
       "bindings.platforms.twitter.evidence_state=__unknown__",
       "bindings.platforms.twitter.status=__unknown__",
-      "bindings.risk_state=__unknown__",
       "bindings.risk_state=restricted",
       "collection.graduation_reward_season_ids.__empty__",
       "map_completion.evidence_state=__unknown__",
@@ -52,14 +47,9 @@
       "ownership_history=multiple_owners",
       "resources.capture_date=__unknown__",
       "resources.evidence_state=__unknown__",
-      "resources.evidence_state=text_claim",
-      "resources.values.hearts",
       "resources.values.hearts=__unknown__",
-      "resources.values.red_candles",
       "resources.values.red_candles=__unknown__",
-      "resources.values.season_candles",
       "resources.values.season_candles=__unknown__",
-      "resources.values.white_candles",
       "resources.values.white_candles=__unknown__",
       "season_profiles.__empty__",
       "season_profiles.season_abyss.capture_date=__unknown__",
@@ -73,16 +63,10 @@
       "season_profiles.season_aurora.capture_date=__unknown__",
       "season_profiles.season_aurora.completion_ratio=__unknown__",
       "season_profiles.season_aurora.evidence_sources.__empty__",
-      "season_profiles.season_aurora.evidence_sources.status:listing_text",
-      "season_profiles.season_aurora.evidence_sources.status:normalized_feature_summary",
-      "season_profiles.season_aurora.evidence_sources.status_completion_positive:listing_text",
-      "season_profiles.season_aurora.evidence_sources.status_completion_positive:normalized_feature_summary",
       "season_profiles.season_aurora.evidence_state=__unknown__",
-      "season_profiles.season_aurora.evidence_state=text_claim",
       "season_profiles.season_aurora.pass_owned=__unknown__",
       "season_profiles.season_aurora.review_status=needs_review",
       "season_profiles.season_aurora.status=__unknown__",
-      "season_profiles.season_aurora.status=complete",
       "season_profiles.season_aurora.ultimate_reward_owned=__unknown__",
       "season_profiles.season_blue_bird.capture_date=__unknown__",
       "season_profiles.season_blue_bird.completion_ratio=__unknown__",
@@ -209,8 +193,8 @@
     ]
   },
   "training": {
-    "records": 3,
-    "total_eligible_records": 3,
+    "records": 2,
+    "total_eligible_records": 2,
     "min_required_records": 300,
     "effective_feature_groups": 7,
     "min_effective_feature_groups": 1,
@@ -220,8 +204,8 @@
     "outer_cv_mae": null,
     "outer_cv_folds": 0,
     "outer_cv_grouping": "cluster_id",
-    "unique_clusters": 3,
-    "group_count": 3,
+    "unique_clusters": 2,
+    "group_count": 2,
     "baseline_median_mae": null
   },
   "publication_gate": {
@@ -244,12 +228,12 @@
     "conditional_attribution_only": true
   },
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "C44EDA54D17FCF86679C4F2BF6BFF8770AD2686CDC533E9DD61CC785E771E3AE",
+    "canonical_item_ids_sha256": "A249F5553FE7E79630A97E1024F8D8D21448833AF8E9A1E4B104C4FCBD98022A",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "6B59CDB8D3A5F54CC3F4991C31892ABAA7D32A787DFD58C41DB1D9B1B16DCC76"
+    "pinned_catalog_sha256": "8B753B4756F1BE8964148B143881F5E56E829C76A5240C2189BB8BB82BFF2549"
   }
 }

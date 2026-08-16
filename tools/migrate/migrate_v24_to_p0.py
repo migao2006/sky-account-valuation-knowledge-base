@@ -24,6 +24,15 @@ URGENT_LISTING_MARKERS = ("急售", "急出")
 NEGATED_URGENT_RE = re.compile(r"(?:不|非|不是|並非|并非)\s*急(?:售|出)")
 EXPLICIT_SALE_EXCHANGE_RE = re.compile(r"(?:售|出)\s*(?:／|/)\s*(?:換|换)|(?:換|换)\s*(?:／|/)\s*(?:售|出)")
 PRICE_TERM_RE = re.compile(r"\d+(?:\.\d+)?\s*萬|\d{3,}\s*(?:元|台幣|NTD)?")
+# A surcharge makes installment payment a distinct contractual price from the
+# advertised one.  Keep this deliberately narrow: merely offering installment
+# payment is not a second price unless the text also expressly adds an amount.
+INSTALLMENT_SURCHARGE_RE = re.compile(
+    r"(?:另加|加收|加價|加\s*價|超過\s*(?:一|1)\s*期\s*加|"
+    r"(?:分期|期付款)[^，。；;]{0,24}?加)\s*(?:NTD|台幣|元|\$)?\s*\d+(?:\.\d+)?\s*(?:萬|元|台幣|NTD)?",
+    re.IGNORECASE,
+)
+INSTALLMENT_MARKER_RE = re.compile(r"分期|分\s*(?:\d+|[一二三四五六七八九十]+)\s*期")
 
 
 def has_explicit_urgent_claim(listing_text: str) -> bool:
@@ -117,6 +126,17 @@ def has_explicit_multi_price_terms(listing_text: str) -> bool:
     )
 
 
+def has_explicit_installment_surcharge(listing_text: str) -> bool:
+    """Return true only when installments have an explicit added amount.
+
+    This recognizes statements such as ``最多分三期，超過一期加 500``.
+    It does not infer a price alternative from ``可分期`` alone, and it never
+    calculates the resulting installment price.
+    """
+    text = str(listing_text)
+    return INSTALLMENT_MARKER_RE.search(text) is not None and INSTALLMENT_SURCHARGE_RE.search(text) is not None
+
+
 def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] | None:
     """Gate mixed price semantics without selecting or modifying an amount.
 
@@ -126,7 +146,9 @@ def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] 
     """
     text = str(listing_text)
     brokerage_included = "含仲" in text
-    multi_price = has_explicit_multi_price_terms(text)
+    badge_and_installment_variants = has_explicit_multi_price_terms(text)
+    installment_surcharge = has_explicit_installment_surcharge(text)
+    multi_price = badge_and_installment_variants or installment_surcharge
     if not brokerage_included and not multi_price:
         return None
     result: dict[str, Any] = {
@@ -140,9 +162,12 @@ def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] 
         result["reason_codes"].append("brokerage_included_price")
     if multi_price:
         result["multi_price"] = True
-        result["reason_codes"].extend([
-            "multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants",
-        ])
+        if badge_and_installment_variants:
+            result["reason_codes"].extend([
+                "multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants",
+            ])
+        else:
+            result["reason_codes"].extend(["multiple_price_terms", "installment_price_variants"])
     return result
 FORBIDDEN_KEYS = {
     "source_group_id", "source_group_name", "source_post_key", "post_url",

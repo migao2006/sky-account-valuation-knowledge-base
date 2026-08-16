@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.1.0-p2.9 — 2026-08-17
+
+- 新增 Kizuna AI 2022 FAQ 879 三件可重播官方／獨立 vendor identity cohort；Hair、Bow、Cape 與 bounded set scope 均已驗證，但目前供應、永久性、正式繁中名、視覺身份與個別價格仍為 unknown／`bundle_only`。
+- 移除錯掛在 Bow 單品的「絆愛三件套／絆愛套組」待審 alias；未將其轉成自動可解析的 verified set alias。
+- 新增 1,022 筆帳號 Catalog lexical review sidecar：僅掃 seller single-account、抑制碰撞與短英文，160 個命中全部維持 review-only，不改寫 ownership、Item Vector、相似度或模型。
+- 將「最多分三期，超過一期加 500」辨識為 payment-dependent multi-price；不推算替代價格，`history_0068` 進 needs-review，正式正常價格由 3 筆降為 2 筆。
+- Vendor crosswalk 重建為 76 canonical relation、296 candidate relation、1,386 unresolved；query index 為 2,480 筆、verified canonical resolution 18、model eligible 0。
+
 ## 4.0.0-p2.8 — 2026-08-17
 
 - 新增 Moomintroll Accessory Set 兩件可重播官方／獨立 vendor identity cohort；套組兩件均為 required，歷史價格只保存 USD 11.99。

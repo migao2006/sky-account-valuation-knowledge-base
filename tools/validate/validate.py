@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT / "tools" / "normalize"))
 from build_comparables import deduplication_is_approved, predicate_hash, strict_recovery_predicates  # noqa: E402
 from build_catalog_universe import build_catalog_universe  # noqa: E402
 from build_catalog_query_index import build_catalog_query_index  # noqa: E402
+from tools.classify.build_account_catalog_resolution import build_account_catalog_resolution, canonical_json, sha256_bytes  # noqa: E402
 from build_item_evidence_bundle import build as build_item_evidence, sha as item_evidence_sha  # noqa: E402
 from build_market_claim_review import build_queue as build_market_claim_queue, validate_gold_links  # noqa: E402
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
@@ -79,6 +80,7 @@ SCHEMA_FILES = {
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
     "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
+    "data/review/account-catalog-resolution.jsonl": "schemas/review/account-catalog-resolution.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
     "data/normalized/source-scoped-item-identities.jsonl": "schemas/normalized/source-scoped-item-identity.schema.json",
     "data/normalized/catalog-query-index.jsonl": "schemas/normalized/catalog-query-index.schema.json",
@@ -109,6 +111,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-968-aurora-remaining-iap.json": "schemas/knowledge/aurora-faq-968-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1308-journey-pack.json": "schemas/knowledge/journey-pack-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1356-moomintroll-accessory-set.json": "schemas/knowledge/moomintroll-accessory-set-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-879-kizuna-ai-2022.json": "schemas/knowledge/kizuna-ai-2022-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -116,6 +119,7 @@ REQUIRED_FORMAL_JSONL = {
     "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
     "data/modeling/item-value-table.jsonl",
+    "data/review/account-catalog-resolution.jsonl",
 }
 PRIVATE_KEYS = {"player_name", "account_name", "uid", "phone", "email", "payment", "login", "password", "social_handle", "source_url", "url", "raw_ocr", "ocr_text"}
 PRIVATE_VALUE_PATTERNS = {
@@ -154,7 +158,7 @@ def validate_canonical_field_evidence(
         "original_currency", "first_release_date", "free_or_premium",
         "permanent_account_item", "collaboration", "visual_reference",
     }
-    set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history"}
+    set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history", "availability_history"}
     string_fields = item_fields - {"original_cost", "collaboration"}
     official_source_types = {"official_site", "official_news", "official_support", "thatgamecompany"}
     for label, rows in evidence_groups:
@@ -540,6 +544,62 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             errors.append("catalog-query-index: committed rows differ from deterministic rebuild")
         if query_summary != expected_query_summary:
             errors.append("catalog-query-index: committed summary differs from deterministic rebuild")
+    resolution_path = root / "data/review/account-catalog-resolution.jsonl"
+    account_catalog_resolution = read_jsonl(resolution_path)
+    resolution_profiles = read_jsonl(root / "data/normalized/account-profiles.jsonl")
+    resolution_listings = read_jsonl(root / "data/normalized/listings.jsonl")
+    try:
+        expected_account_catalog_resolution = build_account_catalog_resolution(
+            resolution_profiles, resolution_listings, query_index,
+            index_sha256=sha256_bytes((root / "data/normalized/catalog-query-index.jsonl").read_bytes()),
+        )
+    except ValueError as exc:
+        errors.append(f"account-catalog-resolution: cannot rebuild: {exc}")
+    else:
+        if account_catalog_resolution != expected_account_catalog_resolution:
+            errors.append("account-catalog-resolution: committed rows differ from deterministic rebuild")
+    profile_by_id = {row.get("account_id"): row for row in resolution_profiles}
+    resolution_listing_by_id = {row.get("listing_id"): row for row in resolution_listings}
+    index_by_id = {row.get("query_entity_id"): row for row in query_index}
+    if len(account_catalog_resolution) != len(resolution_profiles) or {row.get("account_id") for row in account_catalog_resolution} != set(profile_by_id):
+        errors.append("account-catalog-resolution: exact account coverage/linkage mismatch")
+    forbidden_resolution_keys = {"ownership_state", "resolved_item_id", "state", "raw", "listing_text", "alias", "span", "url", "source_url"}
+    for row in account_catalog_resolution:
+        account = profile_by_id.get(row.get("account_id"))
+        listing_id = row.get("listing_id")
+        listing = resolution_listing_by_id.get(listing_id)
+        expected_eligible = bool(
+            account and listing and account.get("source_listing_ids") == [listing_id]
+            and account.get("trade_conditions", {}).get("offer_kind") == listing.get("offer_kind")
+            and account.get("trade_conditions", {}).get("entity_kind") == listing.get("entity_kind")
+            and listing.get("offer_kind") == "seller_listing" and listing.get("entity_kind") == "single_account"
+        )
+        if (row.get("matching_eligibility") == "eligible") != expected_eligible:
+            errors.append(f"account-catalog-resolution:{row.get('account_id')}: seller/single-account gate mismatch")
+        if row.get("catalog_query_index_sha256") != sha256_bytes((root / "data/normalized/catalog-query-index.jsonl").read_bytes()):
+            errors.append(f"account-catalog-resolution:{row.get('account_id')}: index hash mismatch")
+        if listing:
+            if row.get("listing_text_sha256") != sha256_bytes(str(listing.get("listing_text", "")).encode("utf-8")):
+                errors.append(f"account-catalog-resolution:{row.get('account_id')}: listing input hash mismatch")
+            if row.get("normalized_feature_summary_sha256") != sha256_bytes(canonical_json(listing.get("feature_summary", []))):
+                errors.append(f"account-catalog-resolution:{row.get('account_id')}: feature-summary input hash mismatch")
+        if not expected_eligible and row.get("matches"):
+            errors.append(f"account-catalog-resolution:{row.get('account_id')}: suppressed account has matches")
+        for match in row.get("matches", []):
+            source = index_by_id.get(match.get("query_entity_id"))
+            if not source or any(match.get(key) != source.get(key) for key in ("query_entity_type", "truth_level", "verification_status", "review_status")):
+                errors.append(f"account-catalog-resolution:{row.get('account_id')}: query-index linkage mismatch")
+            if match.get("review_only") is not True or match.get("model_feature") is not False:
+                errors.append(f"account-catalog-resolution:{row.get('account_id')}: attempted ownership/model promotion")
+        def keys(value: Any) -> set[str]:
+            if isinstance(value, dict):
+                return set(value) | set().union(*(keys(child) for child in value.values())) if value else set()
+            if isinstance(value, list):
+                return set().union(*(keys(child) for child in value)) if value else set()
+            return set()
+        prohibited = forbidden_resolution_keys & keys(row)
+        if prohibited:
+            errors.append(f"account-catalog-resolution:{row.get('account_id')}: prohibited output keys {sorted(prohibited)}")
     item_evidence = read_jsonl(root / "data/review/item-evidence.jsonl")
     expected_item_evidence = build_item_evidence(
         list(candidates.values()), evidence_rows,
@@ -887,7 +947,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.0-p2.8", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.1-p2.9", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

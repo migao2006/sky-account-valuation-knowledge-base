@@ -81,6 +81,27 @@ class PriceCleaningTest(unittest.TestCase):
         self.assertEqual(ledger[0]["disposition"], "needs_review")
         self.assertIn("multiple_price_terms", ledger[0]["reason_codes"])
 
+    def test_listing_0388_installment_surcharge_is_not_a_clean_price(self):
+        histories = [
+            json.loads(line)
+            for line in (ROOT / "data" / "curated" / "histories.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        installment_listing = dict(next(row for row in histories if row["history_id"] == "history_0068"))
+        # This is the semantic marker the migration/rebuild must carry from
+        # listing_0388; do not choose or calculate an installment total.
+        installment_listing["price_semantic_review"] = {
+            "urgency": "unknown", "multi_price": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["multiple_price_terms", "installment_price_variants"],
+        }
+        normal, urgent, ledger = clean([installment_listing])
+        self.assertEqual(normal, [])
+        self.assertEqual(urgent, [])
+        self.assertEqual(ledger[0]["history_id"], "history_0068")
+        self.assertEqual(ledger[0]["disposition"], "needs_review")
+        self.assertEqual(ledger[0]["reason_codes"], ["multiple_price_terms"])
+
     def test_modified_z_outlier_requires_ten_independent_same_type_clusters(self):
         sparse = [row(index, selected_price_twd=1000 + index * 10) for index in range(1, 9)]
         sparse.append(row(9, selected_price_twd=1_000_000))
@@ -101,22 +122,25 @@ class PriceCleaningTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             summary = build(ROOT, output_dir=output)
-            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 3, "urgent_sale": 0, "excluded_or_review": 100})
+            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 2, "urgent_sale": 0, "excluded_or_review": 101})
             normal = [json.loads(line) for line in (output / "price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines()]
             urgent = [json.loads(line) for line in (output / "price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines()]
-            self.assertEqual({item["history_id"] for item in normal}, {"history_0068", "history_0085", "history_recovered_0792"})
+            self.assertEqual({item["history_id"] for item in normal}, {"history_0085", "history_recovered_0792"})
             accounts = {
                 item["history_id"]: item
                 for item in (json.loads(line) for line in (ROOT / "data/comparables/accounts.jsonl").read_text(encoding="utf-8").splitlines() if line)
             }
             self.assertEqual(
                 {tuple(accounts[item["history_id"]]["source_listing_ids"]) for item in normal},
-                {("listing_0388",), ("listing_0708",), ("listing_0792",)},
+                {("listing_0708",), ("listing_0792",)},
             )
             self.assertEqual(urgent, [])
             self.assertTrue(all(item["currency"] == "TWD" and item["server"] == "international" for item in normal))
             ledger = [json.loads(line) for line in (output / "model-exclusions.jsonl").read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(len(ledger), 100)
+            self.assertEqual(len(ledger), 101)
+            installment = next(item for item in ledger if item["history_id"] == "history_0068")
+            self.assertEqual(installment["disposition"], "needs_review")
+            self.assertIn("multiple_price_terms", installment["reason_codes"])
             semantic = next(item for item in ledger if item["history_id"] == "history_0036")
             self.assertEqual(semantic["price_line"], "urgent_sale")
             self.assertEqual(semantic["disposition"], "needs_review")

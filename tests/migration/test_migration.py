@@ -11,6 +11,9 @@ SPEC.loader.exec_module(MODULE)
 MIGRATE_SPEC = importlib.util.spec_from_file_location("p0_migration", ROOT / "tools/migrate/migrate_v24_to_p0.py")
 MIGRATE = importlib.util.module_from_spec(MIGRATE_SPEC)
 MIGRATE_SPEC.loader.exec_module(MIGRATE)
+COMPARABLES_SPEC = importlib.util.spec_from_file_location("build_comparables", ROOT / "tools/normalize/build_comparables.py")
+COMPARABLES = importlib.util.module_from_spec(COMPARABLES_SPEC)
+COMPARABLES_SPEC.loader.exec_module(COMPARABLES)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -82,6 +85,26 @@ class MigrationContractTests(unittest.TestCase):
             "reason_codes": ["multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants"],
         })
         self.assertIsNone(MIGRATE.price_semantic_review("含勳章 70000 台幣", "asking"))
+
+    def test_installment_surcharge_is_a_multi_price_review_without_calculation(self):
+        text = "標價 56000 台幣；最多分三期，超過一期加 500；出售前持續養號。"
+        review = MIGRATE.price_semantic_review(text, "asking")
+        self.assertEqual(review, {
+            "urgency": "unknown", "multi_price": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["multiple_price_terms", "installment_price_variants"],
+        })
+        # Payment timing alone is not an alternative account price.
+        self.assertIsNone(MIGRATE.price_semantic_review("標價 56000 台幣，可分三期付款。", "asking"))
+
+    def test_comparables_rebuild_preserves_listing_0388_installment_gate(self):
+        listings = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/normalized/listings.jsonl")}
+        histories = {row["history_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/curated/histories.jsonl")}
+        review = COMPARABLES.price_semantic_review(listings["listing_0388"], histories["history_0068"])
+        self.assertIsNotNone(review)
+        self.assertTrue(review["multi_price"])
+        self.assertEqual(review["review_status"], "needs_review")
+        self.assertEqual(review["reason_codes"], ["multiple_price_terms", "installment_price_variants"])
 
     def test_formal_mixed_exchange_and_multi_price_regressions_fail_closed(self):
         listings = {row["listing_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/normalized/listings.jsonl")}

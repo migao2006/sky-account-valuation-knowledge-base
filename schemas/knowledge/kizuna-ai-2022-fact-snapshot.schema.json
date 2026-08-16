@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"knowledge/kizuna-ai-2022-fact-snapshot.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["snapshot_format","snapshot_id","source_id","source_url","retrieved_at","capture_policy","facts","non_claims"],
+  "properties":{
+    "snapshot_format":{"const":"fact_limited_official_support_snapshot_v1"},
+    "snapshot_id":{"const":"tgc_faq_879_kizuna_ai_2022_2026_08_17"},
+    "source_id":{"const":"source_tgc_faq_879_kizuna_ai_2022"},
+    "source_url":{"const":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/879/"},
+    "retrieved_at":{"type":"string","format":"date"},"capture_policy":{"type":"string","minLength":1},
+    "facts":{"type":"object","additionalProperties":false,"required":["included_component_descriptions_en","included_component_values","historical_price_usd","historical_location_en","historical_window_start_date","historical_window_end_date","bow_free_spell"],"properties":{
+      "included_component_descriptions_en":{"type":"object","additionalProperties":false,"required":["item_kizuna_ai_hair","item_kizuna_ai_bow","item_kizuna_ai_cape"],"properties":{"item_kizuna_ai_hair":{"const":"hairstyle"},"item_kizuna_ai_bow":{"const":"bow"},"item_kizuna_ai_cape":{"const":"cape"}}},
+      "included_component_values":{"const":["hairstyle","bow","cape"]},"historical_price_usd":{"const":19.99},"historical_location_en":{"const":"Secret Area"},"historical_window_start_date":{"const":"2022-02-25"},"historical_window_end_date":{"const":"2022-03-10"},"bow_free_spell":{"const":"The bow is available as a free spell."}
+    }},
+    "non_claims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}
