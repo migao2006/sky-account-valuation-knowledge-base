@@ -1,0 +1,733 @@
+__NOTOC__<div class="hidethis">This page is used to generate the Seasonal Cosmetic printable pages found in the [[Outfit Shrine|Outfit Shrine page]]. Print this page with the following recommended settings:
+* Printing: 61 (Scale), 300 dpi, No margins, No printed headers and footers, No printed background.
+* Make sure all icons are visible before printing
+
+</div>
+{| class="fandom-table" border="0" cellpadding="1" cellspacing="1" style="width: 1265px;"
+| width="9%" height=0 |
+| width="28%" height=0 |
+| width="24%" height=0 |
+| width="24%" height=0 |
+| width="15%" height=0 |
+|-
+| colspan="5" |<div class="Print-header">
+=[[File:Sky Logo.png|frameless|120px]]Seasonal Cosmetics=
+<div class="caption">PRINTABLE CHART - Page 1 of 5<br>Updated on 2026-06-13 with Season of Carnival <br><small>See footer for credits</small></div></div><br><br><br>
+|-
+| rowspan="2" |
+<h3>
+Season<br>
+of{{Spirit Item| Gratitude | necklace_u | tab | label=Gratitude Ultimate Pendant }}<br>
+Gratitude
+</h3>
+|{{Spirit Item|Greeting Shaman|expression| tab}}{{Spirit Item| Greeting Shaman |mask | tab }}{{Spirit Item| Greeting Shaman | instrument | tab }}<br>
+'''Greeting Shaman'''
+|{{Spirit Item|Leaping Dancer|expression| tab}}{{Spirit Item| Leaping Dancer | Mask | tab }}{{Spirit Item| Leaping Dancer | instrument | tab }}
+'''Leaping Dancer'''
+|{{Spirit Item|Provoking Performer|expression| tab}}{{Spirit Item| Provoking Performer | mask | tab }}{{Spirit Item| Provoking Performer | Hair | tab }}{{Music Sheet|7| tab |link=Music Sheets#Music Sheet 7}}<sup>[[#Music Sheet 7|#7]]</sup><br>
+'''Provoking Performer'''
+| rowspan="2" |{{Spirit Item| Gratitude | mask_u | tab }}
+'''Ultimate'''
+|-
+|{{Spirit Item|Saluting Protector|expression| tab}}{{Spirit Item| Saluting Protector | mask| tab }}{{Spirit Item| Saluting Protector | cape| tab }}{{Music Sheet|8| tab |link=Music Sheets#Music Sheet 8}}<sup>[[#Music Sheet 8|#8]]</sup>
+'''Saluting Protector'''
+|{{Spirit Item|Sassy Drifter|expression| tab}}{{Spirit Item| Sassy Drifter | Mask | tab }}{{Spirit Item| Sassy Drifter | Hair | tab }}
+'''Sassy Drifter'''
+|{{Spirit Item|Stretching Guru|expression| tab}}{{Spirit Item| Stretching Guru| hair | tab }}{{Spirit Item| Stretching Guru | cape| tab }}<br>
+'''Stretching Guru'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>
+of{{Spirit Item| Lightseekers | necklace_u | tab | label=Lightseekers Ultimate Pendant }}<br>
+Lightseekers
+</h3>
+|{{Spirit Item|Crab Whisperer|expression| tab}}{{Spirit Item|Crab Whisperer|mask| tab }}{{Spirit Item|Crab Whisperer|hair| tab }}{{Spirit Item|Crab Whisperer|cape| tab }}{{Spirit Item|Crab Whisperer|prop| tab }}{{Music Sheet|10| tab |link=Music Sheets#Music Sheet 10}}<sup>[[#Music Sheet 10|#10]]</sup>
+'''Crab Whisperer'''
+|{{Spirit Item|Doublefive Light Catcher|expression| tab}}{{Spirit Item|Doublefive Light Catcher|mask| tab }}{{Spirit Item|Doublefive Light Catcher|hair| tab }}{{Spirit Item|Doublefive Light Catcher|prop| tab }}
+'''Doublefive Light Catcher'''
+|{{Spirit Item|Laidback Pioneer|expression| tab}}{{Spirit Item|Laidback Pioneer|mask| tab }}{{Spirit Item|Laidback Pioneer|hair| tab }}{{Spirit Item|Laidback Pioneer|prop| tab }}{{Music Sheet|9| tab |link=Music Sheets#Music Sheet 9}}<sup>[[#Music Sheet 9|#9]]</sup>
+'''Laidback Pioneer'''
+| rowspan="2" |{{Spirit Item| Lightseekers | prop_u | tab }}
+'''Ultimate'''
+|-
+|{{Spirit Item|Piggyback Lightseeker|expression| tab}}{{Spirit Item|Piggyback Lightseeker|mask| tab }}{{Spirit Item|Piggyback Lightseeker|hair| tab }}{{Spirit Item|Piggyback Lightseeker|cape| tab }}
+'''Piggyback Lightseeker'''
+|{{Spirit Item|Shushing Light Scholar|expression| tab}}{{Spirit Item|Shushing Light Scholar|mask| tab }}{{Spirit Item|Shushing Light Scholar|cape| tab }}
+'''Shushing Light Scholar'''
+|{{Spirit Item|Twirling Champion|expression| tab}}{{Spirit Item|Twirling Champion|mask| tab }}{{Spirit Item|Twirling Champion|hair| tab }}{{Spirit Item|Twirling Champion|instrument| tab }}
+'''Twirling Champion'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br> 
+of{{Spirit Item| Belonging | necklace_u | tab | label=Belonging Ultimate Pendant }}<br> 
+Belonging
+</h3>
+|{{Spirit Item|Boogie Kid|expression| tab}}{{Spirit Item|Boogie Kid|outfit| tab }}{{Spirit Item|Boogie Kid|mask| tab }}
+'''Boogie Kid'''
+|{{Spirit Item|Confetti Cousin|expression| tab}}{{Spirit Item|Confetti Cousin|hair| tab }}{{Spirit Item|Confetti Cousin|cape| tab }}
+'''Confetti Cousin'''
+|{{Spirit Item|Hairtousle Teen|expression| tab}}{{Spirit Item|Hairtousle Teen|headpiece| tab }}{{Spirit Item|Hairtousle Teen|prop| tab }}{{Music Sheet|12| tab |link=Music Sheets#Music Sheet 12}}<sup>[[#Music Sheet 12|#12]]</sup>
+'''Hairtousle Teen'''
+| rowspan="2" |{{Spirit Item| Belonging | prop_u | tab }}
+'''Ultimate'''
+|-
+|{{Spirit Item|Pleaful Parent|expression| tab}}{{Spirit Item|Pleaful Parent|mask| tab }}{{Spirit Item|Pleaful Parent|cape| tab }}{{Spirit Item|Pleaful Parent|instrument| tab }}
+'''Pleaful Parent'''
+|{{Spirit Item|Sparkler Parent|expression| tab}}{{Spirit Item|Sparkler Parent|mask| tab }}{{Spirit Item|Sparkler Parent|hair| tab }}{{Spirit Item|Sparkler Parent|prop| tab }}
+'''Sparkler Parent'''
+|{{Spirit Item|Wise Grandparent |expression| tab}}{{Spirit Item|Wise Grandparent |mask| tab }}{{Spirit Item|Wise Grandparent |cape| tab }}{{Spirit Item|Wise Grandparent |prop| tab }}{{Music Sheet|11| tab |link=Music Sheets#Music Sheet 1}}<sup>[[#Music Sheet 11|#11]]</sup>
+'''Wise Grandparent '''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3> 
+Season<br> 
+of{{Spirit Item| Rhythm | necklace_u | tab | label=Rhythm Ultimate Pendant }}<br> 
+Rhythm
+</h3>
+|{{Spirit Item|Admiring Actor|expression| tab}}{{Spirit Item|Admiring Actor|outfit| tab }}{{Spirit Item|Admiring Actor|mask| tab }}{{Music Sheet|6| tab |link=Music Sheets#Music Sheet 6}}<sup>[[#Music Sheet 6|#6]]</sup>
+'''Admiring Actor'''
+|{{Spirit Item|Festival Spin Dancer|expression| tab}}{{Spirit Item|Festival Spin Dancer|outfit| tab }}{{Spirit Item|Festival Spin Dancer|hair| tab }}{{Spirit Item|Festival Spin Dancer|prop| tab }}{{Music Sheet|5| tab |link=Music Sheets#Music Sheet 5}}<sup>[[#Music Sheet 5|#5]]</sup>
+'''Festival Spin Dancer'''
+|{{Spirit Item|Respectful Pianist|expression| tab}}{{Spirit Item|Respectful Pianist|mask| tab }}{{Spirit Item|Respectful Pianist|hair| tab }}{{Spirit Item|Respectful Pianist|instrument| tab }}
+'''Respectful Pianist'''
+| rowspan="2" |{{Spirit Item| Rhythm| mask_u | tab }}{{Spirit Item| Rhythm| hair_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Thoughtful Director |expression| tab}}{{Spirit Item|Thoughtful Director |mask| tab }}{{Spirit Item|Thoughtful Director |cape| tab }}{{Spirit Item|Thoughtful Director |instrument| tab }}
+'''Thoughtful Director '''
+|{{Spirit Item|Troupe Greeter|expression| tab}}{{Spirit Item|Troupe Greeter|outfit| tab }}{{Spirit Item|Troupe Greeter|mask| tab }}{{Music Sheet|4| tab |link=Music Sheets#Music Sheet 4}}<sup>[[#Music Sheet 4|#4]]</sup>
+'''Troupe Greeter'''
+|{{Spirit Item|Troupe Juggler|expression| tab}}{{Spirit Item|Troupe Juggler|outfit| tab }}{{Spirit Item|Troupe Juggler|hair| tab }}{{Spirit Item|Troupe Juggler|cape| tab }}{{Spirit Item|Troupe Juggler|prop| tab }}
+'''Troupe Juggler'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>  
+of{{Spirit Item| Enchantment | necklace_u | tab | label=Enchantment Ultimate Pendant }}<br> 
+Enchantment
+</h3>
+|{{Spirit Item| Crab Walker|expression| tab}}{{Spirit Item| Crab Walker|hair| tab }}{{Spirit Item| Crab Walker|cape| tab }}
+''' Crab Walker'''
+|{{Spirit Item|Indifferent Alchemist|expression| tab}}{{Spirit Item|Indifferent Alchemist|mask| tab }}{{Spirit Item|Indifferent Alchemist|hair| tab }}{{Spirit Item|Indifferent Alchemist|cape| tab }}
+'''Indifferent Alchemist'''
+|{{Spirit Item|Nodding Muralist|expression| tab}}{{Spirit Item|Nodding Muralist|mask| tab }}{{Spirit Item|Nodding Muralist|hair| tab }}
+'''Nodding Muralist'''
+| rowspan="2" |{{Spirit Item| Enchantment|hair_u | tab }}{{Spirit Item| Enchantment|headpiece_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Playfighting Herbalist |expression| tab}}{{Spirit Item|Playfighting Herbalist |mask| tab }}{{Spirit Item|Playfighting Herbalist |hair| tab }}{{Spirit Item|Playfighting Herbalist |cape| tab }}{{Spirit Item|Playfighting Herbalist |prop| tab }}{{Music Sheet|13| tab |link=Music Sheets#Music Sheet 13}}<sup>[[#Music Sheet 13|#13]]</sup>
+'''Playfighting Herbalist '''
+|{{Spirit Item|Scarecrow Farmer |expression| tab}}{{Spirit Item|Scarecrow Farmer |mask| tab }}{{Spirit Item|Scarecrow Farmer |hair| tab }}
+'''Scarecrow Farmer '''
+|{{Spirit Item|Snoozing Carpenter|expression| tab}}{{Spirit Item|Snoozing Carpenter|hair| tab }}{{Spirit Item|Snoozing Carpenter|cape| tab }}
+'''Snoozing Carpenter'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br> 
+of{{Spirit Item| Sanctuary | necklace_u | tab | label=Sanctuary Ultimate Pendant }}<br> 
+Sanctuary
+</h3>
+|{{Spirit Item|Chill Sunbather |expression| tab}}{{Spirit Item|Chill Sunbather |facepiece| tab }}{{Spirit Item|Chill Sunbather |hairpiece| tab }}{{Spirit Item|Chill Sunbather |cape| tab }}{{Spirit Item|Chill Sunbather |prop| tab }}
+'''Chill Sunbather '''
+|{{Spirit Item|Grateful Shell Collector|expression| tab}}{{Spirit Item|Grateful Shell Collector|hair| tab }}{{Spirit Item|Grateful Shell Collector|cape| tab }}{{Spirit Item|Grateful Shell Collector|prop| tab }}
+'''Grateful Shell Collector'''
+|{{Spirit Item|Hiking Grouch|expression| tab}}{{Spirit Item|Hiking Grouch|mask| tab }}{{Spirit Item|Hiking Grouch|neck accessory| tab }}{{Spirit Item|Hiking Grouch|hair| tab }}{{Spirit Item|Hiking Grouch|prop| tab }}
+'''Hiking Grouch'''
+| rowspan="2" |{{Spirit Item| Sanctuary| cape_u | tab }}{{Spirit Item| Sanctuary| instrument_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Jelly Whisperer|expression| tab}}{{Spirit Item|Jelly Whisperer|outfit| tab }}{{Spirit Item|Jelly Whisperer|hair| tab }}{{Spirit Item|Jelly Whisperer|prop| tab }}{{Music Sheet|14| tab |link=Music Sheets#Music Sheet 14}}<sup>[[#Music Sheet 14|#14]]</sup>
+'''Jelly Whisperer'''
+|{{Spirit Item|Rallying Thrillseeker|expression| tab}}{{Spirit Item|Rallying Thrillseeker|outfit| tab }}{{Spirit Item|Rallying Thrillseeker|hair| tab }}
+'''Rallying Thrillseeker'''
+|{{Spirit Item|Timid Bookworm|expression| tab}}{{Spirit Item|Timid Bookworm|hair| tab }}{{Spirit Item|Timid Bookworm|cape| tab }}{{Music Sheet|15| tab |link=Music Sheets#Music Sheet 15}}<sup>[[#Music Sheet 15|#15]]</sup>
+'''Timid Bookworm'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br> 
+of{{Spirit Item| Prophecy | necklace_u | tab | label=Prophecy Ultimate Pendant }}<br> 
+Prophecy
+</h3>
+| width="31%" | {{Spirit Item|Prophet of Air|expression| tab}}{{Spirit Item|Prophet of Air|mask| tab }}{{Spirit Item|Prophet of Air|hair| tab }}{{Spirit Item|Prophet of Air|cape| tab }}{{Spirit Item|Prophet of Air|prop| tab }}
+'''Prophet of Air'''
+| width="27%" | {{Spirit Item|Prophet of Earth|expression| tab}}{{Spirit Item|Prophet of Earth|mask| tab }}{{Spirit Item|Prophet of Earth|hair| tab }}{{Spirit Item|Prophet of Earth|cape| tab }}{{Spirit Item|Prophet of Earth|prop| tab }}{{Music Sheet|16| tab |link=Music Sheets#Music Sheet 16}}<sup>[[#Music Sheet 16|#16]]</sup>
+'''Prophet of Earth'''
+|
+| rowspan="2" |{{Spirit Item| Prophecy| mask_u | tab }}{{Spirit Item| Prophecy| prop_u | tab }}
+'''Ultimates'''
+|-
+| width="31%" |{{Spirit Item|Prophet of Fire|expression| tab}}{{Spirit Item|Prophet of Fire|outfit| tab }}{{Spirit Item|Prophet of Fire|mask| tab }}{{Spirit Item|Prophet of Fire|hair| tab }}{{Spirit Item|Prophet of Fire|prop| tab }}{{Spirit Item|Prophet of Fire|prop_s| tab }}{{Music Sheet|17| tab |link=Music Sheets#Music Sheet 17}}<sup>[[#Music Sheet 17|#17]]</sup>
+'''Prophet of Fire'''
+|width="27%" | {{Spirit Item|Prophet of Water|expression| tab}}{{Spirit Item|Prophet of Water|mask| tab }}{{Spirit Item|Prophet of Water|hair| tab }}{{Spirit Item|Prophet of Water|cape| tab }}{{Spirit Item|Prophet of Water|prop| tab }}
+'''Prophet of Water'''
+|}
+
+<div class="footer">&nbsp;</div>
+<div class="pagebreak">&nbsp;</div>
+{| class="fandom-table" border="0" cellpadding="1" cellspacing="1" style="width: 1265px;"
+| width="9%" height="0" |
+| width="23.5%" height="0" |
+| width="23.5%" height="0" |
+| width="22.25%" height="0" |
+| width="21.75%" height="0" |
+|-
+| colspan="5" |<div class="Print-header">
+=[[File:Sky Logo.png|frameless|120px]]Seasonal Cosmetics=
+<div class="caption">PRINTABLE CHART - Page 2 of 5<br>Updated on 2026-06-13 with Season of Carnival <br><small>See footer for credits</small></div></div><br><br><br>
+|-
+| rowspan="2" |
+<h3> 
+Season<br>
+of{{Spirit Item| Dreams | necklace_u | tab | label=Dreams Ultimate Pendant }}<br> 
+Dreams
+</h3>
+| width="26.5%" | {{Spirit Item|Bearhug Hermit |expression| tab}}{{Spirit Item|Bearhug Hermit |outfit| tab }}{{Spirit Item|Bearhug Hermit |hair| tab }}{{Spirit Item|Bearhug Hermit |headpiece| tab }}{{Music Sheet|19| tab |link=Music Sheets#Music Sheet 19}}<sup>[[#Music Sheet 19|#19]]</sup>
+'''Bearhug Hermit '''
+|{{Spirit Item|Dancing Performer|expression| tab}}{{Spirit Item|Dancing Performer|mask| tab }}{{Spirit Item|Dancing Performer|hair| tab }}{{Spirit Item|Dancing Performer|cape| tab }}{{Spirit Item|Dancing Performer|instrument| tab }}
+'''Dancing Performer'''
+|
+| rowspan="2" |{{Spirit Item| Dreams| mask_u | tab }}{{Spirit Item| Dreams| cape_u | tab }}
+'''Ultimates'''
+|-
+| width="26.5%" | {{Spirit Item|Peeking Postman |expression| tab}}{{Spirit Item|Peeking Postman |outfit| tab }}{{Spirit Item|Peeking Postman |shoes| tab }}{{Spirit Item|Peeking Postman |mask| tab }}{{Spirit Item|Peeking Postman |cape| tab }}{{Music Sheet|18| tab |link=Music Sheets#Music Sheet 18}}<sup>[[#Music Sheet 18|#18]]</sup>
+'''Peeking Postman '''
+|{{Spirit Item|Spinning Mentor|expression| tab}}{{Spirit Item|Spinning Mentor|mask| tab }}{{Spirit Item|Spinning Mentor|hair| tab }}{{Spirit Item|Spinning Mentor|cape| tab }}
+'''Spinning Mentor'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br> 
+of{{Spirit Item| Assembly | necklace_u | tab | label=Assembly Ultimate Pendant }}<br> 
+Assembly
+</h3>
+|{{Spirit Item|Baffled Botanist|expression| tab}}{{Spirit Item|Baffled Botanist|mask| tab }}{{Spirit Item|Baffled Botanist|hair| tab }}{{Spirit Item|Baffled Botanist|prop| tab }}
+'''Baffled Botanist'''
+|{{Spirit Item|Chuckling Scout|expression| tab}}{{Spirit Item|Chuckling Scout|outfit| tab }}{{Spirit Item|Chuckling Scout|footwear| tab }}{{Spirit Item|Chuckling Scout|mask| tab }}{{Spirit Item|Chuckling Scout|prop| tab }}
+'''Chuckling Scout'''
+|{{Spirit Item|Daydream Forester |expression| tab}}{{Spirit Item|Daydream Forester |mask| tab }}{{Spirit Item|Daydream Forester |hair| tab }}{{Music Sheet|20| tab |link=Music Sheets#Music Sheet 20}}<sup>[[#Music Sheet 20|#20]]</sup>
+'''Daydream Forester '''
+|{{Spirit Item| Assembly| mask_u | tab }}{{Spirit Item| Assembly| hair_u | tab }}{{Spirit Item| Assembly| cape_u | tab }}{{Spirit Item| Assembly| instrument_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Marching Adventurer|expression| tab}}{{Spirit Item|Marching Adventurer|mask| tab }}{{Spirit Item|Marching Adventurer|hair| tab }}{{Spirit Item|Marching Adventurer|prop| tab }}
+'''Marching Adventurer'''
+|{{Spirit Item|Scaredy Cadet|expression| tab}}{{Spirit Item|Scaredy Cadet|mask| tab }}{{Spirit Item|Scaredy Cadet|hair| tab }}{{Spirit Item|Scaredy Cadet|prop| tab }}{{Music Sheet|21| tab |link=Music Sheets#Music Sheet 21}}<sup>[[#Music Sheet 21|#21]]</sup>
+'''Scaredy Cadet'''
+|{{Spirit Item|Scolding Student |expression| tab}}{{Spirit Item|Scolding Student |mask| tab }}{{Spirit Item|Scolding Student |hair| tab }}{{Spirit Item|Scolding Student |cape| tab }}
+'''Scolding Student '''
+|{{Spirit Item| Assembly| prop_l | tab }}{{Spirit Item| Assembly| prop_b | tab }}{{Spirit Item| Assembly| prop_t | tab }}{{Spirit Item| Assembly| prop_j | tab }}{{Spirit Item| Assembly| prop_p | tab }}
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3><font style="font-size:39px;">
+Season<br> 
+of{{Spirit Item| Little Prince | necklace_u | tab | label=Little Prince Ultimate Pendant }}The<br> 
+Little Prince</font></h3>
+|{{Spirit Item|Beckoning Ruler |expression| tab}}{{Spirit Item|Beckoning Ruler |mask| tab }}{{Spirit Item|Beckoning Ruler |hair| tab }}
+'''Beckoning Ruler '''
+|{{Spirit Item|Gloating Narcissist|expression| tab}}{{Spirit Item|Gloating Narcissist|outfit| tab }}{{Spirit Item|Gloating Narcissist|hair| tab }}{{Music Sheet|22| tab |link=Music Sheets#Music Sheet 22}}<sup>[[#Music Sheet 22|#22]]</sup>
+'''Gloating Narcissist'''
+|{{Spirit Item|Slouching Soldier|expression| tab}}{{Spirit Item|Slouching Soldier|hair| tab }}{{Spirit Item|Slouching Soldier|cape| tab }}{{Music Sheet|23| tab |link=Music Sheets#Music Sheet 23}}<sup>[[#Music Sheet 23|#23]]</sup>
+'''Slouching Soldier'''
+
+|{{Spirit Item| Little Prince| outfit_u | tab }}{{Spirit Item| Little Prince| hair_u | tab }}{{Spirit Item| Little Prince| prop_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Sneezing Geographer|expression| tab}}{{Spirit Item|Sneezing Geographer|hair| tab }}{{Spirit Item|Sneezing Geographer|cape| tab }}
+'''Sneezing Geographer'''
+|{{Spirit Item|Star Collector |expression| tab}}{{Spirit Item|Star Collector |neck accessory| tab }}{{Spirit Item|Star Collector |cape| tab }}{{Spirit Item|Star Collector |prop| tab }}
+'''Star Collector '''
+|{{Spirit Item|Stretching Lamplighter|expression| tab}}{{Spirit Item|Stretching Lamplighter|hair| tab }}{{Spirit Item|Stretching Lamplighter|cape| tab }}
+'''Stretching Lamplighter'''
+| width:"10%" |{{Spirit Item| Little Prince| outfit_i| tab }}{{Spirit Item| Little Prince| cape_s | tab }}<sup>IAP</sup>{{Spirit Item| Little Prince| cape_a | tab }}<sup>IAP</sup>{{Spirit Item| Little Prince| prop_i  | tab }}<sup>IAP</sup>
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3> 
+Season<br>
+of{{Spirit Item| Flight | necklace_u | tab | label=Flight Ultimate Pendant }}<br> 
+Flight
+</h3>
+|{{Spirit Item|Light Whisperer|expression| tab}}{{Spirit Item|Light Whisperer|outfit| tab }}{{Spirit Item|Light Whisperer|hair| tab }}{{Spirit Item|Light Whisperer|hairpiece| tab }}{{Spirit Item|Light Whisperer|cape| tab }}
+'''Light Whisperer'''
+|{{Spirit Item|Lively Navigator|expression| tab}}{{Spirit Item|Lively Navigator|hair| tab }}{{Spirit Item|Lively Navigator|hairpiece| tab }}{{Spirit Item|Lively Navigator|cape| tab }}{{Music Sheet|24| tab |link=Music Sheets#Music Sheet 24}}<sup>[[#Music Sheet 24|#24]]</sup>
+'''Lively Navigator'''
+|
+| rowspan="2" |{{Spirit Item| Flight| outfit_u | tab }}{{Spirit Item| Flight| hairpiece_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Talented Builder|expression| tab}}{{Spirit Item|Talented Builder|outfit| tab }}{{Spirit Item|Talented Builder|neckpiece| tab }}{{Spirit Item|Talented Builder|hair| tab }}{{Music Sheet|25| tab |link=Music Sheets#Music Sheet 25}}<sup>[[#Music Sheet 25|#25]]</sup>
+'''Talented Builder'''
+|{{Spirit Item|Tinkering Chimesmith|expression| tab}}{{Spirit Item|Tinkering Chimesmith|outfit| tab }}{{Spirit Item|Tinkering Chimesmith|hair| tab }}{{Spirit Item|Tinkering Chimesmith|hairpiece| tab }}{{Spirit Item|Tinkering Chimesmith|instrument| tab }}
+'''Tinkering Chimesmith'''
+|
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br> 
+of{{Spirit Item| Abyss | necklace_u | tab | label=Abyss Ultimate Pendant }}<br> 
+Abyss
+</h3>
+|{{Spirit Item|Anxious Angler |expression| tab}}{{Spirit Item|Anxious Angler |outfit| tab }}{{Spirit Item|Anxious Angler |mask| tab }}{{Spirit Item|Anxious Angler |hair| tab }}{{Spirit Item|Anxious Angler |cape| tab }}
+'''Anxious Angler '''
+|{{Spirit Item|Bumbling Boatswain|expression| tab}}{{Spirit Item|Bumbling Boatswain|mask| tab }}{{Spirit Item|Bumbling Boatswain|hairpiece| tab }}{{Spirit Item|Bumbling Boatswain|cape| tab }}{{Music Sheet|27| tab |link=Music Sheets#Music Sheet 27}}<sup>[[#Music Sheet 27|#27]]</sup>
+'''Bumbling Boatswain'''
+| rowspan="2" |{{Spirit Item|Abyss Guide|mask| tab}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| Abyss| mask_u | tab }}{{Spirit Item| Abyss| headpiece_u | tab }}{{Spirit Item| Abyss| cape_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Cackling Cannoneer|expression| tab}}{{Spirit Item|Cackling Cannoneer|mask| tab }}{{Spirit Item|Cackling Cannoneer|hair| tab }}{{Spirit Item|Cackling Cannoneer|cape| tab }}{{Music Sheet|26| tab |link=Music Sheets#Music Sheet 26}}<sup>[[#Music Sheet 26|#26]]</sup>
+'''Cackling Cannoneer'''
+|{{Spirit Item|Ceasing Commodore|expression| tab}}{{Spirit Item|Ceasing Commodore|mask| tab }}{{Spirit Item|Ceasing Commodore|hair| tab }}{{Spirit Item|Ceasing Commodore|cape| tab }}
+'''Ceasing Commodore'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3> 
+Season<br>  
+of{{Spirit Item| Performance | necklace_u | tab | label=Performance Ultimate Pendant }}<br>   
+Performance
+</h3>
+|{{Spirit Item|Forgetful Storyteller|expression| tab}}{{Spirit Item|Forgetful Storyteller|outfit| tab }}{{Spirit Item|Forgetful Storyteller|mask| tab }}{{Spirit Item|Forgetful Storyteller|hair| tab }}{{Spirit Item|Forgetful Storyteller|cape| tab }}
+'''Forgetful Storyteller'''
+|{{Spirit Item|Frantic Stagehand|expression| tab}}{{Spirit Item|Frantic Stagehand|outfit| tab }}{{Spirit Item|Frantic Stagehand|mask| tab }}{{Spirit Item|Frantic Stagehand|hair| tab }}{{Music Sheet|29| tab |link=Music Sheets#Music Sheet 29}}<sup>[[#Music Sheet 29|#29]]</sup>
+'''Frantic Stagehand'''
+| rowspan="2" |{{Spirit Item| Performance Guide| mask | tab }}{{Spirit Item| Performance Guide| prop | tab }}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| Performance| mask_u | tab }}{{Spirit Item| Performance| hair_u | tab }}{{Spirit Item| Performance| cape_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Mellow Musician|expression| tab}}{{Spirit Item|Mellow Musician|mask| tab }}{{Spirit Item|Mellow Musician |hair| tab }}{{Spirit Item|Mellow Musician|cape| tab }}{{Spirit Item|Mellow Musician |instrument| tab }}
+'''Mellow Musician'''
+|{{Spirit Item|Modest Dancer|expression| tab}}{{Spirit Item|Modest Dancer |outfit| tab }}{{Spirit Item|Modest Dancer|mask| tab }}{{Spirit Item|Modest Dancer|hair| tab }}{{Music Sheet|28| tab |link=Music Sheets#Music Sheet 28}}<sup>[[#Music Sheet 28|#28]]</sup>
+'''Modest Dancer'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>  
+of{{Spirit Item| Shattering | necklace_u | tab | label=Shattering Ultimate Pendant }}<br>   
+Shattering
+</h3>
+|{{Spirit Item|Ancient Darkness|mask| tab }}{{Spirit Item|Ancient Darkness|hairpiece| tab}}{{Spirit Item|Ancient Darkness|cape| tab }}{{Music Sheet|30| tab |link=Music Sheets#Music Sheet 30}}<sup>[[#Music Sheet 30|#30]]</sup>
+'''Darkness Plant Tree'''
+|{{Spirit Item|Ancient Darkness|neck accessory| tab}}{{Spirit Item|Ancient Darkness|hair| tab }}{{Spirit Item|Ancient Darkness|prop| tab }}
+'''Dragon Tree'''
+|
+| rowspan="2" |{{Spirit Item| Shattering| cape_k | tab }}{{Spirit Item| Shattering| cape_m| tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item| Ancient Light |hair_j| tab }}{{Spirit Item| Ancient Light |hairpiece| tab }}{{Spirit Item| Ancient Light |cape_j | tab }}
+'''Jellyfish Tree'''
+|{{Spirit Item|Ancient Light|outfit| tab }}{{Spirit Item|Ancient Light|hair_m| tab}}{{Spirit Item|Ancient Light|cape_m| tab }}{{Music Sheet|31| tab |link=Music Sheets#Music Sheet 31}}<sup>[[#Music Sheet 31|#31]]</sup>
+'''Manta Tree'''
+|
+|}
+<div class="footer">&nbsp;</div>
+<div class="pagebreak">&nbsp;</div>
+{| class="fandom-table" border="0" cellpadding="1" cellspacing="1" style="width: 1265px;"
+| width="9%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="19%" height="0" |
+|-
+| colspan="5" |<div class="Print-header">
+=[[File:Sky Logo.png|frameless|120px]]Seasonal Cosmetics=
+<div class="caption">PRINTABLE CHART - Page 3 of 5<br>Updated on 2026-06-13 with Season of Carnival <br><small>See footer for credits</small></div></div><br><br><br>
+|-
+| rowspan="2" |
+<h3>
+Season<br>  
+of{{Spirit Item| AURORA | necklace_u | tab | label=AURORA Ultimate Pendant }}<br>  
+AURORA
+</h3>
+|{{Spirit Item|Mindful Miner|expression| tab}}{{Spirit Item|Mindful Miner|outfit| tab }}{{Spirit Item|Mindful Miner|mask| tab }}{{Spirit Item|Mindful Miner|hair| tab }}{{Spirit Item|Mindful Miner|cape| tab }}
+'''Mindful Miner'''
+|{{Spirit Item|Running Wayfarer|expression| tab}}{{Spirit Item|Running Wayfarer|mask| tab }}{{Spirit Item|Running Wayfarer|hair| tab }}{{Spirit Item|Running Wayfarer|cape| tab }}{{Music Sheet|36| tab |link=Music Sheets#Music Sheet 36}}<sup>[[#Music Sheet 36|#36]]</sup>
+'''Running Wayfarer'''
+| rowspan="2" |{{Spirit Item| AURORA Guide| emote_k | tab }}{{Spirit Item| AURORA Guide| emote_c | tab }}{{Spirit Item| AURORA Guide| emote_s | tab }}{{Spirit Item| AURORA Guide| emote_e | tab }}<br>{{Spirit Item| AURORA Guide| outfit | tab }}{{Spirit Item| AURORA Guide| mask | tab }}{{Music Sheet|32| tab |link=Music Sheets#Music Sheet 32}}<sup>[[#Music Sheet 32|#32]]</sup>{{Music Sheet|34| tab |link=Music Sheets#Music Sheet 34}}<sup>[[#Music Sheet 34|#34]]</sup>
+'''Additional'''
+|{{Spirit Item| AURORA| outfit_u | tab }}{{Spirit Item| AURORA| hair_u | tab }}{{Spirit Item| AURORA| cape_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Seed of Hope|expression| tab}}{{Spirit Item|Seed of Hope|mask| tab }}{{Spirit Item|Seed of Hope|hair| tab }}{{Spirit Item|Seed of Hope|cape| tab }}{{Music Sheet|33| tab |link=Music Sheets#Music Sheet 33}}<sup>[[#Music Sheet 33|#33]]</sup>
+'''Seed of Hope'''
+|{{Spirit Item|Warrior of Love|expression| tab}}{{Spirit Item|Warrior of Love|mask| tab }}{{Spirit Item|Warrior of Love|hair| tab }}{{Spirit Item|Warrior of Love|cape| tab }}{{Music Sheet|35| tab |link=Music Sheets#Music Sheet 35}}<sup>[[#Music Sheet 35|#35]]</sup>
+'''Warrior of Love'''
+|{{Spirit Item| AURORA Guide| outfit_t | tab }}{{Spirit Item| AURORA Guide| outfit_i | tab }}{{Days Item| Musical Voyage Sneakers | icon | tab}}{{Spirit Item| AURORA Guide| hair_i| tab }}<br>{{Spirit Item| AURORA Guide| headpiece_i | tab }}{{Spirit Item| AURORA Guide| cape_w | tab }}{{Spirit Item| AURORA Guide| cape_g | tab }}{{Instrument| Voice of AURORA | tab }}
+'''IAP'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>    
+of{{Spirit Item| Remembrance | necklace_u | tab | label=Remembrance Ultimate Pendant }}<br>    
+Remembrance
+</h3>
+|{{Spirit Item|Bereft Veteran|expression| tab}}{{Spirit Item|Bereft Veteran|mask| tab}}{{Spirit Item|Bereft Veteran|hair| tab}}{{Spirit Item|Bereft Veteran|cape| tab}}
+'''Bereft Veteran'''
+|{{Spirit Item|Pleading Child|expression| tab}}{{Spirit Item|Pleading Child|outfit| tab}}{{Spirit Item|Pleading Child|footwear| tab}}{{Spirit Item|Pleading Child|neck accessory| tab}}{{Spirit Item|Pleading Child|hair| tab}}
+'''Pleading Child'''
+| rowspan="2" | {{Spirit Item| Remembrance Guide| prop_p | tab }}{{Spirit Item| Remembrance Guide| prop_k | tab }}{{Spirit Item| Remembrance Guide| prop_c | tab }}{{Spirit Item| Remembrance Guide| prop_q | tab }}{{Spirit Item| Remembrance Guide| prop_m | tab }}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| Remembrance| neckpiece_u | tab }}{{Spirit Item| Remembrance| prop_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Tiptoeing Tea-Brewer|expression| tab}}{{Spirit Item|Tiptoeing Tea-Brewer|outfit| tab}}{{Spirit Item|Tiptoeing Tea-Brewer|hair| tab}}{{Spirit Item|Tiptoeing Tea-Brewer|cape| tab}}
+'''Tiptoeing Tea-Brewer'''
+|{{Spirit Item|Wounded Warrior|expression| tab}}{{Spirit Item|Wounded Warrior|outfit| tab}}{{Spirit Item|Wounded Warrior|mask| tab}}{{Spirit Item|Wounded Warrior|cape| tab}}
+'''Wounded Warrior'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3> 
+Season<br>     
+of{{Spirit Item| Passage | necklace_u | tab | label=Passage Ultimate Pendant }}<br>     
+Passage
+</h3>
+|{{Spirit Item|Melancholy Mope|expression| tab}}{{Spirit Item|Melancholy Mope|outfit| tab}}{{Spirit Item|Melancholy Mope|hair| tab}}{{Spirit Item|Melancholy Mope|headpiece| tab}}
+'''Melancholy Mope'''
+|{{Spirit Item|Oddball Outcast|expression| tab}}{{Spirit Item|Oddball Outcast|outfit| tab}}{{Spirit Item|Oddball Outcast|neck accessory| tab}}{{Spirit Item|Oddball Outcast|hair| tab}}
+'''Oddball Outcast'''
+| rowspan="2" |{{Spirit Item| Passage Guide| mask_s | tab }}{{Spirit Item| Passage Guide| mask_b | tab }}{{Spirit Item| Passage Guide| mask_r | tab }}{{Spirit Item| Passage Guide| mask_m | tab }}{{Spirit Item| Passage Guide| prop_h | tab }}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| Passage Guide| mask_u | tab }}{{Spirit Item| Passage Guide| cape_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Overactive Overachiever|expression| tab}}{{Spirit Item|Overactive Overachiever|hair| tab}}{{Spirit Item|Overactive Overachiever|cape| tab}}{{Spirit Item|Overactive Overachiever|instrument| tab}}
+'''Overactive Overachiever'''
+|{{Spirit Item|Tumbling Troublemaker|expression| tab}}{{Spirit Item|Tumbling Troublemaker|hair| tab}}{{Spirit Item|Tumbling Troublemaker|headpiece| tab}}{{Spirit Item|Tumbling Troublemaker|cape| tab}}
+'''Tumbling Troublemaker'''
+|
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>   
+of{{Spirit Item| Moments | necklace_u | tab | label=Moments Ultimate Pendant }}<br>     
+Moments
+</h3>
+|{{Spirit Item|Ascetic Monk|expression| tab}}{{Spirit Item|Ascetic Monk|outfit| tab}}{{Spirit Item|Ascetic Monk|mask| tab}}{{Spirit Item|Ascetic Monk|hair| tab}}
+'''Ascetic Monk'''
+|{{Spirit Item|Jolly Geologist|expression| tab}}{{Spirit Item|Jolly Geologist|face accessory| tab}}{{Spirit Item|Jolly Geologist|hair| tab}}{{Spirit Item|Jolly Geologist|prop| tab}}{{Music Sheet|37| tab |link=Music Sheets#Music Sheet 37}}<sup>[[#Music Sheet 37|#37]]</sup>
+'''Jolly Geologist'''
+| rowspan="2" |{{Spirit Item|Moments Guide|prop| tab}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item|Moments Guide|facepiece_u| tab}}{{Spirit Item|Moments Guide|hairpiece_u | tab}}{{Spirit Item|Moments Guide|prop_u| tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Nightbird Whisperer|expression| tab}}{{Spirit Item|Nightbird Whisperer|outfit| tab}}{{Spirit Item|Nightbird Whisperer|footwear| tab}}{{Spirit Item|Nightbird Whisperer|hair| tab}}{{Spirit Item|Nightbird Whisperer|hairpiece| tab}}
+'''Nightbird Whisperer'''
+|{{Spirit Item|Reassuring Ranger|expression| tab}}{{Spirit Item|Reassuring Ranger|mask| tab}}{{Spirit Item|Reassuring Ranger|face accessory| tab}}{{Spirit Item|Reassuring Ranger|hair accessory| tab}}{{Spirit Item|Reassuring Ranger|cape| tab}}
+'''Reassuring Ranger'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>   
+of{{Spirit Item| Revival | necklace_u | tab | label=Revival Ultimate Pendant }}<br>     
+Revival
+</h3>
+|{{Spirit Item|Echo of an Abandoned Refuge|shoes| tab}}{{Spirit Item|Echo of an Abandoned Refuge|hairpiece| tab}}{{Spirit Item|Echo of an Abandoned Refuge|cape| tab}}{{Music Sheet|38| tab |link=Music Sheets#Music Sheet 38}}<sup>[[#Music Sheet 38|#38]]</sup>
+'''Echo of an Abandoned Refuge'''
+|{{Spirit Item|Memory of a Lost Village|outfit| tab}}{{Spirit Item|Memory of a Lost Village|hair| tab}}{{Spirit Item|Memory of a Lost Village|cape| tab}}
+'''Memory of a Lost Village'''
+| rowspan="2" |{{Spirit Item|Hopeful Steward|hair| tab}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item|Hopeful Steward|hair_u| tab}}{{Spirit Item|Hopeful Steward|cape_u | tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item| Remnant of a Forgotten Haven|shoes| tab}}{{Spirit Item| Remnant of a Forgotten Haven|hairpiece| tab}}{{Spirit Item| Remnant of a Forgotten Haven|cape| tab}}
+''' Remnant of a Forgotten Haven'''
+|{{Spirit Item|Vestige of a Deserted Oasis|shoes| tab}}{{Spirit Item|Vestige of a Deserted Oasis|hair| tab}}{{Spirit Item|Vestige of a Deserted Oasis|cape| tab}}
+'''Vestige of a Deserted Oasis'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3><font style="font-size:39px;">
+Season<br>   
+of{{Spirit Item| Nine-Colored Deer | necklace_u | tab | label=Nine-Colored Deer Ultimate Pendant }}The<br> 
+Nine-Colored Deer</font></h3>
+|{{Spirit Item|Feudal Lord|expression| tab}}{{Spirit Item|Feudal Lord|mask| tab}}{{Spirit Item|Feudal Lord|hairpiece| tab}}{{Spirit Item|Feudal Lord|cape| tab}}{{Music Sheet|39| tab |link=Music Sheets#Music Sheet 39}}<sup>[[#Music Sheet 39|#39]]</sup>
+'''Feudal Lord'''
+|{{Spirit Item|Herb Gatherer|expression| tab}}{{Spirit Item|Herb Gatherer|outfit| tab}}{{Spirit Item|Herb Gatherer|hair| tab}}{{Spirit Item|Herb Gatherer|prop| tab}}
+'''Herb Gatherer'''
+|{{Spirit Item|Spirit of Mural|mask| tab}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item|Spirit of Mural|outfit_u | tab}}{{Spirit Item|Spirit of Mural|hair_u| tab}}{{Spirit Item|Spirit of Mural|cape_u| tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Hunter|expression| tab}}{{Spirit Item|Hunter|outfit| tab}}{{Spirit Item|Hunter|hair| tab}}{{Spirit Item|Hunter|cape| tab}}
+'''Hunter'''
+|{{Spirit Item| Princess|expression| tab}}{{Spirit Item| Princess|outfit| tab}}{{Spirit Item| Princess|mask| tab}}{{Spirit Item| Princess|hair| tab}}{{Spirit Item| Princess|cape| tab}}
+''' Princess'''
+|{{Spirit Item| Spirit of Mural | mask_g | tab }}{{Spirit Item| Spirit of Mural | headpiece_g | tab}}{{Spirit Item| Spirit of Mural | cape_r | tab}}
+'''IAP'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>  
+of{{Spirit Item| Nesting | necklace_u | tab}}<br>  
+Nesting
+</h3>
+|{{Spirit Item|Nesting Atrium|hair| tab}}{{Spirit Item|Nesting Atrium|prop_h| tab }}{{Spirit Item|Nesting Atrium|prop_b| tab }}{{Spirit Item|Nesting Atrium|prop_f| tab }}
+'''Nesting Atrium'''
+|{{Spirit Item|Nesting Loft|cape| tab}}{{Spirit Item|Nesting Loft|prop_b| tab }}{{Spirit Item|Nesting Loft|prop_c| tab }}{{Spirit Item|Nesting Loft|prop_p| tab }}
+'''Nesting Loft'''
+|
+|rowspan="2" |{{Spirit Item|Nesting Guide| outfit_u | tab }}{{Spirit Item|Nesting Guide| prop_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Nesting Nook|hairpiece| tab}}{{Spirit Item|Nesting Nook|prop_c| tab }}{{Spirit Item|Nesting Nook|prop_s| tab }}{{Spirit Item|Nesting Nook|prop_r| tab }}
+'''Nesting Nook'''
+|{{Spirit Item|Nesting Solarium|prop_t| tab}}{{Spirit Item|Nesting Solarium|prop_b| tab }}{{Spirit Item|Nesting Solarium|prop_h| tab }}{{Spirit Item|Nesting Solarium|prop_p| tab }}
+'''Nesting Solarium'''
+|
+|}
+<div class="footer">&nbsp;</div>
+<div class="pagebreak">&nbsp;</div>
+{| class="fandom-table" border="0" cellpadding="1" cellspacing="1" style="width: 1265px;"
+| width="9%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="19%" height="0" |
+|-
+| colspan="5" |<div class="Print-header">
+=[[File:Sky Logo.png|frameless|120px]]Seasonal Cosmetics=
+<div class="caption">PRINTABLE CHART - Page 4 of 5<br>Updated on 2026-06-13 with Season of Carnival <br><small>See footer for credits</small></div></div><br><br><br>
+|-
+| rowspan="2" |
+<h3>
+Season<br>    
+of{{Spirit Item| Duets | necklace_u | tab }}<br>    
+Duets
+</h3>
+|{{Spirit Item|The Cellist's Beginnings|outfit| tab}}{{Spirit Item|The Cellist's Beginnings|hair| tab}}{{Spirit Item|The Cellist's Beginnings|prop| tab}}
+'''The Cellist's Beginnings'''
+|{{Spirit Item|The Cellist's Flourishing|outfit| tab}}{{Spirit Item|The Cellist's Flourishing|cape| tab}}{{Spirit Item|The Cellist's Flourishing|prop_p| tab}}{{Spirit Item|The Cellist's Flourishing|prop_r| tab}}
+'''The Cellist's Flourishing'''
+| {{Spirit Item| The Musicians' Legacy| instrument_c | tab }}{{Spirit Item| The Musicians' Legacy| instrument_p | tab }}{{Music Sheet|40| tab |link=Music Sheets#Music Sheet 40}}<sup>[[#Music Sheet 40|#40]]</sup>
+'''The Musicians' Legacy'''
+| {{Spirit Item| duets guide| cape_u | tab }}{{Spirit Item| duets guide| prop_u | tab }}{{Spirit Item| duets guide| instrument_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|The Pianist's Beginnings|outfit| tab}}{{Spirit Item|The Pianist's Beginnings|hair| tab}}{{Spirit Item|The Pianist's Beginnings|prop_p| tab}}{{Spirit Item|The Pianist's Beginnings|prop_r| tab}}
+'''The Pianist's Beginnings'''
+|{{Spirit Item|The Pianist's Flourishing|outfit| tab}}{{Spirit Item|The Pianist's Flourishing|shoes| tab}}{{Spirit Item|The Pianist's Flourishing|prop| tab}}
+'''The Pianist's Flourishing'''
+| {{Spirit Item| Compassionate Cellist| facepiece | tab }}{{Spirit Item| Compassionate Cellist| instrument | tab }}
+'''Compassionate Cellist'''
+| {{Spirit Item|Duets Guide|emote|tab}}{{Spirit Item|Duets Guide|mask|tab}}
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3> 
+Season<br>     
+of{{Spirit Item| Moomin | necklace_u | tab }}<br>     
+Moomin
+</h3>
+|{{Spirit Item|Comfort of Kindness|neckpiece| tab}}{{Spirit Item|Comfort of Kindness|hair| tab}}{{Spirit Item|Comfort of Kindness|cape| tab}}{{Spirit Item|Comfort of Kindness|prop_c| tab}}{{Spirit Item|Comfort of Kindness|prop_p| tab}}
+'''Comfort of Kindness'''
+|{{Spirit Item|Inspiration of Inclusion|outfit| tab}}{{Spirit Item|Inspiration of Inclusion|neckpiece| tab}}{{Spirit Item|Inspiration of Inclusion|hairpiece| tab}}{{Spirit Item|Inspiration of Inclusion|prop_c| tab}}{{Spirit Item|Inspiration of Inclusion|prop_p| tab}}
+'''Inspiration of Inclusion'''
+| {{Spirit Item| Moomin Guide| emote | tab }}{{Spirit Item| Moomin Guide| outfit_i | tab }}{{Spirit Item| Moomin Guide| prop_p | tab }}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| Moomin Guide| outfit_u | tab }}{{Spirit Item| Moomin Guide| prop_u | tab }}{{Spirit Item| Moomin Guide| prop_m | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Sense of Self|shoes| tab}}{{Spirit Item|Sense of Self|neckpiece| tab}}{{Spirit Item|Sense of Self|hairpiece| tab}}{{Music Sheet|42| tab |link=Music Sheets#Music Sheet 42}}<sup>[[#Music Sheet 42|#42]]</sup>
+'''Sense of Self'''
+|{{Spirit Item|Spirit of Adventure|hair| tab}}{{Spirit Item|Spirit of Adventure|cape| tab}}{{Spirit Item|Spirit of Adventure|instrument| tab}}{{Spirit Item|Spirit of Adventure|prop| tab}}{{Music Sheet|41| tab |link=Music Sheets#Music Sheet 41}}<sup>[[#Music Sheet 41|#41]]</sup>
+'''Spirit of Adventure'''
+| {{Spirit Item| Moomin Guide| outfit_s | tab }}{{Spirit Item| Moomin Guide| neckpiece_s | tab }}{{Spirit Item| Moomin Guide| neckpiece_h | tab }}{{Spirit Item| Moomin Guide| neckpiece_m | tab }}<br>{{Spirit Item| Moomin Guide| hairpiece_m | tab }}{{Spirit Item| Moomin Guide| hairpiece_s | tab }}{{Spirit Item| Moomin Guide| cape_n | tab }}
+'''IAP'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>   
+of{{Spirit Item| Radiance | necklace_u | tab }}<br>     
+Radiance
+</h3>
+|{{Spirit Item|Radiance Greeting Shaman|expression| tab}}{{Spirit Item|Radiance Greeting Shaman|outfit| tab}}{{Spirit Item|Radiance Greeting Shaman|hair| tab}}{{Spirit Item|Radiance Greeting Shaman|hairpiece| tab}}
+'''Radiance Greeting Shaman'''
+|width="28%" |{{Spirit Item|Radiance Leaping Dancer|expression| tab}}{{Spirit Item|Radiance Leaping Dancer|outfit| tab}}{{Spirit Item|Radiance Leaping Dancer|shoes| tab}}{{Spirit Item|Radiance Leaping Dancer|hair| tab}}{{Spirit Item|Radiance Leaping Dancer|cape| tab}}{{Spirit Item|Radiance Leaping Dancer|prop| tab}}
+'''Radiance Leaping Dancer'''
+| rowspan="2" |{{Spirit Item|Radiance Guide|cape_a| tab}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item|Radiance Guide|mask_u| tab}}{{Spirit Item|Radiance Guide|cape_u | tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Radiance Provoking Performer|expression| tab}}{{Spirit Item|Radiance Provoking Performer|outfit| tab}}{{Spirit Item|Radiance Provoking Performer|shoes| tab}}{{Spirit Item|Radiance Provoking Performer|headpiece| tab}}{{Spirit Item|Radiance Provoking Performer|cape| tab}}
+'''Radiance Provoking Performer'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3><font style="font-size:36px;">
+Season<br>   
+of{{Spirit Item| Blue Bird | necklace_u | tab }}The<br> 
+Blue Bird</font></h3>
+|{{Spirit Item|Costumed Confetti Cousin|outfit| tab}}{{Spirit Item|Costumed Confetti Cousin|mask| tab}}{{Spirit Item|Costumed Confetti Cousin|hair| tab}}{{Spirit Item|Costumed Confetti Cousin|hairpiece| tab}}
+'''Costumed Confetti Cousin'''
+|{{Spirit Item|Divining Wise Grandparent|facepiece| tab}}{{Spirit Item|Divining Wise Grandparent|cape| tab}}
+'''Divining Wise Grandparent'''
+|{{Spirit Item|Nostalgic Sparkler Parent|hairpiece| tab}}{{Spirit Item|Nostalgic Sparkler Parent|cape| tab}}
+'''Nostalgic Sparkler Parent'''
+| rowspan="2" |{{Spirit Item|Blue Bird Guide|facepiece_u| tab}}{{Spirit Item|Blue Bird Guide|cape_u | tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Royal Hairtousle Teen|expression| tab}}{{Spirit Item|Royal Hairtousle Teen|outfit| tab}}{{Spirit Item|Royal Hairtousle Teen|headpiece| tab}}{{Spirit Item|Royal Hairtousle Teen|cape| tab}}
+'''Royal Hairtousle Teen'''
+|{{Spirit Item| Woodcutting Pleaful Parent|outfit| tab}}{{Spirit Item| Woodcutting Pleaful Parent|shoes| tab}}{{Music Sheet|43| tab |link=Music Sheets#Music Sheet 43}}<sup>[[#Music Sheet 43|#43]]</sup>
+'''Woodcutting Pleaful Parent'''
+| {{Spirit Item|Blue Bird Guide|emote| tab}}{{Spirit Item|Blue Bird Guide|emote_s| tab}}{{Spirit Item|Blue Bird Guide|emote_c| tab}}{{Spirit Item|Blue Bird Guide|prop_a| tab}}
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3><font style="font-size:26px;">
+Season<br>   
+of{{Spirit Item| Two Embers - Part 1 | necklace_u | tab }}The<br> 
+Two Embers -<br>Part 1
+</font></h3>
+|{{Spirit Item|Resourceful Recluse|outfit| tab}}{{Spirit Item|Resourceful Recluse|mask| tab}}{{Spirit Item|Resourceful Recluse|prop_p| tab}}{{Spirit Item|Resourceful Recluse|prop_t| tab}}
+'''Resourceful Recluse'''
+|{{Spirit Item|Scarred Sentry|expression| tab}}{{Spirit Item|Scarred Sentry|outfit| tab}}{{Spirit Item|Scarred Sentry|shoes| tab}}{{Spirit Item|Scarred Sentry|hair_c| tab}}<br>{{Spirit Item|Scarred Sentry|hair_p| tab}}{{Spirit Item|Scarred Sentry|cape| tab}}{{Spirit Item|Scarred Sentry|prop_s| tab}}{{Spirit Item|Scarred Sentry|prop_c| tab}}
+'''Scarred Sentry'''
+|{{Spirit Item| Caring Companion|prop| tab}}
+'''Caring Companion'''
+|{{Spirit Item|Vault Elder's Lantern|hairpiece_u | tab}}{{Spirit Item|Vault Elder's Lantern|cape_u| tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Stern Shepherd|expression| tab}}{{Spirit Item|Stern Shepherd|outfit| tab}}{{Spirit Item|Stern Shepherd|mask| tab}}{{Spirit Item|Stern Shepherd|hair| tab}}<br>{{Spirit Item|Stern Shepherd|prop| tab}}{{Music Sheet|44| tab |link=Music Sheets#Music Sheet 44}}<sup>[[#Music Sheet 44|#44]]</sup>
+'''Stern Shepherd'''
+|{{Spirit Item| Tender Toymaker|outfit| tab}}{{Spirit Item| Tender Toymaker|hair| tab}}{{Spirit Item| Tender Toymaker|prop_m| tab}}{{Spirit Item| Tender Toymaker|prop_c| tab}}
+'''Tender Toymaker'''
+|{{Spirit Item|Vault Elder's Lantern|neckpiece_v| tab}}{{Spirit Item|Vault Elder's Lantern|headpiece_v| tab}}{{Spirit Item|Vault Elder's Lantern|neckpiece_s| tab}}{{Spirit Item|Vault Elder's Lantern|headpiece_s| tab}}{{Spirit Item|Vault Elder's Lantern|hairpiece_b| tab}}<br>{{Spirit Item|Vault Elder's Lantern|hairpiece_m| tab}}{{Spirit Item|Vault Elder's Lantern|cape_d| tab}}{{Spirit Item|Vault Elder's Lantern|prop_p| tab}}{{Spirit Item|Vault Elder's Lantern|prop_m| tab}}
+'''IAP'''
+|{{Spirit Item|Vault Elder's Lantern|prop_a| tab}}
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>   
+of{{Spirit Item| Migration | necklace_u | tab }}<br>     
+Migration
+</h3>
+|{{Spirit Item|Migrating Bellmaker|expression| tab}}{{Spirit Item|Migrating Bellmaker|face accessory| tab}}{{Spirit Item|Migrating Bellmaker|hair| tab}}{{Spirit Item|Migrating Bellmaker|cape| tab}}{{Music Sheet|45| tab |link=Music Sheets#Music Sheet 45}}<sup>[[#Music Sheet 45|#45]]</sup>
+'''Migrating Bellmaker'''
+|{{Spirit Item|Migrating Bird Whisperer|expression| tab}}{{Spirit Item|Migrating Bird Whisperer|outfit| tab}}{{Spirit Item|Migrating Bird Whisperer|cape| tab}}
+'''Migrating Bird Whisperer'''
+|{{Spirit Item|Migrating Butterfly Charmer|expression| tab}}{{Spirit Item|Migrating Butterfly Charmer|hairpiece| tab}}{{Spirit Item|Migrating Butterfly Charmer|cape| tab}}
+'''Migrating Butterfly Charmer'''
+| rowspan="2" |{{Spirit Item|Migration Guide|outfit_u| tab}}{{Spirit Item|Migration Guide|shoes_u | tab}}{{Spirit Item|Migration Guide|facepiece_u| tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Migrating Jelly Whisperer|expression| tab}}{{Spirit Item|Migrating Jelly Whisperer|outfit| tab}}{{Spirit Item|Migrating Jelly Whisperer|hairpiece| tab}}
+'''Migrating Jelly Whisperer'''
+|{{Spirit Item|Migrating Manta Whisperer|expression| tab}}{{Spirit Item|Migrating Manta Whisperer|outfit| tab}}{{Spirit Item|Migrating Manta Whisperer|hair| tab}}{{Spirit Item|Migrating Manta Whisperer|cape| tab}}
+'''Migrating Manta Whisperer'''
+| rowspan="2" |{{Spirit Item|Migration Guide|prop_a| tab}}
+'''Additional'''
+|-
+| colspan="5" |<hr>
+|-
+| rowspan="2" |
+<h3>
+Season<br>   
+of{{Spirit Item| Lightmending | necklace_u | tab }}<br>     
+Lightmending
+</h3>
+|{{Spirit Item|Lightmending Champion|expression| tab}}{{Spirit Item|Lightmending Champion|outfit| tab}}{{Spirit Item|Lightmending Champion|mask| tab}}{{Spirit Item|Lightmending Champion|headpiece| tab}}{{Spirit Item|Reassuring Ranger|hair accessory| tab}}
+'''Lightmending Champion'''
+|{{Spirit Item|Lightmending Light Catcher|expression| tab}}{{Spirit Item|Lightmending Light Catcher|mask| tab}}{{Spirit Item|Lightmending Light Catcher|hairpiece| tab}}{{Spirit Item|Lightmending Light Catcher|cape| tab}}{{Spirit Item|Lightmending Light Catcher|instrument| tab}}
+'''Lightmending Light Catcher'''
+|
+| rowspan="2" |{{Spirit Item|Lightmending Guide|mask_u| tab}}{{Spirit Item|Lightmending Guide|hair_u| tab}}{{Spirit Item|Lightmending Guide|cape_u | tab}}
+'''Ultimates'''
+|-
+|{{Spirit Item|Lightmending Light Scholar|expression| tab}}{{Spirit Item|Lightmending Light Scholar|outfit| tab}}{{Spirit Item|Lightmending Light Scholar|mask| tab}}{{Spirit Item|Lightmending Light Scholar|hair| tab}}{{Spirit Item|Lightmending Light Scholar|cape| tab}}
+'''Lightmending Light Scholar'''
+|{{Spirit Item|Lightmending Pioneer|expression| tab}}{{Spirit Item|Lightmending Pioneer|outfit| tab}}{{Spirit Item|Lightmending Pioneer|mask| tab}}{{Spirit Item|Lightmending Pioneer|hair| tab}}
+'''Lightmending Pioneer'''
+|
+|}
+<div class="footer">&nbsp;</div>
+<div class="pagebreak">&nbsp;</div>
+{| class="fandom-table" border="0" cellpadding="1" cellspacing="1" style="width: 1265px;"
+| width="9%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="24%" height="0" |
+| width="19%" height="0" |
+|-
+| colspan="5" |<div class="Print-header">
+=[[File:Sky Logo.png|frameless|120px]]Seasonal Cosmetics=
+<div class="caption">PRINTABLE CHART - Page 5 of 5<br>Updated on 2026-06-13 with Season of Carnival <br><small>See footer for credits</small></div></div><br><br><br>
+|-
+| rowspan="2" |
+<h3>
+Season<br>    
+of{{Spirit Item| Carnival | necklace_u | tab }}<br>    
+Carnival
+</h3>
+|{{Spirit Item|Carnival Athletic Dancer|expression| tab}}{{Spirit Item|Carnival Athletic Dancer|outfit| tab}}{{Spirit Item|Carnival Athletic Dancer|mask| tab}}{{Spirit Item|Carnival Athletic Dancer|cape| tab}}
+'''Carnival Athletic Dancer'''
+|{{Spirit Item|Carnival Juggler|expression| tab}}{{Spirit Item|Carnival Juggler|outfit| tab}}{{Spirit Item|Carnival Juggler|mask| tab}}{{Spirit Item|Carnival Juggler|necklace| tab}}
+'''Carnival Juggler'''
+| rowspan="2" |{{Spirit Item|Carnival Guide|prop_b|infobox}}{{Spirit Item|Carnival Guide|prop_p|infobox}}{{Spirit Item|Carnival Guide|prop_u|infobox}}{{Spirit Item|Carnival Guide|prop_d|infobox}}<br>{{Spirit Item|Carnival Guide|prop_s|infobox}}{{Spirit Item|Carnival Guide|prop_t|infobox}}
+'''Additional'''
+| rowspan="2" |{{Spirit Item| carnival guide| hair_u | tab }}{{Spirit Item| carnival guide| cape_u | tab }}
+'''Ultimates'''
+|-
+|{{Spirit Item|Carnival Puzzle Director|expression| tab}}{{Spirit Item|Carnival Puzzle Director|outfit| tab}}{{Spirit Item|Carnival Puzzle Director|hair| tab}}{{Spirit Item|Carnival Puzzle Director|hairpiece| tab}}{{Music Sheet|46| tab |link=Music Sheets#Music Sheet 46}}<sup>[[#Music Sheet 46|#46]]</sup>
+'''Carnival Puzzle Director'''
+|{{Spirit Item|Carnival Stunt Actor|expression| tab}}{{Spirit Item|Carnival Stunt Actor|outfit| tab}}{{Spirit Item|Carnival Stunt Actor|hair| tab}}{{Spirit Item|Carnival Stunt Actor|hairpiece| tab}}{{Spirit Item|Carnival Stunt Actor|cape| tab}}
+'''Carnival Stunt Actor'''
+|
+|}
+<div class="footer">&nbsp;</div>
+[[Category:Printables]]

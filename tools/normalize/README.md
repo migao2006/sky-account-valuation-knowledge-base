@@ -37,7 +37,7 @@ review artifact.  Even an approved ledger row has `canonical_write` set to
 `not_performed`; a separately reviewed migration is required for any canonical
 change.
 
-`build_market_claim_review.py` creates the fixed, anonymized P2.1 queue for
+`build_market_claim_review.py` creates the fixed, anonymized P2.2 200-record queue for
 two independent human annotations of market fields. It writes only listing IDs,
 listing-text SHA-256 values, opaque buckets, and requested field names—never source
 text or machine-proposed labels. It does not modify formal market data:

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/fandom-seasonal-cosmetics-crosswalk.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "source_id", "source_independence", "source_item_key", "source_locator", "season_label", "template_subject", "template_slot", "season_ids", "candidate_item_ids", "match_status", "review_status", "promotion_effect"],
+  "properties": {
+    "snapshot_id": {"const": "fandom_printable_seasonal_cosmetics_r107991"},
+    "source_id": {"const": "source_fandom_printable_seasonal_cosmetics_r107991"},
+    "source_independence": {"const": "not_independent_same_fandom_wiki"},
+    "source_item_key": {"type": "string", "minLength": 1},
+    "source_locator": {"type": "string", "pattern": "^revision:107991:season:.+:template:[1-9][0-9]*$"},
+    "season_label": {"type": "string", "minLength": 1},
+    "template_subject": {"type": "string", "minLength": 1},
+    "template_slot": {"type": "string", "minLength": 1},
+    "season_ids": {"type": "array", "items": {"type": "string", "pattern": "^season_[a-z0-9_]+$"}, "uniqueItems": true},
+    "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
+    "match_status": {"enum": ["season_mapped_candidate_linked", "season_mapped_no_candidate_link", "ambiguous_season", "unmapped_season", "ambiguous_candidate"]},
+    "review_status": {"enum": ["needs_review", "not_required"]},
+    "promotion_effect": {"const": "none"}
+  }
+}

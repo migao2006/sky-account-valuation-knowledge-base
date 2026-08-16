@@ -7,7 +7,7 @@
     "data/modeling/account-item-vectors.jsonl",
     "data/modeling/price-cleaned-normal.jsonl"
   ],
-  "input_snapshot_sha256": "52F3F2285D6619765544EBA542D7598F1808F0819580C1DF3E1025DBE9DC91B8",
+  "input_snapshot_sha256": "C2EB6418F97A14461EED362B15D30CDF354DE10A258B5ECD47DABC4286F2C58F",
   "feature_schema": {
     "version": "1",
     "feature_names": [

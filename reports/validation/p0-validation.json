@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.3-p2.1",
+  "schema_version": "3.4-p2.2",
   "offline_only": true,
   "valid": true,
   "checks": {
@@ -19,21 +19,23 @@
     "p2_1_catalog_universe_reconciled": true,
     "p2_1_vendor_correlation_fail_closed": true,
     "p2_1_human_gold_not_fabricated": true,
+    "p2_2_vendor_registry_fail_closed": true,
+    "p2_2_fandom_same_lineage_only": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
     "no_model_eligible_items": true
   },
-  "schema_records_checked": 15297,
+  "schema_records_checked": 17936,
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 144,
+    "run": 165,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 188,
+    "hashed_files": 207,
     "mismatches": []
   },
   "release_residue": [],
@@ -69,7 +71,7 @@
     "sets": 8,
     "aliases": 322,
     "availability_events": 12,
-    "sources": 25,
+    "sources": 26,
     "visual_references": 0,
     "unresolved": 39,
     "unmapped": 14,
@@ -84,6 +86,8 @@
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
     "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
     "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
-    "市場 claim 人工金標仍為 0；20 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。"
+    "P2.2 固定 1,758 筆 vendor collectible registry 是 review-only 來源列母體，不是 1,758 個 canonical items；重名與跨類型衝突均隔離，模型白名單提升為 0。",
+    "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
+    "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。"
   ]
 }

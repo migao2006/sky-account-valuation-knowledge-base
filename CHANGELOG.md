@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 3.4.0-p2.2 — 2026-08-17
+
+- 新增 1,758 筆 review-only vendor collectible registry；64 canonical link、296 candidate link、1,398 unresolved，所有跨類型名稱衝突隔離，canonical/model writes 均為 0。
+- 固定 Fandom Printable Seasonal Cosmetics revision 107991，產生 700 筆 template-coordinate crosswalk；明示與既有 printable 同 lineage，獨立證據與 canonical promotion 都為 0。
+- 人工 market-claim 盲審佇列由 20 擴為 200 筆，gold 仍為 0，未以機器標籤冒充人工標註。
+- 帳號 profile 與 Item Vector 同時使用 listing text 和 normalized feature summary，保留逐來源 provenance、衝突 fail-closed；collection profile 覆蓋提高但仍只使用 canonical 精確別名。
+- 正常刊登模型價格列仍只有 3 筆、急售 0；正式模型與 item value table 維持停用。
+
 ## 3.3.0-p2.1 — 2026-08-17
 
 - 將固定 vendor snapshot 的 3,266 筆列完整對帳：64 canonical-linked、296 candidate-linked、1,398 unmatched、1,508 explicitly-excluded，沒有靜默遺失。

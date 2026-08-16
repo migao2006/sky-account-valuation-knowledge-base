@@ -1,6 +1,6 @@
 # Market-claim gold contract
 
-P2.1 establishes an offline, fixed 20-listing review queue for market-field
+P2.2 establishes an offline, fixed 200-listing review queue for market-field
 labels. The queue stores only an anonymous `listing_id`, a SHA-256 digest of
 the existing normalized listing text, an opaque selection bucket, and fields
 to label. It stores neither listing text nor machine-proposed labels. Bucket
@@ -21,10 +21,14 @@ but it cannot cryptographically prove that a pseudonym belongs to a human.
 Operational review must therefore verify reviewer identity outside the dataset
 before any non-empty gold file is accepted; the current gold file is empty.
 
-The sample spans seller listings, ambiguous seller identity, buyer budgets,
-services, exchanges, multi-account posts, China-server posts, foreign currency,
-and sold claims. It is a review instrument, not a market-price sample and not a
-license to treat a sold claim as a verified sale.
+The deterministic sample has twenty opaque buckets of ten unique listings.
+Selection coverage includes price presence and price-type ambiguity, TWD/HKD/RM/CNY
+and unknown currency claims, international/China/unknown server claims, seller-like
+and non-seller transaction forms, multi-account posts, date claims, and listings
+with resource, season, and binding text. This coverage is encoded only in the
+offline selector; it is not exposed in queue rows and must not be treated as a
+machine-proposed label. The queue is a review instrument, not a market-price
+sample and not a license to treat a sold claim as a verified sale.
 
 Build the deterministic queue offline:
 

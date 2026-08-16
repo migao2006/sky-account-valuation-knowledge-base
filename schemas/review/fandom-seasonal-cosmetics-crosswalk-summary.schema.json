@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "source_id", "snapshot_sha256", "template_record_count", "status_counts", "candidate_linked_count", "independent_evidence_count", "canonical_writes", "source_independence", "canonical_promotion", "notes"],
+  "properties": {
+    "snapshot_id": {"const": "fandom_printable_seasonal_cosmetics_r107991"},
+    "source_id": {"const": "source_fandom_printable_seasonal_cosmetics_r107991"},
+    "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "template_record_count": {"const": 700},
+    "status_counts": {"type": "object", "additionalProperties": false, "required": ["season_mapped_candidate_linked", "season_mapped_no_candidate_link"], "properties": {"season_mapped_candidate_linked": {"const": 579}, "season_mapped_no_candidate_link": {"const": 121}}},
+    "candidate_linked_count": {"const": 579},
+    "independent_evidence_count": {"const": 0},
+    "canonical_writes": {"const": 0},
+    "source_independence": {"const": "not_independent_same_fandom_wiki"},
+    "canonical_promotion": {"const": "not_performed"},
+    "notes": {"type": "string", "minLength": 1}
+  }
+}
