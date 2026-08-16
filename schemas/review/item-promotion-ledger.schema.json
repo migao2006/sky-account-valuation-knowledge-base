@@ -8,12 +8,17 @@
   "properties": {
     "candidate_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
     "proposed_canonical_item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
-    "decision": {"enum": ["vendor_correlated_template_candidate", "rejected_fail_closed"]},
+    "decision": {"enum": ["approved_for_canonical_promotion", "vendor_correlated_template_candidate", "rejected_fail_closed"]},
     "reasons": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "evidence_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_evidence_[a-z0-9_]+$"}, "uniqueItems": true},
     "canonical_write": {"const": "not_performed"},
     "verification_status": {"enum": ["needs_review", "unknown"]},
     "model_feature_status": {"const": "excluded_pending_verification"},
-    "unresolved_fields": {"type": "array", "items": {"enum": ["canonical_identity", "season_id", "acquisition", "availability", "cost", "visual_reference"]}, "uniqueItems": true}
+    "unresolved_fields": {"type": "array", "items": {"enum": ["canonical_identity", "season_id", "acquisition", "availability", "cost", "visual_reference"]}, "uniqueItems": true},
+    "promotion_contract_version": {"const": "p2.5-pinned-source-v1"},
+    "promotion_ready": {"type": "boolean"},
+    "source_lineage_ids": {"type": "array", "items": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"}, "uniqueItems": true},
+    "field_coverage": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "uniqueItems": true}},
+    "replay_status": {"enum": ["verified", "unverified"]}
   }
 }

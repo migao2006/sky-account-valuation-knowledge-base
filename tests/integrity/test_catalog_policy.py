@@ -24,13 +24,23 @@ class CatalogPolicyTests(unittest.TestCase):
     def test_only_high_evidence_verified_items_can_be_model_eligible(self):
         items = read_jsonl("knowledge/items/items.jsonl")
         eligible = [row for row in items if row["model_feature_status"] == "eligible"]
-        self.assertEqual(eligible, [])
         for row in items:
             if row["model_feature_status"] == "eligible":
                 self.assertEqual(row["verification_status"], "verified")
                 self.assertIn(row["evidence_tier"], {"official_item_specific", "official_with_secondary"})
             else:
                 self.assertEqual(row["model_feature_status"], "excluded_pending_verification")
+
+    def test_nintendo_identity_cohort_is_verified_but_not_over_promoted(self):
+        items = {row["item_id"]: row for row in read_jsonl("knowledge/items/items.jsonl")}
+        cohort = {
+            "item_nintendo_blue_cape", "item_nintendo_red_cape",
+            "item_nintendo_hair", "item_nintendo_vessel_flute",
+        }
+        self.assertEqual({item_id for item_id, row in items.items() if row["verification_status"] == "verified"}, cohort)
+        for item_id in cohort:
+            self.assertEqual(items[item_id]["evidence_tier"], "official_with_secondary")
+            self.assertEqual(items[item_id]["model_feature_status"], "excluded_pending_verification")
 
     def test_canonical_aliases_are_globally_unambiguous(self):
         aliases = read_jsonl("knowledge/aliases/item-aliases.jsonl")

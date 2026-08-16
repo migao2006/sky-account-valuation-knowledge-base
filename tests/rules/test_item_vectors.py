@@ -13,7 +13,7 @@ from tools.validate.schema_validator import OfflineSchemaValidator
 class ItemVectorTests(unittest.TestCase):
     def setUp(self):
         self.items = {
-            "item_verified_cape": {"item_id": "item_verified_cape", "canonical_name_zh_tw": "測試斗篷", "canonical_name_en": "Test Cape", "aliases": ["測斗"], "verification_status": "verified"},
+            "item_verified_cape": {"item_id": "item_verified_cape", "canonical_name_zh_tw": "測試斗篷", "canonical_name_en": "Test Cape", "aliases": ["測斗"], "verification_status": "verified", "_model_verified_tokens": ["測斗", "測試斗篷", "testcape"]},
             "item_review_mask": {"item_id": "item_review_mask", "canonical_name_zh_tw": "測試面具", "canonical_name_en": "Test Mask", "aliases": ["測面"], "verification_status": "needs_review"},
         }
         self.aliases = {"測試斗篷": {"item_verified_cape"}, "測斗": {"item_verified_cape"}, "測試面具": {"item_review_mask"}, "測面": {"item_review_mask"}}
@@ -45,12 +45,25 @@ class ItemVectorTests(unittest.TestCase):
 
     def _set_profile(self, root, text="", owned=(), missing=(), items=None):
         profile = json.loads(json.dumps(self.profile))
-        profile["collection"]["owned_item_ids"] = list(owned)
-        profile["season_profiles"] = [{"owned_item_ids": [], "missing_item_ids": list(missing)}]
+        item_rows = json.loads(json.dumps(items or self.items))
+        alias_rows = {key: set(value) for key, value in self.aliases.items()}
+        text_parts = [text]
+        for item_id in owned:
+            item = item_rows[item_id]
+            token = item["canonical_name_en"]
+            item.setdefault("_model_verified_tokens", []).append("".join(char.lower() for char in token if char.isalnum()))
+            alias_rows.setdefault("".join(char.lower() for char in token if char.isalnum()), set()).add(item_id)
+            text_parts.append(token)
+        for item_id in missing:
+            item = item_rows[item_id]
+            token = item["canonical_name_en"]
+            item.setdefault("_model_verified_tokens", []).append("".join(char.lower() for char in token if char.isalnum()))
+            alias_rows.setdefault("".join(char.lower() for char in token if char.isalnum()), set()).add(item_id)
+            text_parts.append("沒有" + token)
         vector = build_vector(
             profile,
-            {"listing_text": text, "offer_kind": "seller_listing", "entity_kind": "single_account"},
-            items or self.items, self.aliases, root,
+            {"listing_text": " ".join(text_parts), "offer_kind": "seller_listing", "entity_kind": "single_account"},
+            item_rows, alias_rows, root,
         )
         return vector["feature_groups"]["item_sets"][0]
 
@@ -68,6 +81,19 @@ class ItemVectorTests(unittest.TestCase):
         self.assertEqual(states["item_review_mask"]["state"], "owned")
         self.assertFalse(states["item_review_mask"]["model_feature"])
         self.assertTrue(states["item_review_mask"]["sensitivity_feature"])
+
+    def test_unreviewed_alias_cannot_create_a_known_model_observation(self):
+        items = json.loads(json.dumps(self.items))
+        items["item_verified_cape"]["_model_verified_tokens"] = ["testcape"]
+        vector = build_vector(
+            self.profile,
+            {"listing_text": "含測斗", "offer_kind": "seller_listing", "entity_kind": "single_account"},
+            items, self.aliases, ROOT,
+        )
+        state = next(row for row in vector["item_states"] if row["item_id"] == "item_verified_cape")
+        self.assertEqual(state["state"], "unknown")
+        self.assertTrue(state["model_feature"])
+        self.assertEqual(state["evidence_state"], "unknown")
 
     def test_feature_summary_is_a_separate_item_provenance_source(self):
         vector = build_vector(

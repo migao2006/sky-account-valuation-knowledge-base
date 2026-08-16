@@ -84,3 +84,14 @@ items, 622 review candidates, and 1,758 source-scoped references. It verifies
 the pinned snapshot bytes and all target IDs, keeps truth levels separate, and
 does not duplicate or promote the canonical item master. The index is only
 offline lookup/review support; it is never ownership proof or a model feature.
+
+`apply_nintendo_starter_pack.py` is the bounded P2.5 canonical-evidence
+replayer. It verifies the fixed official fact snapshot, independent vendor
+snapshot, source registry lineages, JSON pointers and hashes before checking
+the four existing Nintendo canonical records. Unknown Traditional Chinese
+names, storefront availability, permanence, prices and images remain unknown;
+the command neither fetches data nor adds model features:
+
+```powershell
+python tools/normalize/apply_nintendo_starter_pack.py --root .
+```

@@ -18,10 +18,15 @@ class CatalogQueryIndexTests(unittest.TestCase):
         summary = json.loads((ROOT / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
         self.assertEqual(len(rows), 2474); self.assertEqual(len({row["query_entity_id"] for row in rows}), len(rows))
         self.assertEqual(Counter(row["query_entity_type"] for row in rows), Counter({"source_reference": 1758, "review_candidate": 622, "canonical_item": 94}))
-        self.assertEqual(summary["canonical_resolved_eligible_count"], 0)
-        self.assertTrue(all(row["model_feature_status"] == "excluded_pending_verification" for row in rows))
-        self.assertTrue(all(row["resolution_eligibility"] == "review_only" for row in rows))
-        self.assertTrue(all(row["truth_level"] != "canonical_knowledge" or row["verification_status"] == "needs_review" for row in rows))
+        items = read_jsonl(ROOT / "knowledge/items/items.jsonl")
+        verified = {row["item_id"] for row in items if row["verification_status"] == "verified"}
+        resolved = {row["query_entity_id"] for row in rows if row["resolution_eligibility"] == "canonical_resolved"}
+        self.assertEqual(summary["canonical_resolved_eligible_count"], len(resolved))
+        self.assertEqual(resolved, verified)
+        self.assertTrue(all(
+            row["resolution_eligibility"] == "review_only"
+            for row in rows if row["query_entity_type"] != "canonical_item"
+        ))
         collided = {key for row in rows for key in row["ambiguous_lookup_keys"]}
         self.assertEqual(summary["ambiguous_lookup_key_count"], len(collided))
         self.assertEqual(summary["rows_with_lookup_key_collisions"], sum(row["has_lookup_key_collision"] for row in rows))

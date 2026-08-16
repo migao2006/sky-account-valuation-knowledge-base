@@ -1,6 +1,6 @@
-# 估價方法（v3.6 P2.4）
+# 估價方法（v3.7 P2.5）
 
-P2.4 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 不會自動成為 canonical 或模型物品特徵；`winged_or_unspecified` 也維持 unknown，不再因共享 fallback 值獲得帳型分數。
+P2.5 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 不會自動成為 canonical 或模型物品特徵；四件已驗證 Nintendo identity 也因建模欄位與持有證據不足而維持模型排除。`winged_or_unspecified` 仍是 unknown，不因共享 fallback 值獲得帳型分數。
 
 ## 輸入與正規化
 

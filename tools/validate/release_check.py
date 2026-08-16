@@ -148,6 +148,9 @@ def main() -> None:
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    nintendo_evidence = [json.loads(line) for line in (root / "data/review/nintendo-starter-pack-canonical-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    verified_item_ids = {row["item_id"] for row in items if row.get("verification_status") == "verified"}
+    resolved_query_ids = {row["query_entity_id"] for row in catalog_query_index if row.get("resolution_eligibility") == "canonical_resolved"}
     checks = {
         "schema_and_integrity": integrity["valid"],
         "unit_tests": test_success,
@@ -165,22 +168,23 @@ def main() -> None:
         "p2_1_catalog_universe_reconciled": len(catalog_universe) == 3266 and coverage.get("p2_1_review_infrastructure", {}).get("catalog_universe_reconciled") is True,
         "p2_1_vendor_correlation_fail_closed": len(item_promotions) == 622 and sum(row.get("decision") == "vendor_correlated_template_candidate" for row in item_promotions) == 284 and all(row.get("canonical_write") == "not_performed" and row.get("model_feature_status") == "excluded_pending_verification" and "canonical_identity" in row.get("unresolved_fields", []) for row in item_promotions if row.get("decision") == "vendor_correlated_template_candidate"),
         "p2_1_human_gold_not_fabricated": len(market_claim_review) == 200 and not market_claim_gold,
-        "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == 1758 and sum(row.get("link_status") == "canonical_link" for row in reference_identities) == 64 and sum(row.get("link_status") == "candidate_link" for row in reference_identities) == 296 and sum(row.get("link_status") == "unresolved" for row in reference_identities) == 1398 and all(row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
+        "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == 1758 and sum(row.get("link_status") in {"canonical_link", "candidate_link", "unresolved"} for row in reference_identities) == 1758 and all(row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
         "p2_4_near_miss_evidence_not_fabricated": len(market_near_miss_review) >= 1 and not market_near_miss_evidence,
-        "p2_4_catalog_query_truth_layers": len(catalog_query_index) == 2474 and sum(row.get("query_entity_type") == "canonical_item" for row in catalog_query_index) == 94 and sum(row.get("query_entity_type") == "review_candidate" for row in catalog_query_index) == 622 and sum(row.get("query_entity_type") == "source_reference" for row in catalog_query_index) == 1758 and not any(row.get("resolution_eligibility") == "canonical_resolved" for row in catalog_query_index),
+        "p2_5_catalog_query_truth_layers": len(catalog_query_index) == 2474 and sum(row.get("query_entity_type") == "canonical_item" for row in catalog_query_index) == 94 and sum(row.get("query_entity_type") == "review_candidate" for row in catalog_query_index) == 622 and sum(row.get("query_entity_type") == "source_reference" for row in catalog_query_index) == 1758 and resolved_query_ids == verified_item_ids,
+        "p2_5_nintendo_identity_evidence_replayed": verified_item_ids == {"item_nintendo_blue_cape", "item_nintendo_red_cape", "item_nintendo_hair", "item_nintendo_vessel_flute"} and len(nintendo_evidence) == 18 and all(row.get("review_status") == "approved" for row in nintendo_evidence),
         "p2_4_catalog_scope_is_auditable": len(catalog_universe) == 3266 and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe) and sum(row.get("scope_disposition") != "collectible_item" for row in catalog_universe) == 1508,
         "p2_4_unknown_sets_not_model_features": all(all(set_row.get("model_feature") is False and set_row.get("completion_ratio") is None and set_row.get("is_complete") is None for set_row in vector.get("feature_groups", {}).get("item_sets", [])) for vector in vectors),
         "p2_2_fandom_same_lineage_only": len(fandom_crosswalk) == 700 and sum(row.get("match_status") == "season_mapped_candidate_linked" for row in fandom_crosswalk) == 579 and all(row.get("source_independence") == "not_independent_same_fandom_wiki" and row.get("promotion_effect") == "none" for row in fandom_crosswalk),
         "formal_models_fail_closed": all(row.get("status") == "insufficient_training_data" for row in model_artifacts),
         "item_values_fail_closed": len(item_values) == len(items) == 94 and all(row.get("status") == "insufficient_support" and row.get("mean_conditional_attribution") is None for row in item_values),
-        "no_model_eligible_items": not any(row.get("model_feature_status") == "eligible" for row in items),
+        "verified_identity_cohort_not_over_promoted_to_model": not any(row.get("model_feature_status") == "eligible" for row in items),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
         fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "3.6-p2.4", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "3.7-p2.5", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

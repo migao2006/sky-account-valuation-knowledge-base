@@ -69,6 +69,18 @@ class PriceCleaningTest(unittest.TestCase):
             "price_line": "urgent_sale", "selected_price_twd": 1000,
         }])
 
+    def test_explicit_multi_price_terms_are_retained_for_review_not_training(self):
+        account = row(1, price_semantic_review={
+            "urgency": "unknown", "multi_price": True,
+            "evidence_state": "text_claim", "review_status": "needs_review",
+            "reason_codes": ["multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants"],
+        })
+        normal, urgent, ledger = clean([account])
+        self.assertEqual(normal, [])
+        self.assertEqual(urgent, [])
+        self.assertEqual(ledger[0]["disposition"], "needs_review")
+        self.assertIn("multiple_price_terms", ledger[0]["reason_codes"])
+
     def test_modified_z_outlier_requires_ten_independent_same_type_clusters(self):
         sparse = [row(index, selected_price_twd=1000 + index * 10) for index in range(1, 9)]
         sparse.append(row(9, selected_price_twd=1_000_000))
@@ -93,6 +105,14 @@ class PriceCleaningTest(unittest.TestCase):
             normal = [json.loads(line) for line in (output / "price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines()]
             urgent = [json.loads(line) for line in (output / "price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual({item["history_id"] for item in normal}, {"history_0068", "history_0085", "history_recovered_0792"})
+            accounts = {
+                item["history_id"]: item
+                for item in (json.loads(line) for line in (ROOT / "data/comparables/accounts.jsonl").read_text(encoding="utf-8").splitlines() if line)
+            }
+            self.assertEqual(
+                {tuple(accounts[item["history_id"]]["source_listing_ids"]) for item in normal},
+                {("listing_0388",), ("listing_0708",), ("listing_0792",)},
+            )
             self.assertEqual(urgent, [])
             self.assertTrue(all(item["currency"] == "TWD" and item["server"] == "international" for item in normal))
             ledger = [json.loads(line) for line in (output / "model-exclusions.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -101,6 +121,9 @@ class PriceCleaningTest(unittest.TestCase):
             self.assertEqual(semantic["price_line"], "urgent_sale")
             self.assertEqual(semantic["disposition"], "needs_review")
             self.assertIn("brokerage_included_price", semantic["reason_codes"])
+            multi_price = next(item for item in ledger if item["history_id"] == "history_0062")
+            self.assertEqual(multi_price["disposition"], "needs_review")
+            self.assertIn("multiple_price_terms", multi_price["reason_codes"])
 
 
 if __name__ == "__main__":

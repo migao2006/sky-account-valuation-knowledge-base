@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.6-p2.4",
+  "schema_version": "3.7-p2.5",
   "offline_only": true,
   "valid": true,
   "checks": {
@@ -21,25 +21,26 @@
     "p2_1_human_gold_not_fabricated": true,
     "p2_3_source_scoped_identities_fail_closed": true,
     "p2_4_near_miss_evidence_not_fabricated": true,
-    "p2_4_catalog_query_truth_layers": true,
+    "p2_5_catalog_query_truth_layers": true,
+    "p2_5_nintendo_identity_evidence_replayed": true,
     "p2_4_catalog_scope_is_auditable": true,
     "p2_4_unknown_sets_not_model_features": true,
     "p2_2_fandom_same_lineage_only": true,
     "formal_models_fail_closed": true,
     "item_values_fail_closed": true,
-    "no_model_eligible_items": true
+    "verified_identity_cohort_not_over_promoted_to_model": true
   },
-  "schema_records_checked": 20428,
+  "schema_records_checked": 20449,
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 203,
+    "run": 217,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 229,
+    "hashed_files": 237,
     "mismatches": []
   },
   "release_residue": [],
@@ -75,8 +76,8 @@
     "sets": 8,
     "aliases": 322,
     "availability_events": 12,
-    "sources": 26,
-    "visual_references": 0,
+    "sources": 27,
+    "visual_references": 4,
     "unresolved": 39,
     "unmapped": 14,
     "item_candidates": 622,
@@ -84,7 +85,7 @@
   },
   "known_limitations": [
     "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-    "只有 verification_status=verified 且 evidence_tier 為 official_item_specific 或 official_with_secondary 的 item 才可標記為 model_feature_status=eligible；本版無符合條件的 item。",
+    "P2.5 已以可重播的官方與獨立次級來源確認 Nintendo Starter Pack 四件英文 identity、類別與套組關係；正式繁中名稱、現況供應、永久性與價格仍未知，因此四件仍不進模型白名單。",
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
@@ -93,8 +94,8 @@
     "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-    "P2.4 保留 18 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
-    "P2.4 提供 2,474 筆離線 Catalog 查詢索引，仍嚴格區分 canonical、候選與來源觀測；目前 canonical resolved/model eligible 仍為 0。",
+    "P2.5 保留 16 筆僅缺單一硬證據群組的匿名 near-miss；approved evidence 仍為 0，沒有任何案例因此自動進入可比池。",
+    "P2.5 的 2,474 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 4，model eligible 仍為 0。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
   ]

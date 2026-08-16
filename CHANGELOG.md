@@ -1,5 +1,14 @@
 # 變更紀錄
 
+## 3.7.0-p2.5 — 2026-08-17
+
+- 以固定 TGC FAQ 823 fact snapshot 重播官方描述性套組成分，再以獨立 SkyGame-Data snapshot 支持精確英文名稱與類別；不把 vendor 名稱轉錄成官方原文，未證實的繁中名、供應、永久性與價格維持 unknown。
+- 新增 18 筆欄位級 evidence、source lineage／JSON pointer／SHA-256 replay gate、四筆 source-description visual reference；沒有保存官方 HTML、圖片或玩家資料。
+- Vendor crosswalk 重建為 67 canonical relation、296 candidate relation、1,395 unresolved；source-scoped observation 仍全部禁止 promotion 與模型使用。
+- 明示「售／換」改為 mixed transaction；勳章含／不含與分期多價進 semantic review。正式價格仍為正常刊登 3、急售 0、verified sale 0。
+- 近失人工 evidence queue 排除 brokerage 與 multi-price 案例，保留 16 筆真正只缺單一硬證據群組的匿名案例；approved evidence 仍為 0。
+- 修正 verified item 不會連帶驗證「紅斗」等短俗稱；缺乏 alias-level 審核時不建立持有狀態。
+
 ## 3.6.0-p2.4 — 2026-08-17
 
 - 新增 2,474 筆離線 Catalog query index 與結構化 resolver；canonical、review candidate、source observation 維持不同 truth level，verified canonical resolution 仍為 0。

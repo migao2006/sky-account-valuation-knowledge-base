@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/official-item-fact-snapshot.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_format", "snapshot_id", "source_id", "source_url", "retrieved_at", "capture_policy", "facts", "non_claims"],
+  "properties": {
+    "snapshot_format": {"const": "fact_limited_official_support_snapshot_v1"},
+    "snapshot_id": {"const": "tgc_faq_823_nintendo_starter_pack_2026_08_17"},
+    "source_id": {"const": "source_tgc_faq_823_nintendo_starter_pack"},
+    "source_url": {"type": "string", "pattern": "^https://thatgamecompany\\.helpshift\\.com/"},
+    "retrieved_at": {"type": "string", "format": "date"},
+    "capture_policy": {"type": "string", "minLength": 1},
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_description_en", "included_item_descriptions_en", "platform_context"],
+      "properties": {
+        "pack_description_en": {"const": "Starter Pack for Nintendo Switch"},
+        "included_item_descriptions_en": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item_nintendo_blue_cape", "item_nintendo_red_cape", "item_nintendo_hair", "item_nintendo_vessel_flute"],
+          "properties": {
+            "item_nintendo_blue_cape": {"const": "blue themed cape"},
+            "item_nintendo_red_cape": {"const": "red themed cape"},
+            "item_nintendo_hair": {"const": "elvish hairstyle"},
+            "item_nintendo_vessel_flute": {"const": "vessel flute"}
+          }
+        },
+        "platform_context": {"const": "Nintendo Switch"}
+      }
+    },
+    "non_claims": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  }
+}

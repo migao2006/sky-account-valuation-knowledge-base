@@ -52,9 +52,9 @@ class VendorCatalogImportTests(unittest.TestCase):
             self.assertEqual(first_evidence.read_bytes(), second_evidence.read_bytes())
             summary = json.loads(first_summary.read_text(encoding="utf-8"))
         self.assertEqual(summary["vendor_item_count"], 3266)
-        self.assertEqual(summary["canonical_matched_count"], 64)
+        self.assertEqual(summary["canonical_matched_count"], 67)
         self.assertEqual(summary["candidate_matched_count"], 296)
-        self.assertEqual(summary["unmatched_collectible_count"], 1398)
+        self.assertEqual(summary["unmatched_collectible_count"], 1395)
         self.assertEqual(summary["field_evidence_count"], 296)
         self.assertEqual(summary["canonical_promotion"], "not_performed")
         canonical_ids = {row["item_id"] for row in read_jsonl(ROOT / "knowledge/items/items.jsonl")}

@@ -206,7 +206,12 @@ def build(root: Path) -> dict[str, int]:
     for history in histories:
         source_ids = history.get("source_listing_ids", [])
         listing = listings.get(source_ids[0]) if isinstance(source_ids, list) and len(source_ids) == 1 else None
-        semantic_review = price_semantic_review(listing, history) if listing is not None else None
+        # A migration-level review may cover explicit multi-price terms, while
+        # this builder independently detects brokerage.  Do not discard the
+        # former merely because it has no brokerage marker.
+        semantic_review = history.get("price_semantic_review")
+        if semantic_review is None and listing is not None:
+            semantic_review = price_semantic_review(listing, history)
         if semantic_review is not None:
             history["price_semantic_review"] = semantic_review
         else:

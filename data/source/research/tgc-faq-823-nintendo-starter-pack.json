@@ -1,0 +1,23 @@
+{
+  "snapshot_format": "fact_limited_official_support_snapshot_v1",
+  "snapshot_id": "tgc_faq_823_nintendo_starter_pack_2026_08_17",
+  "source_id": "source_tgc_faq_823_nintendo_starter_pack",
+  "source_url": "https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/823/",
+  "retrieved_at": "2026-08-17",
+  "capture_policy": "Structured, fact-limited transcription. No image, account, storefront, or full-page text is retained.",
+  "facts": {
+    "pack_description_en": "Starter Pack for Nintendo Switch",
+    "included_item_descriptions_en": {
+      "item_nintendo_blue_cape": "blue themed cape",
+      "item_nintendo_red_cape": "red themed cape",
+      "item_nintendo_hair": "elvish hairstyle",
+      "item_nintendo_vessel_flute": "vessel flute"
+    },
+    "platform_context": "Nintendo Switch"
+  },
+  "non_claims": [
+    "No formal Traditional Chinese item name is asserted.",
+    "No image asset or visual identity is asserted.",
+    "No current storefront availability, return policy, price, release date, or irreversible permanent-account property is asserted."
+  ]
+}

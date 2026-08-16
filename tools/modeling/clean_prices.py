@@ -78,6 +78,10 @@ def basic_reasons(row: dict[str, Any]) -> tuple[str, list[str]]:
         # a fee or subtract one; retain the price-line semantics in the ledger
         # and require offline review before any model training use.
         reasons.append("brokerage_included_price")
+    if isinstance(semantic_review, dict) and semantic_review.get("multi_price") is True:
+        # Do not select one installment/badge-inclusion alternative as if it
+        # were the account's single cash listing price.
+        reasons.append("multiple_price_terms")
     if line == "unknown":
         reasons.append("price_type_not_training_line")
     return line, reasons
@@ -125,7 +129,7 @@ def clean(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[s
     for row in rows:
         line, reasons = basic_reasons(row)
         if reasons:
-            disposition = "needs_review" if "brokerage_included_price" in reasons else "excluded"
+            disposition = "needs_review" if {"brokerage_included_price", "multiple_price_terms"} & set(reasons) else "excluded"
             ledger.append(exclusion(row, line, reasons, disposition))
         else:
             candidates.append((row, line))

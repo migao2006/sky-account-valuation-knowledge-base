@@ -39,9 +39,9 @@ class SourceScopedItemIdentityTests(unittest.TestCase):
             summary = json.loads(first_summary.read_text(encoding="utf-8"))
         self.assertEqual(summary["collectible_record_count"], 1758)
         self.assertEqual(summary["excluded_non_collectible_count"], 1508)
-        self.assertEqual(summary["canonical_link_count"], 64)
+        self.assertEqual(summary["canonical_link_count"], 67)
         self.assertEqual(summary["candidate_link_count"], 296)
-        self.assertEqual(summary["unresolved_count"], 1398)
+        self.assertEqual(summary["unresolved_count"], 1395)
         self.assertEqual(summary["cross_type_conflict_cluster_count"], 16)
         self.assertEqual(summary["promotion_eligibility"], "prohibited")
 
@@ -60,7 +60,7 @@ class SourceScopedItemIdentityTests(unittest.TestCase):
         self.assertTrue(all(row["promotion_eligibility"] == "prohibited" for row in rows))
         self.assertTrue(all(row["model_feature_status"] == "excluded_pending_verification" for row in rows))
         self.assertTrue(all(row["reference_identity_id"] == reference_identity_id(row["source_id"], row["snapshot_id"], row["vendor_guid"]) for row in rows))
-        self.assertEqual(Counter(row["link_status"] for row in rows), Counter({"unresolved": 1398, "candidate_link": 296, "canonical_link": 64}))
+        self.assertEqual(Counter(row["link_status"] for row in rows), Counter({"unresolved": 1395, "candidate_link": 296, "canonical_link": 67}))
         conflicts = [row for row in rows if row["name_cluster"]["cross_type_conflict"]]
         self.assertEqual({row["name_cluster"]["cluster_id"] for row in conflicts}.__len__(), 11)
         self.assertEqual(summary["cross_type_conflict_cluster_count"], 16)

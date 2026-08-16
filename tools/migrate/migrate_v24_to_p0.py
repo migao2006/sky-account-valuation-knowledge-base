@@ -22,6 +22,8 @@ SCHEMA_VERSION = "3.0-p0"
 
 URGENT_LISTING_MARKERS = ("急售", "急出")
 NEGATED_URGENT_RE = re.compile(r"(?:不|非|不是|並非|并非)\s*急(?:售|出)")
+EXPLICIT_SALE_EXCHANGE_RE = re.compile(r"(?:售|出)\s*(?:／|/)\s*(?:換|换)|(?:換|换)\s*(?:／|/)\s*(?:售|出)")
+PRICE_TERM_RE = re.compile(r"\d+(?:\.\d+)?\s*萬|\d{3,}\s*(?:元|台幣|NTD)?")
 
 
 def has_explicit_urgent_claim(listing_text: str) -> bool:
@@ -84,22 +86,64 @@ def normalize_price_variants(price_variants: Any, listing_text: str) -> list[Any
     return normalized
 
 
+def apply_explicit_trade_semantics(record: dict[str, Any]) -> None:
+    """Fail closed when a listing expressly mixes cash sale and exchange.
+
+    A ``售／換`` offer is not evidence that the displayed amount is a pure
+    seller-to-buyer single-account listing.  Keep the source amount and text
+    intact, but ensure downstream eligibility gates see a mixed transaction.
+    """
+    if not EXPLICIT_SALE_EXCHANGE_RE.search(str(record.get("listing_text", ""))):
+        return
+    record["offer_kind"] = "mixed"
+    record["entity_kind"] = "unknown"
+    record["core_candidate"] = False
+    reason = "explicit_cash_and_exchange_offer_requires_review"
+    existing = record.get("exclusion_reason")
+    if not isinstance(existing, str) or not existing.strip():
+        record["exclusion_reason"] = reason
+    elif reason not in existing:
+        record["exclusion_reason"] = f"{existing}; {reason}"
+
+
+def has_explicit_multi_price_terms(listing_text: str) -> bool:
+    """Recognize explicit contractual price alternatives without choosing one."""
+    text = str(listing_text)
+    return (
+        "含勳章" in text
+        and "不含勳章" in text
+        and "分期" in text
+        and len(PRICE_TERM_RE.findall(text)) >= 3
+    )
+
+
 def price_semantic_review(listing_text: str, price_type: str) -> dict[str, Any] | None:
-    """Gate brokerage-inclusive observations without guessing the fee amount.
+    """Gate mixed price semantics without selecting or modifying an amount.
 
     The marker ``含仲`` means the public amount includes brokerage.  It remains
     an urgent observation when the text explicitly says so, but may not enter
     a model training line until its brokerage treatment is reviewed offline.
     """
-    if "含仲" not in str(listing_text):
+    text = str(listing_text)
+    brokerage_included = "含仲" in text
+    multi_price = has_explicit_multi_price_terms(text)
+    if not brokerage_included and not multi_price:
         return None
-    return {
+    result: dict[str, Any] = {
         "urgency": "urgent_sale" if price_type == "urgent_sale" else "unknown",
-        "brokerage_included": True,
         "evidence_state": "text_claim",
         "review_status": "needs_review",
-        "reason_codes": ["brokerage_included_price"],
+        "reason_codes": [],
     }
+    if brokerage_included:
+        result["brokerage_included"] = True
+        result["reason_codes"].append("brokerage_included_price")
+    if multi_price:
+        result["multi_price"] = True
+        result["reason_codes"].extend([
+            "multiple_price_terms", "badge_inclusion_price_variants", "installment_price_variants",
+        ])
+    return result
 FORBIDDEN_KEYS = {
     "source_group_id", "source_group_name", "source_post_key", "post_url",
     "profile_url", "author", "author_name", "uid", "group_id", "locator",
@@ -223,7 +267,6 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
     set_path = v3_root / "knowledge" / "sets" / "item-sets.jsonl"
     item_rows = read_jsonl(item_path) if item_path.exists() else []
     item_ids = {row.get("item_id") for row in item_rows}
-    item_status = {row.get("item_id"): row.get("verification_status") for row in item_rows}
     set_ids = {row.get("set_id") for row in read_jsonl(set_path)} if set_path.exists() else set()
 
     def add(alias: Any, target_type: str, target_id: Any) -> None:
@@ -235,9 +278,12 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
             return
         candidates.setdefault(alias.casefold(), set()).add((target_type, str(target_id)))
 
-    def safe_alias(value: Any, target_id: Any) -> bool:
+    def safe_alias(value: Any, *, alias_verified: bool = False) -> bool:
         normalized = "".join(char for char in str(value) if char.isalnum())
-        return item_status.get(target_id) == "verified" or len(normalized) >= 3
+        # Item identity verification does not automatically verify every
+        # nickname attached to that item.  Short player aliases remain
+        # context-dependent unless the alias record itself was reviewed.
+        return alias_verified or len(normalized) >= 3
 
     # Canonical titles remain searchable. Short aliases on unverified items
     # (for example 鹿角 or 紅斗) require context and cannot prove ownership.
@@ -245,7 +291,7 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
         for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en")):
             add(value, "item", row.get("item_id"))
         for value in row.get("aliases", []):
-            if safe_alias(value, row.get("item_id")):
+            if safe_alias(value):
                 add(value, "item", row.get("item_id"))
     for row in read_jsonl(set_path) if set_path.exists() else []:
         for value in (row.get("canonical_name_zh_tw"), row.get("canonical_name_en")):
@@ -257,7 +303,9 @@ def collection_aliases(v3_root: Path) -> dict[str, tuple[str, str]]:
         target_type, target_id = row.get("target_type"), row.get("target_id")
         if target_type in {"item", "set"}:
             value = row.get("alias_text") or row.get("normalized_alias")
-            if target_type != "item" or safe_alias(value, target_id):
+            if target_type != "item" or safe_alias(
+                value, alias_verified=row.get("verification_status") == "verified"
+            ):
                 add(value, target_type, target_id)
     return {alias: next(iter(targets)) for alias, targets in candidates.items() if len(targets) == 1}
 
@@ -891,6 +939,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
         result["price_type"] = normalize_urgent_listing_price_type(str(result.get("price_type", "unknown")), result["listing_text"])
         if "price_variants" in result:
             result["price_variants"] = normalize_price_variants(result["price_variants"], result["listing_text"])
+        apply_explicit_trade_semantics(result)
         result["feature_summary"] = [sanitize_market_text(value, source_names) for value in result.get("feature_summary", [])]
         result["risk_summary"] = [sanitize_market_text(value, source_names) for value in result.get("risk_summary", [])]
         if result["date_verified"] and not result["post_date"]:
@@ -967,8 +1016,12 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             "currency_verified": bool(history.get("currency_verified")),
             "server": history.get("server", "unknown"),
             "server_verified": bool(history.get("server_verified")),
-            "offer_kind": history.get("offer_kind", "unknown"),
-            "entity_kind": history.get("entity_kind", "unknown"),
+            # An explicit source-level sale/exchange statement is stronger
+            # than a legacy flat transaction label.  It fails closed only for
+            # that narrow mixed-offer fact; all other legacy classifications
+            # remain unchanged.
+            "offer_kind": "mixed" if EXPLICIT_SALE_EXCHANGE_RE.search(str(primary.get("listing_text", ""))) else history.get("offer_kind", "unknown"),
+            "entity_kind": "unknown" if EXPLICIT_SALE_EXCHANGE_RE.search(str(primary.get("listing_text", ""))) else history.get("entity_kind", "unknown"),
             "market_pool": comp.get("pool", "unknown"),
             "legacy_features": [sanitize_market_text(value, source_names) for value in comp.get("feature_summary", [])],
             "legacy_risks": [sanitize_market_text(value, source_names) for value in comp.get("risk_summary", [])],
