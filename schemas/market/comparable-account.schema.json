@@ -7,7 +7,7 @@
   "required": [
     "schema_version", "comparable_id", "history_id", "account_id", "source_listing_ids", "base_account",
     "season_profiles", "season_summary", "field_evidence", "collection", "map_completion", "resources", "bindings", "ownership_history", "trade_conditions", "evidence_quality", "review_status",
-    "selected_price_twd", "price_history_twd", "price_type", "status", "post_date", "observed_at", "date_verified", "date_evidence_state", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "market_pool", "market_evidence_quality", "sale_outcome"
+    "selected_price_twd", "price_history_twd", "price_type", "status", "post_date", "observed_at", "date_verified", "date_evidence_state", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "market_pool", "market_evidence_quality", "sale_outcome", "market_data_authorization"
   ],
   "properties": {
     "schema_version": {"const": "3.0-p0"},
@@ -18,6 +18,7 @@
     "season_profiles": {"$ref": "account-profile.schema.json#/properties/season_profiles"}, "season_summary": {"$ref": "account-profile.schema.json#/properties/season_summary"}, "field_evidence": {"$ref": "account-profile.schema.json#/properties/field_evidence"}, "collection": {"$ref": "account-profile.schema.json#/properties/collection"}, "map_completion": {"$ref": "account-profile.schema.json#/properties/map_completion"}, "resources": {"$ref": "account-profile.schema.json#/properties/resources"}, "bindings": {"$ref": "account-profile.schema.json#/properties/bindings"}, "ownership_history": {"$ref": "account-profile.schema.json#/properties/ownership_history"}, "trade_conditions": {"$ref": "account-profile.schema.json#/properties/trade_conditions"}, "evidence_quality": {"$ref": "account-profile.schema.json#/properties/evidence_quality"}, "review_status": {"$ref": "account-profile.schema.json#/properties/review_status"},
     "selected_price_twd": {"type": ["number", "null"], "minimum": 0}, "price_history_twd": {"type": "array", "items": {"type": "number", "minimum": 0}}, "price_type": {"type": "string"}, "status": {"type": "string"}, "price_semantic_review": {"$ref": "history.schema.json#/properties/price_semantic_review"}, "observed_at": {"type": "string", "format": "date"},
     "currency": {"type": "string"}, "currency_verified": {"type": "boolean"}, "server": {"type": "string"}, "server_verified": {"type": "boolean"}, "offer_kind": {"type": "string"}, "entity_kind": {"type": "string"}, "market_pool": {"type": "string"}, "market_evidence_quality": {"type": "string"},
+    "market_data_authorization": {"$ref": "market-data-authorization.schema.json"},
     "post_date": {"type": ["string", "null"], "format": "date"},
     "date_verified": {"type": "boolean"},
     "date_evidence_state": {"enum": ["verified", "unknown"]},

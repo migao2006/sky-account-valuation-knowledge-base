@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/publication-readiness.schema.json",
+  "title": "Deterministic model publication-readiness audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "artifact_publication_fields_consulted", "trained_models_treated_as_passed", "requirements", "formal_clean_price_rows", "valid_vector_accounts", "model_eligible_item_count", "verified_completed_sale_count", "market_pools", "blocking_reasons"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3"},
+    "status": {"const": "not_ready"},
+    "artifact_publication_fields_consulted": {"const": false},
+    "trained_models_treated_as_passed": {"const": false},
+    "requirements": {"type": "object", "additionalProperties": false, "required": ["independent_training_clusters", "time_forward_holdout_clusters"], "properties": {"independent_training_clusters": {"const": 300}, "time_forward_holdout_clusters": {"const": 100}}},
+    "formal_clean_price_rows": {"type": "integer", "minimum": 0},
+    "valid_vector_accounts": {"type": "integer", "minimum": 0},
+    "model_eligible_item_count": {"type": "integer", "minimum": 0},
+    "verified_completed_sale_count": {"type": "integer", "minimum": 0},
+    "market_pools": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["market_pool", "clean_price_rows", "independent_cluster_count", "dated_cluster_count", "verified_date_count", "time_forward_split", "training_cluster_gap", "holdout_cluster_gap", "blocking_reasons"], "properties": {"market_pool": {"type": "string"}, "clean_price_rows": {"type": "integer", "minimum": 0}, "independent_cluster_count": {"type": "integer", "minimum": 0}, "dated_cluster_count": {"type": "integer", "minimum": 0}, "verified_date_count": {"type": "integer", "minimum": 0}, "training_cluster_gap": {"type": "integer", "minimum": 0}, "holdout_cluster_gap": {"type": "integer", "minimum": 0}, "blocking_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "time_forward_split": {"type": "object", "additionalProperties": false, "required": ["available", "cut_date", "training_clusters", "holdout_clusters", "excluded_spanning_clusters", "cluster_overlap"], "properties": {"available": {"type": "boolean"}, "cut_date": {"type": ["string", "null"]}, "training_clusters": {"type": "integer", "minimum": 0}, "holdout_clusters": {"type": "integer", "minimum": 0}, "excluded_spanning_clusters": {"type": "integer", "minimum": 0}, "cluster_overlap": {"const": false}}}}}},
+    "blocking_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  }
+}

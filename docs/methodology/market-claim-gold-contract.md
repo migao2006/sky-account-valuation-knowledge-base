@@ -18,8 +18,35 @@ or parser output cannot satisfy this contract.
 
 The repository can enforce distinct pseudonymous roles and exact data linkage,
 but it cannot cryptographically prove that a pseudonym belongs to a human.
-Operational review must therefore verify reviewer identity outside the dataset
-before any non-empty gold file is accepted; the current gold file is empty.
+For that reason a non-empty gold ledger now also requires a detached OpenSSH
+audit contract. The authority bundle is kept outside the release and its exact
+SHA-256 is injected at validation time; a repository-local bundle is rejected.
+Each gold row has exactly three attestations in
+`data/review/market-audit/attestations.jsonl`, one for `annotator_a`,
+`annotator_b`, and `adjudicator`. Their authority IDs must be the ledger IDs,
+their public-key fingerprints must differ, and their authorized roles must
+match. Each detached `.sig` is verified with `ssh-keygen -Y verify` over a
+canonical payload containing the complete ledger row, complete committed queue
+row, and attestation binding. A changed label, listing hash, queue field,
+signature reuse, wrong role, revoked fingerprint, absent external root, or
+tampered signature fails closed.
+
+The external JSON authority bundle has `schema_version`
+`sky-market-audit-authority-bundle-v1`, an `authorities` array with
+`authority_id`, OpenSSH `public_key`, computed `fingerprint`, and allowed
+`roles`, plus an optional `revoked_fingerprints` array. No private key belongs
+in this repository. The current ledgers and attestation file are empty, so the
+offline release remains valid without an injected authority bundle.
+
+For a non-empty ledger, inject the trust root rather than placing it in the
+checkout:
+
+```powershell
+python tools/validate/validate.py --root . --market-audit-authority-bundle C:\secure\market-authorities.json --market-audit-authority-bundle-sha256 <SHA256>
+```
+
+The same values may be supplied by `SKY_MARKET_AUDIT_AUTHORITY_BUNDLE` and
+`SKY_MARKET_AUDIT_AUTHORITY_BUNDLE_SHA256` for an offline release job.
 
 The deterministic sample has twenty opaque buckets of ten unique listings.
 Selection coverage includes price presence and price-type ambiguity, TWD/HKD/RM/CNY

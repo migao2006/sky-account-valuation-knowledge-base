@@ -1250,6 +1250,13 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
                 "completed_sale_price_twd": None,
                 "verified": False,
             },
+            "market_data_authorization": {
+                "status": "legacy_research_only",
+                "allowed_uses": ["research"],
+                "source_snapshot": {"artifact_path": "data/source/listings.jsonl", "sha256": "50E6719A847C90E46F4439B8477A2F906F3AF2CD3D55D717152AEC41188DD897", "captured_at": "2026-08-16", "replayable": False},
+                "license_evidence": {"kind": "legacy_anonymous_research", "evidence_id": "p0_legacy_anonymous_market_snapshot", "verified": False},
+                "replay_evidence": [],
+            },
         }
         semantic_review = price_semantic_review(str(primary.get("listing_text", "")), price_type)
         if semantic_review is not None:
@@ -1336,6 +1343,7 @@ def migrate(v3_root: Path, old_root: Path) -> dict[str, Any]:
             "offer_kind": history["offer_kind"], "entity_kind": history["entity_kind"],
             "market_pool": history["market_pool"], "market_evidence_quality": history["evidence_quality"],
             "sale_outcome": history["sale_outcome"],
+            "market_data_authorization": history["market_data_authorization"],
         })
         comparable_accounts.append(profile)
     write_jsonl(v3_root / "data" / "comparables" / "accounts.jsonl", comparable_accounts)

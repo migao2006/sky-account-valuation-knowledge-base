@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.2.0-p3.0 — 2026-08-17
+
+- 新增 SkyFest FAQ 1330 core-five 的官方／固定 vendor identity evidence；維持目前供應、永久性、正式繁中名、視覺身份與模型 eligibility 為 unknown／excluded。
+- 新增官方歷史取得成本參考層；bundle 不分攤、全列 `model_feature=false`，且明示不推論帳號轉售價。
+- 市場人工 ledger 改以外部信任根、三個不同 OpenSSH keys 與 detached signatures 驗證；無信任根時非空 ledger fail closed。
+- 103 筆既有市場歷程標示為 `legacy_research_only`；沒有外部資料授權 evaluator 時，正式正常／急售訓練列皆為 0，估價器不輸出價格。
+- 新增 deterministic publication-readiness 報告；目前狀態仍為 `not_ready`，不接受 artifact 自填發布指標。
+
 ## 4.1.0-p2.9 — 2026-08-17
 
 - 新增 Kizuna AI 2022 FAQ 879 三件可重播官方／獨立 vendor identity cohort；Hair、Bow、Cape 與 bounded set scope 均已驗證，但目前供應、永久性、正式繁中名、視覺身份與個別價格仍為 unknown／`bundle_only`。

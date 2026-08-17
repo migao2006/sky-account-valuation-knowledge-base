@@ -65,6 +65,15 @@ def validate(root: Path) -> dict:
         "graduation_claims": sum(bool(row.get("collection", {}).get("graduation_rewards") or row.get("collection", {}).get("graduation_reward_season_ids")) for row in profiles),
     }
     same_history = histories == comparable
+    legacy_authorization_breaks = [
+        row["history_id"] for row in histories
+        if row.get("market_data_authorization", {}).get("status") != "legacy_research_only"
+        or row.get("market_data_authorization", {}).get("allowed_uses") != ["research"]
+    ]
+    comparable_authorization_breaks = [
+        row["history_id"] for row in comparable_accounts
+        if row.get("market_data_authorization") != next((history.get("market_data_authorization") for history in histories if history["history_id"] == row["history_id"]), None)
+    ]
     result = {
         "source_listings": len(source), "normalized_listings": len(normalized), "account_profiles": len(profiles),
         "curated_histories": len(histories), "comparable_histories": len(comparable), "comparable_accounts": len(comparable_accounts),
@@ -76,13 +85,15 @@ def validate(root: Path) -> dict:
         "date_history_breaks": date_history_breaks, "sold_semantic_breaks": sold_semantic_breaks,
         "price_type_review_rows": len(price_type_review), "profile_coverage": profile_coverage,
         "comparables_match_curated": same_history,
+        "legacy_market_data_authorization_breaks": legacy_authorization_breaks,
+        "comparable_market_data_authorization_breaks": comparable_authorization_breaks,
     }
     # Graduation-reward evidence may genuinely be absent; its zero count is a
     # coverage finding, not a license to fabricate ownership.  The structural
     # production coverage gate applies to dimensions that the legacy snapshot
     # actually contains.
     coverage_complete = all(profile_coverage[key] > 0 for key in ("season_profiles", "map_completion_claims", "ownership_claims", "binding_claims"))
-    result["valid"] = result["source_listings"] == result["normalized_listings"] == result["account_profiles"] == 1022 and result["curated_histories"] == result["comparable_histories"] == result["comparable_accounts"] == 103 and not forbidden and not bad_dates and not bad_history_dates and not broken_lineage and not source_date_breaks and not profile_date_breaks and not date_history_breaks and not sold_semantic_breaks and result["price_type_review_rows"] > 0 and coverage_complete and same_history
+    result["valid"] = result["source_listings"] == result["normalized_listings"] == result["account_profiles"] == 1022 and result["curated_histories"] == result["comparable_histories"] == result["comparable_accounts"] == 103 and not forbidden and not bad_dates and not bad_history_dates and not broken_lineage and not source_date_breaks and not profile_date_breaks and not date_history_breaks and not sold_semantic_breaks and not legacy_authorization_breaks and not comparable_authorization_breaks and result["price_type_review_rows"] > 0 and coverage_complete and same_history
     return result
 
 

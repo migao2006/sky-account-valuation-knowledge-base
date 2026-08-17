@@ -15,6 +15,10 @@ from pathlib import Path
 from statistics import quantiles
 from typing import Any, Iterable
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from market_authorization import model_training_authorization_reasons
+
 WEIGHTS = {
     "account_type": 15, "seasons": 22, "items_sets": 20,
     "map_completion": 10, "collection": 8, "resources": 7,
@@ -383,11 +387,12 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
     return {"score": round(sum(weighted.values()), 4), "dimensions": weighted, "known_dimensions": known}
 
 
-def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool, list[str]]:
+def hard_pool(account: dict[str, Any], comparable: dict[str, Any], authorization_evaluator: Any = None) -> tuple[bool, list[str]]:
     account, comparable = adapt_profile(account), adapt_profile(comparable)
     reasons = _independence_reasons(account, comparable)
     reasons.extend(_price_semantic_reasons(account, "target_"))
     reasons.extend(_price_semantic_reasons(comparable))
+    reasons.extend(model_training_authorization_reasons(comparable, authorization_evaluator))
     for field in ("currency", "server"):
         a, b = _value(account, field), _value(comparable, field)
         if a in ("unknown", None):
@@ -452,12 +457,12 @@ def _describe(account: dict[str, Any], row: dict[str, Any], dimensions: dict[str
     return {"major_matches": same, "major_differences": different, "unconfirmed_dimensions": unknown}
 
 
-def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]], authorization_evaluator: Any = None) -> dict[str, Any]:
     account = adapt_profile(account)
     strict, rejected, quality_rejected, selection_rejected = [], [], [], []
     for row in comparables:
         comparable = adapt_profile(row)
-        ok, reasons = hard_pool(account, comparable)
+        ok, reasons = hard_pool(account, comparable, authorization_evaluator)
         if not ok:
             rejected.append({"comparable_id": _value(comparable, "comparable_id", "history_id", default="unknown"), "reasons": reasons})
             continue

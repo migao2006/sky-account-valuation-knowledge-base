@@ -32,7 +32,7 @@ python tools/estimate/estimate.py valuation-account.json data/comparables/accoun
 
 輸出的 `price_type` 只使用正規化值：`normal_listing`、`urgent_sale`、`last_public_price`、`verified_sale` 或 `unknown`。已售聲稱不是 verified sale；未知資料不補值。相似度說明會將已確認不同的 `major_differences` 與資料未知的 `unconfirmed_dimensions` 分開，`unknown` 不會匹配 `unknown`。
 
-正式市場資料目前只有兩筆正常刊登同時確認 TWD、國際服與單一價格語義；唯一急售觀察含仲，56,000 元觀察另有分期加價，均保留為 `needs_review`，不猜測或計算替代價格。估價適用範圍有限。這一版新增固定 vendor catalog 的 review evidence 與一筆明示覆核恢復歷程，但不把二級來源自動升級 canonical，也不加入回測、校準或自動資料更新。
+正式市場資料目前沒有任何一筆通過外部可重播資料授權 evaluator；既有 103 筆歷程全部只限研究用途，正式估價器維持 fail closed。官方歷史取得成本只作知識庫參考，不分攤 bundle、不推論轉售價，也不把二級來源自動升級 canonical。
 
 ## P2.3 Catalog reference 與市場證據資料流
 

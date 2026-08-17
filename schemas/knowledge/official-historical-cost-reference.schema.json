@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/official-historical-cost-reference.schema.json",
+  "description": "Derived, replayable official historical acquisition-cost reference. It is not a resale value or a model feature.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "item_id", "reference_kind", "item_amount", "item_currency", "bundle_set_id", "bundle_amount", "bundle_currency", "evidence_ids", "source_ids", "as_of_date", "historical_scope", "model_feature", "resale_value_effect", "notes"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
+    "reference_kind": {"enum": ["exact_historical_item_price", "bundle_only", "in_game_currency", "unknown"]},
+    "item_amount": {"type": ["number", "null"], "minimum": 0},
+    "item_currency": {"type": ["string", "null"], "minLength": 1},
+    "bundle_set_id": {"type": ["string", "null"], "pattern": "^set_[a-z0-9_]+$"},
+    "bundle_amount": {"type": ["number", "null"], "minimum": 0},
+    "bundle_currency": {"type": ["string", "null"], "minLength": 1},
+    "evidence_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^canonical_evidence_[a-z0-9_]+$"}},
+    "source_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}},
+    "as_of_date": {"type": "string", "format": "date"},
+    "historical_scope": {"enum": ["official_item_cost", "official_bundle_price_no_item_allocation", "official_in_game_currency_cost", "no_approved_historical_cost_reference"]},
+    "model_feature": {"const": false},
+    "resale_value_effect": {"const": "not_inferred"},
+    "notes": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"reference_kind": {"const": "exact_historical_item_price"}}}, "then": {"properties": {"item_amount": {"type": "number"}, "item_currency": {"type": "string"}, "bundle_set_id": {"type": "null"}, "bundle_amount": {"type": "null"}, "bundle_currency": {"type": "null"}, "historical_scope": {"const": "official_item_cost"}}}},
+    {"if": {"properties": {"reference_kind": {"const": "in_game_currency"}}}, "then": {"properties": {"item_amount": {"type": "number"}, "item_currency": {"type": "string"}, "bundle_set_id": {"type": "null"}, "bundle_amount": {"type": "null"}, "bundle_currency": {"type": "null"}, "historical_scope": {"const": "official_in_game_currency_cost"}}}},
+    {"if": {"properties": {"reference_kind": {"const": "bundle_only"}}}, "then": {"properties": {"item_amount": {"type": "null"}, "item_currency": {"type": "null"}, "bundle_set_id": {"type": "string"}, "bundle_amount": {"type": "number"}, "bundle_currency": {"const": "USD"}, "historical_scope": {"const": "official_bundle_price_no_item_allocation"}}}},
+    {"if": {"properties": {"reference_kind": {"const": "unknown"}}}, "then": {"properties": {"item_amount": {"type": "null"}, "item_currency": {"type": "null"}, "bundle_set_id": {"type": "null"}, "bundle_amount": {"type": "null"}, "bundle_currency": {"type": "null"}, "historical_scope": {"const": "no_approved_historical_cost_reference"}}}}
+  ]
+}
