@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/verified-sale-receipt-archive.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "archive_id", "issued_at", "expires_at", "disclosures"],
+  "properties": {
+    "schema_version": {"const": "verified-sale-receipt-archive-v1"},
+    "archive_id": {"type": "string", "pattern": "^archive_[a-z0-9_]{1,96}$"},
+    "issued_at": {"type": "string", "format": "date-time"}, "expires_at": {"type": "string", "format": "date-time"},
+    "disclosures": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["sale_event_id", "observation_id", "training_example_id", "training_example_digest", "observation_row_digest", "seller_identity_commitment_sha256", "sale_price_twd", "sale_completed_at", "currency", "server", "evidence_assertions", "disclosure_digest"], "properties": {"sale_event_id": {"type": "string", "pattern": "^sale_event_[a-z0-9_]{1,96}$"}, "observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]{1,96}$"}, "training_example_id": {"type": "string", "pattern": "^training_example_[a-z0-9_]{1,96}$"}, "training_example_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "observation_row_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "seller_identity_commitment_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "sale_price_twd": {"type": "integer", "minimum": 1}, "sale_completed_at": {"type": "string", "format": "date-time"}, "currency": {"const": "TWD"}, "server": {"const": "international"}, "evidence_assertions": {"type": "array", "minItems": 2}, "disclosure_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}}}
+  }
+}

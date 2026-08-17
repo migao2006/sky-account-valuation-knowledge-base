@@ -1,8 +1,8 @@
-# Sky 光遇知識庫與授權估價框架 v4.7 P3.5
+# Sky 光遇知識庫與授權估價框架 v4.8 P3.6
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v4.7 P3.5 新增 Days of Fortune FAQ 1264 core-five 的可重播官方／vendor evidence，並新增 release 外部的市場 provider 與 parser review onboarding 契約。審查確認供應者自證 cluster 無法證明獨立性、公開的 unsalted parser input hash 也無法真正隱藏 held-out split，因此兩條 onboarding 在取得外部簽署 identity→cluster mapping 與 keyed split commitment 前會主動 fail closed。新的 publication runtime 路徑可從簽署、凍結的 normal-listing train clusters 重建 portable Elastic Net artifact，並以 untouched holdout、cluster-weighted metrics、OOD coverage、subgroup 與同一區間契約評估；任何未簽署、異步驟或不受支援的 urgent／XGBoost 路徑仍 fail closed。正式授權 registry、真人 gold、圖片資產與 verified sale 仍為空，因此 production training 與估價不會輸出價格。所有正式工具只處理本機檔案，不主動連網。
+v4.8 P3.6 新增 Days of Love FAQ 1374 core-four 的可重播官方／vendor evidence，並完成三條不降低安全門檻的外部契約：雙獨立簽章的 identity→cluster mapping、不可由公開 manifest 反推個別 split 的 keyed parser custodian protocol，以及雙 issuer 的 verified-sale receipt archive replay。市場 payload 也擴為 catalog-bound 的完整八組特徵與 exact item states，訓練與 runtime 共用同一 canonical mapping。上述能力都只接受 release root 外、SHA-256 固定且可重播的資料；正式 registry、identity mapping、receipt archive、真人 gold 與圖片資產仍為空，所以 production training／verified-sale pool／估價仍保持 not ready。所有正式工具只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。123 個 canonical item 中 44 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
@@ -54,4 +54,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.5 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或任何正式 verified sale；visual capability 報告明確記錄實體資產 0、核准 detection 0、來源文字描述 10。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.6 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或任何正式 verified sale；visual capability 報告明確記錄實體資產 0、核准 detection 0。已售聲稱不會被升級為 verified sale。

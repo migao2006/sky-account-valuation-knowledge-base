@@ -33,6 +33,7 @@ def signed_row(sample: dict, vector: dict) -> dict:
 
 
 def training_example(signed: dict) -> dict:
+    feature_payload = {"account_id": signed["account_id"], "catalog_provenance": PROVENANCE}
     return {
         "training_example_id": signed["training_example_id"],
         "training_example_digest": signed["training_example_digest"],
@@ -41,6 +42,8 @@ def training_example(signed: dict) -> dict:
         "dedup_cluster_digest": signed["dedup_cluster_digest"],
         "account_id": signed["account_id"],
         "dedup_cluster_id": signed["cluster_id"],
+        "feature_payload": feature_payload,
+        "catalog_provenance": PROVENANCE,
         "_registered_observation": {
             "observation_id": "observation_fixture_0001", "price_twd": signed["selected_price_twd"],
             "post_date": signed["post_date"], "price_line": "asking",
@@ -98,21 +101,23 @@ class PublicationDatasetTests(unittest.TestCase):
         self.assertFalse(pool["cluster_overlap"])
         self.assertFalse(pool["requirements_met"])
 
-    def test_signed_feature_payload_must_be_exact_matching_vector(self):
+    def test_signed_feature_payload_is_loaded_from_registered_external_example(self):
         sample=row(1, cluster="cluster_signed_not_account_derived")
         vector=vectors([sample])[0]
         signed=signed_row(sample, vector)
-        manifest=freeze([signed], [vector], PROVENANCE, SNAPSHOTS, [training_example(signed)])
+        manifest=freeze([signed], [], PROVENANCE, SNAPSHOTS, [training_example(signed)])
         self.assertEqual("cluster_signed_not_account_derived", manifest["dataset_rows"][0]["cluster_id"])
-        forged={**vector, "feature_groups": {"tampered": True}}
+        self.assertEqual(vector, manifest["dataset_rows"][0]["feature_payload"])
+        forged_example = training_example(signed)
+        forged_example["feature_payload"] = {**vector, "feature_groups": {"tampered": True}}
         with self.assertRaisesRegex(PublicationDatasetError, "signed_feature_payload_vector_mismatch"):
-            freeze([signed], [forged], PROVENANCE, SNAPSHOTS, [training_example(signed)])
+            freeze([signed], [], PROVENANCE, SNAPSHOTS, [forged_example])
 
     def test_frozen_signed_feature_payload_cannot_be_swapped_and_rehashed(self):
         sample = row(1, cluster="cluster_signed_feature_replay")
         vector = vectors([sample])[0]
         signed = signed_row(sample, vector)
-        manifest = freeze([signed], [vector], PROVENANCE, SNAPSHOTS, [training_example(signed)])
+        manifest = freeze([signed], [], PROVENANCE, SNAPSHOTS, [training_example(signed)])
         manifest["dataset_rows"][0]["feature_payload"] = {**vector, "feature_groups": {"forged": 1}}
         payload = {key: value for key, value in manifest["dataset_rows"][0].items() if key != "row_sha256"}
         manifest["dataset_rows"][0]["row_sha256"] = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest().upper()
@@ -141,7 +146,7 @@ class PublicationDatasetTests(unittest.TestCase):
         signed = signed_row(sample, vector)
         example = training_example(signed)
         with self.assertRaisesRegex(PublicationDatasetError, "signed_training_example_commitment_mismatch"):
-            freeze([{**signed, "training_example_digest": "B" * 64}], [vector], PROVENANCE, SNAPSHOTS, [example])
+            freeze([{**signed, "training_example_digest": "B" * 64}], [], PROVENANCE, SNAPSHOTS, [example])
 
     def test_direct_production_split_requires_deterministic_root_replay(self):
         manifest = freeze_synthetic_for_test([row(1)], vectors([row(1)]), PROVENANCE, SNAPSHOTS)

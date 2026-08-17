@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-feature-payload-v1.schema.json",
+  "title": "Privacy-safe authorized market feature payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feature_contract_version", "feature_groups", "item_states"],
+  "properties": {
+    "feature_contract_version": {"const": "authorized-market-feature-payload-v1"},
+    "feature_groups": {"type": "object", "additionalProperties": false, "required": ["season_profiles", "item_sets", "collection", "resources", "map_completion", "base_account", "bindings", "ownership_history"], "properties": {
+      "season_profiles": {"type": "array"}, "item_sets": {"type": "array", "maxItems": 0},
+      "collection": {"type": "object", "additionalProperties": false, "required": ["bundle_claim_level"], "properties": {"bundle_claim_level": {"enum": ["none", "partial", "complete", "unknown"]}}},
+      "resources": {"type": "object"}, "map_completion": {"type": "object"}, "base_account": {"type": "object"}, "bindings": {"type": "object"}, "ownership_history": {"type": "string"}
+    }},
+    "item_states": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["item_id", "state", "evidence_state", "conflict"], "properties": {"item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "state": {"enum": ["owned", "confirmed_missing", "unknown"]}, "evidence_state": {"enum": ["profile_claim", "text_claim", "unknown", "conflict"]}, "conflict": {"type": "boolean"}}}}
+  }
+}

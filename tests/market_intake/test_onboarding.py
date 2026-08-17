@@ -7,6 +7,8 @@ from tools.market_authorization import _valid_observation, canonical_bytes, sha2
 from tools.market_intake.onboarding import IntakeError, build, canonical_signing_payload, sha256
 from tools.validate.schema_validator import OfflineSchemaValidator
 from tools.modeling.catalog_provenance import catalog_provenance
+from tools.modeling.catalog_provenance import read_jsonl
+from tools.modeling.market_feature_contract import VERSION
 from tools.modeling.publication_dataset import freeze
 
 
@@ -18,12 +20,14 @@ def digest(label: str | bytes) -> str:
 
 
 def record(number: int, day: str = "2026-08-01") -> dict:
+    states = [{"item_id": row["item_id"], "state": "owned" if index == number % 123 else "unknown", "evidence_state": "profile_claim", "conflict": False} for index, row in enumerate(read_jsonl(REPO_ROOT / "knowledge/items/items.jsonl"))]
+    payload = {"feature_contract_version": VERSION, "feature_groups": {"base_account": {"account_type": "unknown", "wing_state": "unknown", "special_appearance": []}, "season_profiles": [], "item_sets": [], "collection": {"bundle_claim_level": "unknown"}, "resources": {"values": {"white_candles": number, "hearts": None, "red_candles": None, "season_candles": None}}, "map_completion": {"standard_maps": "unknown", "second_tier_capes": "unknown"}, "bindings": {"risk_state": "unknown", "platforms": [{"platform": platform, "status": "unknown"} for platform in ("google", "apple", "game_center", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter")]}, "ownership_history": "unknown"}, "item_states": states}
     return {
         "dedup_cluster_digest": digest(f"cluster-{number}"),
         "account_commitment_digest": digest(f"account-{number}"), "post_date": day,
         "currency": "TWD", "server": "international", "offer_kind": "seller_listing", "entity_kind": "single_account",
         "price_line": "asking", "price_twd": 1000 + number,
-        "feature_payload": {"feature_groups": {"base_account": {"account_type": "unknown", "owned_count": number}}},
+        "feature_payload": payload,
         "catalog_provenance": catalog_provenance(REPO_ROOT), "catalog_provenance_sha256": digest(canonical_bytes(catalog_provenance(REPO_ROOT))),
     }
 
@@ -103,7 +107,7 @@ class MarketProviderOnboardingTest(unittest.TestCase):
     def test_arbitrary_latin_handle_value_or_key_fails_allowlist(self):
         bad = record(1); bad["feature_payload"] = {"feature_groups": {"base_account": {"account_type": "AliceSecretHandle"}}}
         checksum = self.write_stage([bad])
-        with self.assertRaisesRegex(IntakeError, "approved enum"):
+        with self.assertRaisesRegex(IntakeError, "runtime contract"):
             build(REPO_ROOT, self.staging, checksum, self.output, "v2")
         bad = record(2); bad["feature_payload"] = {"feature_groups": {"base_account": {"account_type": "unknown", "opaque_label": "AliceSecretHandle"}}}
         checksum = self.write_stage([bad])

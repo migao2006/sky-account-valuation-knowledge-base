@@ -16,6 +16,49 @@ python tools/parser_review/onboarding.py build-queue --source D:\restricted\pars
 
 目前不得發出 A/B 盲化封包。公開 manifest 含 unsalted `input_sha256` 與 split，reviewer 能由 profile/listing 重算 hash 並連回 held-out mapping；`build-blind-packages` 與 preflight 因此 fail-closed。必須先完成 release root 外的 keyed commitment 與 split mapping 協定，才能安全恢復發放。
 
+## P3.6 keyed custodian protocol
+
+P3.6 replaces that unsafe cohort format.  A separate external custodian keeps
+the raw input-to-split mapping and non-exportable HMAC key in its restricted
+environment.  It signs a contract before reviewers receive data.  The contract
+contains only a commitment Merkle root, a keyed split commitment, 200/100
+counts, aggregate strata coverage, opaque packet hashes, and the custodian's
+OpenSSH identity.  It must contain **no** individual input hash/commitment,
+queue ID, raw row, source digest, HMAC key, or individual split.
+
+The public issuer cannot generate a cohort or accept `--blind-secret`.  It can
+only validate an external, detached-signed custodian contract and publish its
+safe public surface:
+
+```powershell
+python tools/parser_review/onboarding.py publish-keyed-manifest `
+  --custodian-contract D:\restricted\custodian-contract.json `
+  --manifest-out data\review\parser-gold\review-queue-manifest.json
+```
+
+Each reviewer receives all 200 rows in a separately shuffled packet.  A row is
+only `{assignment_id, profile, listing, strata}`.  `assignment_id` is an
+opaque, custodian-issued random handle; it is not derived from a public input
+hash and does not reveal development versus heldout.  The external assignment
+ledger contains only 400 `{assignment_id, reviewer}` rows (200 per reviewer),
+never an input or split mapping.  The issuer may copy packets only after the
+same signed contract and ledger verify:
+
+```powershell
+python tools/parser_review/onboarding.py issue-keyed-blind-packages `
+  --custodian-contract D:\restricted\custodian-contract.json `
+  --assignment-ledger D:\restricted\assignments.jsonl `
+  --packet-dir D:\restricted\issued-by-custodian `
+  --output-dir D:\restricted\for-reviewers
+```
+
+P3.6 decisions use only `assignment_id`.  The custodian, not an annotator or
+rule developer, resolves it after both signed ledgers arrive.  Later evaluator
+integration must require a custodian-signed external replay-binding bundle to
+prove raw replay input → keyed commitment → frozen split.  That bundle and the
+HMAC key never enter the release root.  A repository gold row will use the
+keyed commitment rather than an unsalted input SHA-256.
+
 ```powershell
 python tools/parser_review/onboarding.py build-blind-packages --manifest data\review\parser-gold\review-queue-manifest.json --packet-dir D:\restricted\packets --output-dir D:\restricted\issued --blind-secret <external-secret>
 python tools/parser_review/onboarding.py preflight --manifest data\review\parser-gold\review-queue-manifest.json --packet-dir D:\restricted\packets --output D:\restricted\parser-review-preflight.json

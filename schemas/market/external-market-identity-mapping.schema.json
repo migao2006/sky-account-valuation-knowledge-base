@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/external-market-identity-mapping.schema.json",
+  "title": "External PII-free signed identity-to-cluster mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mapping_id", "dataset_id", "authorization_record_id", "manifest_sha256", "observations_sha256", "training_example_id", "training_example_digest", "observation_id", "observation_row_digest", "source_snapshot_sha256", "account_id", "dedup_cluster_id", "dedup_cluster_digest", "identity_commitment", "identity_commitment_scheme", "review_scope", "reviewed_at"],
+  "properties": {
+    "mapping_id": {"type": "string", "pattern": "^identity_mapping_[a-z0-9_]+$"},
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "authorization_record_id": {"type": "string", "pattern": "^authorization_record_[a-z0-9_]+$"},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"}, "observations_sha256": {"$ref": "#/$defs/sha256"},
+    "training_example_id": {"type": "string", "pattern": "^training_example_[a-z0-9_]+$"}, "training_example_digest": {"$ref": "#/$defs/sha256"},
+    "observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]+$"}, "observation_row_digest": {"$ref": "#/$defs/sha256"}, "source_snapshot_sha256": {"$ref": "#/$defs/sha256"},
+    "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"}, "dedup_cluster_id": {"type": "string", "pattern": "^cluster_[a-z0-9_]+$"}, "dedup_cluster_digest": {"$ref": "#/$defs/sha256"},
+    "identity_commitment": {"$ref": "#/$defs/sha256"}, "identity_commitment_scheme": {"const": "resolver-hmac-sha256-v1"}, "review_scope": {"const": "restricted-licensed-source-identity-resolution"}, "reviewed_at": {"type": "string", "format": "date"}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}
+}

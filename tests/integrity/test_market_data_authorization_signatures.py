@@ -147,9 +147,11 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         (self.root / "knowledge/items").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge/aliases").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge/sets").mkdir(parents=True, exist_ok=True)
+        (self.root / "knowledge/seasons").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge/items/items.jsonl").write_text('{"item_id":"item_fixture"}\n', encoding="utf-8")
         (self.root / "knowledge/aliases/item-aliases.jsonl").write_text("", encoding="utf-8")
         (self.root / "knowledge/sets/item-sets.jsonl").write_text("", encoding="utf-8")
+        (self.root / "knowledge/seasons/seasons.jsonl").write_text("", encoding="utf-8")
         dsid="authorized_market_fixture"; ddir=self.root / "data/review/market-authorization/datasets" / dsid
         observations=[
             {"observation_id":"observation_fixture_0001", "source_snapshot_sha256":"A" * 64, "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000},
@@ -172,7 +174,8 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         provenance=catalog_provenance(self.root)
         examples=[]
         for number, observation in enumerate(observations, 1):
-            example={"training_example_id":f"training_example_fixture_{number:04d}", "observation_id":observation["observation_id"], "source_snapshot_sha256":observation["source_snapshot_sha256"], "account_id":f"account_fixture_{number:04d}", "feature_payload":{"feature_groups":{"base_account":{"account_type":"unknown", "owned_count":number}}}, "catalog_provenance":provenance, "dedup_cluster_id":observation["dedup_cluster_id"]}
+            feature_payload={"account_id":f"account_fixture_{number:04d}", "catalog_provenance":provenance, "feature_contract_version":"authorized-market-feature-payload-v1", "feature_groups":{"base_account":{"account_type":"unknown", "wing_state":"unknown", "special_appearance":[]}, "season_profiles":[], "item_sets":[], "collection":{"bundle_claim_level":"unknown"}, "resources":{"values":{"white_candles":number,"hearts":None,"red_candles":None,"season_candles":None}}, "map_completion":{"standard_maps":"unknown","second_tier_capes":"unknown"}, "bindings":{"risk_state":"unknown", "platforms":[{"platform":name,"status":"unknown"} for name in ("google","apple","game_center","facebook","nintendo","playstation","steam","huawei","twitter")]}, "ownership_history":"unknown"}, "item_states":[{"item_id":"item_fixture","state":"unknown","evidence_state":"unknown","conflict":False}]}
+            example={"training_example_id":f"training_example_fixture_{number:04d}", "observation_id":observation["observation_id"], "source_snapshot_sha256":observation["source_snapshot_sha256"], "account_id":f"account_fixture_{number:04d}", "feature_payload":feature_payload, "catalog_provenance":provenance, "dedup_cluster_id":observation["dedup_cluster_id"]}
             example["feature_payload_sha256"]=sha256_bytes(canonical_bytes(example["feature_payload"]))
             example["catalog_provenance_sha256"]=sha256_bytes(canonical_bytes(provenance))
             example["dedup_cluster_digest"]=sha256_bytes(canonical_bytes(example["dedup_cluster_id"]))

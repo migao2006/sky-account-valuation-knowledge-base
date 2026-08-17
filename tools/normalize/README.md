@@ -142,6 +142,16 @@ permanent ownership, formal Chinese names, visual identity, or model eligibility
 python tools/normalize/apply_kizuna_ai_2022_cohort.py --root .
 ```
 
+`apply_days_of_love_faq1374_core_four_cohort.py` replays FAQ 1374's bounded
+Days of Love 2025 core-four cohort. It records four named historical offers and
+the event window, while retaining explicit per-item FAQ/vendor title-pair
+allowlisting and making no current availability, ownership, visual, or resale
+claim.
+
+```powershell
+python tools/normalize/apply_days_of_love_faq1374_core_four_cohort.py --root .
+```
+
 `build_historical_cost_references.py` discovers every active, replayable
 canonical-evidence cohort through the formal registry and writes one conservative
 reference per verified target item. It separates an exact historical item cost,

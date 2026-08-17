@@ -42,7 +42,7 @@
     {
       "actual": {
         "review_scopes": 39,
-        "source_references": 1367
+        "source_references": 1364
       },
       "contract_id": "catalog.unresolved_zero",
       "evidence_paths": [
@@ -76,7 +76,7 @@
     },
     {
       "actual": {
-        "canonical_items": 123,
+        "canonical_items": 127,
         "non_verified_count": 79,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -169,7 +169,7 @@
     },
     {
       "actual": {
-        "items_missing_required_fields": 123,
+        "items_missing_required_fields": 127,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_status",
@@ -547,6 +547,34 @@
             "source_type"
           ],
           "item_days_of_fortune_dragon_vestment": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_love_amethyst_accessory": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_love_amethyst_tipped_tails": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_love_braids": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_love_violet_crystal_prop": [
             "availability_status",
             "free_or_premium",
             "item_category",
@@ -1277,6 +1305,10 @@
           "item_days_of_fortune_dragon_bangles",
           "item_days_of_fortune_dragon_stole",
           "item_days_of_fortune_dragon_vestment",
+          "item_days_of_love_amethyst_accessory",
+          "item_days_of_love_amethyst_tipped_tails",
+          "item_days_of_love_braids",
+          "item_days_of_love_violet_crystal_prop",
           "item_days_of_sunlight_helios_hoops",
           "item_days_of_sunlight_manta_float",
           "item_days_of_sunlight_woven_wrap",
@@ -1351,7 +1383,7 @@
           "item_tournament_of_triumph_torch",
           "item_tournament_of_triumph_tunic"
         ],
-        "items_without_actual_visual_evidence": 123,
+        "items_without_actual_visual_evidence": 127,
         "visual_input_error_count": 0
       },
       "contract_id": "catalog.visual_state_verified",
@@ -1368,9 +1400,9 @@
   "counts": {
     "alias_conflicts": 1,
     "candidates": 622,
-    "canonical_items": 123,
+    "canonical_items": 127,
     "scope_review": 3266,
-    "source_scoped_unresolved": 1367,
+    "source_scoped_unresolved": 1364,
     "universe": 3266,
     "unmapped_aliases": 14,
     "unresolved_review_scopes": 39

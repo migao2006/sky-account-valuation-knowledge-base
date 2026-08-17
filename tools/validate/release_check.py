@@ -161,6 +161,16 @@ def verify_fresh_lf_checkout(
     market_authorization_authority_bundle_sha256: str | None = None,
     market_authorization_statement: Path | None = None,
     market_authorization_statement_sha256: str | None = None,
+    market_identity_authority_bundle: Path | None = None,
+    market_identity_authority_bundle_sha256: str | None = None,
+    market_identity_mapping: Path | None = None,
+    market_identity_mapping_sha256: str | None = None,
+    market_identity_statement: Path | None = None,
+    market_identity_statement_sha256: str | None = None,
+    market_receipt_archive: Path | None = None,
+    market_receipt_archive_sha256: str | None = None,
+    market_receipt_authority_bundle: Path | None = None,
+    market_receipt_authority_bundle_sha256: str | None = None,
     parser_gold_authority_bundle: Path | None = None,
     parser_gold_authority_bundle_sha256: str | None = None,
     parser_gold_replay_inputs: Path | None = None,
@@ -195,6 +205,16 @@ def verify_fresh_lf_checkout(
             command.extend(["--market-authorization-statement", str(market_authorization_statement)])
         if market_authorization_statement_sha256 is not None:
             command.extend(["--market-authorization-statement-sha256", market_authorization_statement_sha256])
+        if market_identity_authority_bundle is not None: command.extend(["--market-identity-authority-bundle", str(market_identity_authority_bundle)])
+        if market_identity_authority_bundle_sha256 is not None: command.extend(["--market-identity-authority-bundle-sha256", market_identity_authority_bundle_sha256])
+        if market_identity_mapping is not None: command.extend(["--market-identity-mapping", str(market_identity_mapping)])
+        if market_identity_mapping_sha256 is not None: command.extend(["--market-identity-mapping-sha256", market_identity_mapping_sha256])
+        if market_identity_statement is not None: command.extend(["--market-identity-statement", str(market_identity_statement)])
+        if market_identity_statement_sha256 is not None: command.extend(["--market-identity-statement-sha256", market_identity_statement_sha256])
+        if market_receipt_archive is not None: command.extend(["--market-receipt-archive", str(market_receipt_archive)])
+        if market_receipt_archive_sha256 is not None: command.extend(["--market-receipt-archive-sha256", market_receipt_archive_sha256])
+        if market_receipt_authority_bundle is not None: command.extend(["--market-receipt-authority-bundle", str(market_receipt_authority_bundle)])
+        if market_receipt_authority_bundle_sha256 is not None: command.extend(["--market-receipt-authority-bundle-sha256", market_receipt_authority_bundle_sha256])
         if parser_gold_authority_bundle is not None: command.extend(["--parser-gold-authority-bundle", str(parser_gold_authority_bundle)])
         if parser_gold_authority_bundle_sha256 is not None: command.extend(["--parser-gold-authority-bundle-sha256", parser_gold_authority_bundle_sha256])
         if parser_gold_replay_inputs is not None: command.extend(["--parser-gold-replay-inputs", str(parser_gold_replay_inputs)])
@@ -221,6 +241,16 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--market-identity-authority-bundle", type=Path)
+    parser.add_argument("--market-identity-authority-bundle-sha256")
+    parser.add_argument("--market-identity-mapping", type=Path)
+    parser.add_argument("--market-identity-mapping-sha256")
+    parser.add_argument("--market-identity-statement", type=Path)
+    parser.add_argument("--market-identity-statement-sha256")
+    parser.add_argument("--market-receipt-archive", type=Path)
+    parser.add_argument("--market-receipt-archive-sha256")
+    parser.add_argument("--market-receipt-authority-bundle", type=Path)
+    parser.add_argument("--market-receipt-authority-bundle-sha256")
     parser.add_argument("--parser-gold-authority-bundle", type=Path)
     parser.add_argument("--parser-gold-authority-bundle-sha256")
     parser.add_argument("--parser-gold-replay-inputs", type=Path)
@@ -231,6 +261,11 @@ def main() -> None:
         root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
+        args.market_identity_authority_bundle, args.market_identity_authority_bundle_sha256,
+        args.market_identity_mapping, args.market_identity_mapping_sha256,
+        args.market_identity_statement, args.market_identity_statement_sha256,
+        args.market_receipt_archive, args.market_receipt_archive_sha256,
+        args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
         args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
         args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
     )
@@ -471,12 +506,17 @@ def main() -> None:
             root, source_zip, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
             args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
             args.market_authorization_statement, args.market_authorization_statement_sha256,
+            args.market_identity_authority_bundle, args.market_identity_authority_bundle_sha256,
+            args.market_identity_mapping, args.market_identity_mapping_sha256,
+            args.market_identity_statement, args.market_identity_statement_sha256,
+            args.market_receipt_archive, args.market_receipt_archive_sha256,
+            args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
             args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
             args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.7-p3.5", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.8-p3.6", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

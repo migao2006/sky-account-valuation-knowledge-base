@@ -45,6 +45,34 @@ class CompletionStatusTests(unittest.TestCase):
         market_check = next(row for row in report["checks"] if row["contract_id"] == "market.human_gold_evaluation_passed")
         self.assertTrue(market_check["passed"])
 
+    def test_model_completion_uses_exact_replayed_binding_not_four_trained_count(self):
+        """P3.5 supports one bound normal Elastic runtime, not four runtimes."""
+        from tools.validate import build_completion_status as completion_module
+
+        evaluation = {
+            "status": "passed", "publication_ready": True,
+            "artifact_bindings": [{"model_type": "elastic_net", "price_line": "normal_listing"}],
+        }
+        actual_json = completion_module._json
+
+        def report_override(path):
+            if path.name == "model-publication-evaluation.json":
+                return evaluation
+            return actual_json(path)
+
+        with (
+            patch.object(completion_module, "_json", side_effect=report_override),
+            patch("tools.modeling.publication_evaluator.build", return_value=evaluation),
+            # The helper itself is integration-tested with canonical four-slot
+            # envelopes in test_progression_contracts.  This isolates the
+            # completion gate from the obsolete all-trained count.
+            patch("tools.validate.release_check.model_artifacts_release_valid", return_value=True),
+        ):
+            report = completion_module.build(ROOT)
+
+        model_check = next(row for row in report["checks"] if row["contract_id"] == "model.replayable_publication_passed")
+        self.assertTrue(model_check["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

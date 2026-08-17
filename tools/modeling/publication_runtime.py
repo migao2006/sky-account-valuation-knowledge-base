@@ -82,13 +82,25 @@ def _pool_rows(manifest: dict[str, Any], pool: dict[str, Any]) -> tuple[list[dic
     return train, holdout
 
 
-def _training_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _payload_features(payload: dict[str, Any], root: Path) -> dict[str, Any]:
+    """Map v1 market payloads through the shared catalog gate.
+
+    Synthetic evaluator fixtures intentionally retain the historic feature
+    shape; they are never admissible production-signed market rows.
+    """
+    from tools.modeling.market_feature_contract import VERSION, feature_mapping_for_payload
+    if payload.get("feature_contract_version") == VERSION:
+        return feature_mapping_for_payload(payload, root)
+    return feature_mapping({"features": payload.get("feature_groups", {})})
+
+
+def _training_rows(rows: list[dict[str, Any]], root: Path) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for row in rows:
         payload = row.get("feature_payload")
         if not isinstance(payload, dict) or not isinstance(payload.get("feature_groups"), dict):
             raise PublicationRuntimeError("signed_feature_payload_missing")
-        features = feature_mapping({"features": payload["feature_groups"]})
+        features = _payload_features(payload, root)
         if not features:
             raise PublicationRuntimeError("signed_feature_payload_empty")
         result.append({"price": float(row["selected_price_twd"]), "group": row["cluster_id"], "features": features})
@@ -107,7 +119,7 @@ def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str
     if pool.get("price_line") != "normal_listing":
         raise PublicationRuntimeError("runtime_artifact_supports_normal_listing_only")
     train, _holdout = _pool_rows(manifest, pool)
-    rows = _training_rows(train)
+    rows = _training_rows(train, root)
     if len({row["group"] for row in rows}) < 3:
         raise PublicationRuntimeError("fewer_than_three_independent_training_clusters")
     numeric, categorical = classify_columns(rows)
@@ -166,11 +178,23 @@ def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str
     }
 
 
-def predict_log(contract: dict[str, Any], row: dict[str, Any], runtime_domain: dict[str, Any] | None = None) -> float:
+def predict_log(contract: dict[str, Any], row: dict[str, Any], runtime_domain: dict[str, Any] | None = None, root: Path = ROOT) -> float:
     """Use the trainer's portable contract on exactly the signed payload."""
     from modeling.train_elastic_net import portable_predict_log
     payload = row.get("feature_payload", {})
+    if payload.get("feature_contract_version"):
+        try:
+            features = _payload_features(payload, root)
+        except Exception as exc:
+            raise PublicationRuntimeError(f"runtime_feature_mapping_failed:{type(exc).__name__}") from exc
+        # Runtime domains are declared against flattened features, so validate
+        # them directly rather than flattening the structured payload twice.
+        for name, bounds in (runtime_domain or {}).get("numeric", {}).items():
+            value = features.get(name)
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                if isinstance(bounds, dict) and bounds.get("missing_observed") is False: raise PublicationRuntimeError(f"out_of_distribution:missing_unobserved:{name}")
+            elif value < bounds.get("min", value) or value > bounds.get("max", value): raise PublicationRuntimeError(f"out_of_distribution:{name}")
+        return portable_predict_log(contract, features)
     features, reasons = runtime_features(payload.get("feature_groups", {}), runtime_domain or {})
-    if features is None:
-        raise PublicationRuntimeError(reasons[0])
+    if features is None: raise PublicationRuntimeError(reasons[0])
     return portable_predict_log(contract, features)

@@ -1,5 +1,14 @@
 # 變更紀錄
 
+## 4.8.0-p3.6 — 2026-08-17
+
+- 新增 Days of Love FAQ 1374 core-four 的固定官方事實、vendor identity、歷史取得窗口與逐欄 replay evidence。
+- 新增 release 外部、雙獨立 OpenSSH 簽章的 identity→cluster mapping verifier；只有完整覆蓋正式 signed examples 時才解除 cluster independence gate。
+- 新增 keyed parser custodian contract：公開 manifest 不保存可連回原文的個別 hash、queue ID 或 split；HMAC key 與 replay mapping永遠留在受控外部環境。
+- 新增 verified-sale receipt archive verifier；只有 receipt replay、identity mapping 與原 signed sale observation 全部一致時才可能進獨立成交池。
+- 將 authorized market feature payload 擴為固定八組特徵與 exact catalog item states，並統一 intake、trainer、evaluator 與 estimator 的 canonical mapping。
+- 修正 completion model gate，使唯一已支援的 normal-listing Elastic runtime 加三個 fail-closed insufficient envelopes 能由 exact evaluator binding 判定。
+
 ## 4.7.0-p3.5 — 2026-08-17
 
 - 新增 Days of Fortune FAQ 1264 core-five 的五件 canonical identity、歷史取得成本與活動期間證據。

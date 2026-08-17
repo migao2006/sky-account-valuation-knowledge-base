@@ -13,7 +13,10 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from canonical_evidence_registry import load_registry, validate_registry
+try:
+    from .canonical_evidence_registry import load_registry, validate_registry
+except ImportError:  # direct script execution
+    from canonical_evidence_registry import load_registry, validate_registry
 from tools.modeling.visual_evidence_coverage import DEFAULT_ASSET_REGISTRY, actual_visual_item_ids
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -1,5 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "reports/validation.schema.json", "type": "object", "additionalProperties": true,
   "required": ["schema_version", "offline_only", "valid", "schema_records_checked"],
-  "properties": {"schema_version": {"const": "4.7-p3.5"}, "offline_only": {"const": true}, "valid": {"type": "boolean"}, "errors": {"type": "array", "items": {"type": "string"}}, "warnings": {"type": "array", "items": {"type": "string"}}, "schema_errors": {"type": "array", "items": {"type": "string"}}, "schema_warnings": {"type": "array", "items": {"type": "string"}}, "schema_records_checked": {"type": "integer", "minimum": 0}, "counts": {"type": "object"}, "checks": {"type": "object"}}
+  "properties": {"schema_version": {"const": "4.8-p3.6"}, "offline_only": {"const": true}, "valid": {"type": "boolean"}, "errors": {"type": "array", "items": {"type": "string"}}, "warnings": {"type": "array", "items": {"type": "string"}}, "schema_errors": {"type": "array", "items": {"type": "string"}}, "schema_warnings": {"type": "array", "items": {"type": "string"}}, "schema_records_checked": {"type": "integer", "minimum": 0}, "counts": {"type": "object"}, "checks": {"type": "object"}}
 }
