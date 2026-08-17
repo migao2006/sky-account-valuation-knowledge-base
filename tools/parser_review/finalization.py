@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -171,6 +172,63 @@ def build_candidate_bundle(verified: dict[str, Any], resolution_rows: list[dict[
     return {"schema_version": "2.0-p3.8", "status": "external_candidate_bundle_unsigned", "public_gold": public, "binding_payload": binding_payload, "rule_manifest": rule_manifest, "finalization": finalization, "candidate_sha256": "", "formal_gold_written": False} | {"candidate_sha256": digest(canonical_bytes({"schema_version": "2.0-p3.8", "status": "external_candidate_bundle_unsigned", "public_gold": public, "binding_payload": binding_payload, "rule_manifest": rule_manifest, "finalization": finalization, "formal_gold_written": False}))}
 
 
+def _import_lock(root: Path) -> tuple[Any, Path]:
+    """Acquire an OS-released lock and return its durable crash journal path."""
+    stem = f"sky-parser-gold-{digest(str(root.resolve()).encode('utf-8'))[:24]}"
+    path = Path(tempfile.gettempdir()) / f"{stem}.lock"
+    journal = Path(tempfile.gettempdir()) / f"{stem}.journal.json"
+    handle = path.open("a+b")
+    try:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"0"); handle.flush(); os.fsync(handle.fileno())
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, BlockingIOError) as exc:
+        handle.close()
+        raise ValueError("another parser-gold import transaction holds the OS lock") from exc
+    return handle, journal
+
+
+def _release_import_lock(handle: Any) -> None:
+    try:
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+    finally:
+        handle.close()
+
+
+def _read_output_snapshot(path: Path) -> bytes | None:
+    """Read an output through the handle used to establish its pre-state."""
+    try:
+        with path.open("rb") as handle:
+            return handle.read()
+    except FileNotFoundError:
+        return None
+
+
+def _remove_owned_file(path: Path, identity: tuple[int, int]) -> None:
+    """Remove only the inode created by this transaction."""
+    try:
+        stat = path.stat()
+        if path.is_file() and (stat.st_dev, stat.st_ino) == identity:
+            path.unlink()
+    except OSError:
+        pass
+
+
 def import_signed_candidate(candidate_path: Path, candidate_signature: Path, binding_signature: Path, resolution_rows: list[dict[str, Any]], contract_path: Path, assignment_ledger: Path, decisions_a: Path, decisions_b: Path, adjudications: Path, custodian_authority_bundle: Path, custodian_authority_sha256: str, review_authority_bundle: Path, review_authority_sha256: str, root: Path = ROOT) -> None:
     """Rebuild and atomically import a custodian-signed V2 candidate bundle."""
     root = root.resolve(); candidate_path = _outside_root(candidate_path, root, "external candidate bundle")
@@ -194,13 +252,77 @@ def import_signed_candidate(candidate_path: Path, candidate_signature: Path, bin
         if result.returncode: raise ValueError("custodian detached signature verification failed")
     signature(candidate, candidate_signature, NAMESPACE)
     signature(candidate["binding_payload"], binding_signature, "sky-parser-keyed-replay-binding-v2")
-    binding = candidate["binding_payload"] | {"signature_file": "external-only", "binding_sha256": digest(canonical_bytes(candidate["binding_payload"]))}
     # The evaluator receives the original external binding/signature; release
     # root receives only privacy-safe public gold and rule boundary.
-    target = root / "data/review/parser-gold"; target.mkdir(parents=True, exist_ok=True)
-    temp_claims = target / "claims.jsonl.tmp"; temp_rules = target / "rule-development-manifest.json.tmp"; temp_attest = target / "attestations.jsonl.tmp"
-    temp_claims.write_bytes(b"".join(canonical_bytes(row) for row in candidate["public_gold"])); temp_rules.write_bytes(canonical_bytes(candidate["rule_manifest"])); temp_attest.write_bytes(b"")
-    os.replace(temp_claims, target / "claims.jsonl"); os.replace(temp_rules, target / "rule-development-manifest.json"); os.replace(temp_attest, target / "attestations.jsonl")
+    target = root / "data/review/parser-gold"
+    expected = {
+        "claims.jsonl": b"".join(canonical_bytes(row) for row in candidate["public_gold"]),
+        "rule-development-manifest.json": canonical_bytes(candidate["rule_manifest"]),
+        "attestations.jsonl": b"",
+    }
+    # All trust and candidate verification above is intentionally completed
+    # before the transactional boundary.  From here onward every outcome is
+    # either exact idempotence or a fresh, all-or-nothing installation.
+    lock_handle, journal_path = _import_lock(root)
+    created: list[tuple[Path, tuple[int, int]]] = []
+    recovering = journal_path.exists()
+    try:
+        journal_value = {"candidate_sha256": candidate["candidate_sha256"], "expected_sha256": {name: digest(value) for name, value in expected.items()}}
+        if recovering:
+            try: existing_journal = json.loads(journal_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc: raise ValueError("parser-gold crash journal is invalid") from exc
+            if existing_journal != journal_value:
+                raise ValueError("parser-gold crash journal belongs to a different signed candidate")
+        else:
+            with journal_path.open("xb") as handle:
+                handle.write(canonical_bytes(journal_value)); handle.flush(); os.fsync(handle.fileno())
+        snapshots = {name: _read_output_snapshot(target / name) for name in expected}
+        present = {name: value for name, value in snapshots.items() if value is not None}
+        if any(value != expected[name] and not (recovering and expected[name].startswith(value)) for name, value in present.items()):
+            raise ValueError("parser-gold formal output already exists and is not this exact signed import")
+        if len(present) == len(expected):
+            if all(present[name] == expected[name] for name in expected):
+                journal_path.unlink(missing_ok=True)
+                return
+        # Staging gives every final write a fixed, rechecked byte source.  The
+        # final paths use exclusive creation, never replacement, so a racing
+        # foreign writer cannot be overwritten.
+        with tempfile.TemporaryDirectory(prefix="sky-parser-gold-import-", dir=root) as temp:
+            staging = Path(temp)
+            for name, value in expected.items():
+                (staging / name).write_bytes(value)
+            if any((staging / name).read_bytes() != value for name, value in expected.items()):
+                raise ValueError("parser-gold staging bytes changed before installation")
+            target.mkdir(parents=True, exist_ok=True)
+            for name in expected:
+                if name in present and present[name] == expected[name]:
+                    continue
+                destination = target / name
+                if name in present:
+                    with destination.open("r+b") as destination_handle:
+                        stat = os.fstat(destination_handle.fileno())
+                        if destination_handle.read() != present[name] or not expected[name].startswith(present[name]):
+                            raise ValueError("parser-gold crash residue changed during recovery")
+                        destination_handle.seek(0); destination_handle.write(expected[name]); destination_handle.truncate()
+                        destination_handle.flush(); os.fsync(destination_handle.fileno())
+                else:
+                    with (staging / name).open("rb") as source_handle, destination.open("xb") as destination_handle:
+                        stat = os.fstat(destination_handle.fileno())
+                        created.append((destination, (stat.st_dev, stat.st_ino)))
+                        shutil.copyfileobj(source_handle, destination_handle)
+                        destination_handle.flush(); os.fsync(destination_handle.fileno())
+        if any(_read_output_snapshot(target / name) != value for name, value in expected.items()):
+            raise ValueError("parser-gold formal output changed during import completion")
+        journal_path.unlink(missing_ok=True)
+    except BaseException:
+        for path, identity in reversed(created):
+            _remove_owned_file(path, identity)
+        if not recovering:
+            try: journal_path.unlink()
+            except OSError: pass
+        raise
+    finally:
+        _release_import_lock(lock_handle)
 
 
 def main() -> None:

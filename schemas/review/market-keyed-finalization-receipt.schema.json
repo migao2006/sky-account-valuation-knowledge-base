@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-keyed-finalization-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "cohort_id", "custodian_contract_sha256", "public_gold_sha256", "finalization_sha256", "candidate_sha256", "binding_payload_sha256", "candidate_signature_sha256", "binding_signature_sha256", "formal_gold_written", "receipt_sha256"],
+  "properties": {
+    "schema_version": {"const": "1.0-p4.2"},
+    "status": {"const": "keyed_market_gold_imported"},
+    "cohort_id": {"type": "string"},
+    "custodian_contract_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "public_gold_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "finalization_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "candidate_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "binding_payload_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "candidate_signature_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "binding_signature_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "formal_gold_written": {"const": true},
+    "receipt_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}
+  }
+}

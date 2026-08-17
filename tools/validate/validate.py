@@ -179,6 +179,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1391-days-of-nature-color-core-eleven.json": "schemas/knowledge/days-of-nature-color-faq-1391-core-eleven-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1362-days-of-music-core-four.json": "schemas/knowledge/days-of-music-faq-1362-core-four-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1356-days-of-mischief-core-five.json": "schemas/knowledge/days-of-mischief-faq-1356-core-five-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1343-days-of-moonlight-core-three.json": "schemas/knowledge/days-of-moonlight-faq-1343-core-three-fact-snapshot.schema.json",
     "data/review/shadow/days-of-love-faq1374-core-four.declaration.json": "schemas/review/canonical-evidence-declaration.schema.json",
 }
 
@@ -450,6 +451,9 @@ def validate(
     parser_keyed_replay_binding_sha256: str | None = None,
     canonical_review_authority_bundle: str | Path | None = None,
     canonical_review_authority_bundle_sha256: str | None = None,
+    market_keyed_custodian_authority_bundle: str | Path | None = None, market_keyed_custodian_authority_bundle_sha256: str | None = None,
+    market_keyed_review_authority_bundle: str | Path | None = None, market_keyed_review_authority_bundle_sha256: str | None = None,
+    market_keyed_contract: str | Path | None = None, market_keyed_assignment_ledger: str | Path | None = None, market_keyed_decisions_a: str | Path | None = None, market_keyed_decisions_b: str | Path | None = None, market_keyed_adjudications: str | Path | None = None, market_keyed_resolution_map: str | Path | None = None, market_keyed_candidate: str | Path | None = None, market_keyed_candidate_signature: str | Path | None = None, market_keyed_binding_signature: str | Path | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -480,6 +484,8 @@ def validate(
     authorized_jsonl_files, authorized_json_files = authorized_market_schema_files(root)
     schema_files = {**SCHEMA_FILES, **cohort_schema_files, **authorized_jsonl_files}
     json_schema_files = {**JSON_SCHEMA_FILES, **declarative_json_schema_files, **authorized_json_files}
+    if (root / "data/review/market-keyed-finalization-receipt.json").is_file():
+        json_schema_files["data/review/market-keyed-finalization-receipt.json"] = "schemas/review/market-keyed-finalization-receipt.schema.json"
     actual_formal_json = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
@@ -846,6 +852,7 @@ def validate(
         for issue in audit_market_ledgers(
             root, market_claim_queue, market_claim_gold, near_miss_queue, near_miss_evidence,
             market_audit_authority_bundle, market_audit_authority_bundle_sha256,
+            market_keyed_custodian_authority_bundle, market_keyed_custodian_authority_bundle_sha256, market_keyed_review_authority_bundle, market_keyed_review_authority_bundle_sha256, market_keyed_contract, market_keyed_assignment_ledger, market_keyed_decisions_a, market_keyed_decisions_b, market_keyed_adjudications, market_keyed_resolution_map, market_keyed_candidate, market_keyed_candidate_signature, market_keyed_binding_signature,
         )
     )
     errors.extend(f"parser-gold: {issue}" for issue in audit_parser_gold(root, read_jsonl(root / "data/review/parser-gold/claims.jsonl"), parser_gold_authority_bundle, parser_gold_authority_bundle_sha256, parser_keyed_custodian_authority_bundle, parser_keyed_custodian_authority_bundle_sha256, parser_keyed_custodian_contract, parser_keyed_custodian_contract_sha256, parser_keyed_replay_binding, parser_keyed_replay_binding_sha256))
@@ -1179,7 +1186,7 @@ def validate(
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"parser gold evaluation: {exc}")
     for relative, builder, label in (
-        ("reports/market-gold-evaluation.json", lambda: build_market_gold_evaluation(root, market_audit_authority_bundle, market_audit_authority_bundle_sha256), "market gold evaluation"),
+        ("reports/market-gold-evaluation.json", lambda: build_market_gold_evaluation(root, market_audit_authority_bundle, market_audit_authority_bundle_sha256, market_keyed_custodian_authority_bundle, market_keyed_custodian_authority_bundle_sha256, market_keyed_review_authority_bundle, market_keyed_review_authority_bundle_sha256, market_keyed_contract, market_keyed_assignment_ledger, market_keyed_decisions_a, market_keyed_decisions_b, market_keyed_adjudications, market_keyed_resolution_map, market_keyed_candidate, market_keyed_candidate_signature, market_keyed_binding_signature), "market gold evaluation"),
         ("reports/catalog-completion.json", lambda: build_catalog_completion(root, canonical_review_authority_bundle, canonical_review_authority_bundle_sha256), "catalog completion"),
         ("reports/coverage/visual-evidence-capability.json", lambda: build_visual_evidence_coverage(root), "visual evidence capability"),
     ):
@@ -1266,7 +1273,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "5.3-p4.1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "5.4-p4.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1279,6 +1286,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
     parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
+    parser.add_argument("--market-keyed-custodian-authority-bundle", type=Path); parser.add_argument("--market-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-review-authority-bundle", type=Path); parser.add_argument("--market-keyed-review-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-contract", type=Path); parser.add_argument("--market-keyed-assignment-ledger", type=Path)
+    parser.add_argument("--market-keyed-decisions-a", type=Path); parser.add_argument("--market-keyed-decisions-b", type=Path); parser.add_argument("--market-keyed-adjudications", type=Path)
+    parser.add_argument("--market-keyed-resolution-map", type=Path); parser.add_argument("--market-keyed-candidate", type=Path); parser.add_argument("--market-keyed-candidate-signature", type=Path); parser.add_argument("--market-keyed-binding-signature", type=Path)
     parser.add_argument("--market-authorization-authority-bundle", type=Path)
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
@@ -1321,6 +1333,7 @@ def main() -> None:
         args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
         args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
         args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

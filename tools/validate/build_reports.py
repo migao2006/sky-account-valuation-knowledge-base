@@ -75,6 +75,11 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
     parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
+    parser.add_argument("--market-keyed-custodian-authority-bundle", type=Path); parser.add_argument("--market-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-review-authority-bundle", type=Path); parser.add_argument("--market-keyed-review-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-contract", type=Path); parser.add_argument("--market-keyed-assignment-ledger", type=Path)
+    parser.add_argument("--market-keyed-decisions-a", type=Path); parser.add_argument("--market-keyed-decisions-b", type=Path); parser.add_argument("--market-keyed-adjudications", type=Path)
+    parser.add_argument("--market-keyed-resolution-map", type=Path); parser.add_argument("--market-keyed-candidate", type=Path); parser.add_argument("--market-keyed-candidate-signature", type=Path); parser.add_argument("--market-keyed-binding-signature", type=Path)
     parser.add_argument("--market-authorization-authority-bundle", type=Path)
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
@@ -165,6 +170,7 @@ def main() -> None:
     market_audit_errors = audit_market_ledgers(
         root, rows["market_claim_review"], rows["market_claim_gold"], rows["market_near_miss_review"], rows["market_near_miss_evidence"],
         args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     if market_audit_errors:
         raise RuntimeError(f"market audit contract is invalid: {market_audit_errors}")
@@ -196,6 +202,7 @@ def main() -> None:
     parser_gold_evaluation = build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256, args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256, args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256, args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256)
     market_gold_evaluation = build_market_gold_evaluation(
         root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     catalog_completion = build_catalog_completion(root, args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256)
     visual_evidence_coverage = build_visual_evidence_coverage(root)
@@ -246,7 +253,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "5.3-p4.1",
+        "schema_version": "5.4-p4.2",
         "as_of_date": "2026-08-17",
         "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
         "full_item_catalog_complete": catalog_completion["complete"],
@@ -457,6 +464,7 @@ def main() -> None:
         args.parser_keyed_replay_binding_sha256,
         args.canonical_review_authority_bundle,
         args.canonical_review_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     write_utf8_lf(root / "reports/completion-status.json", json.dumps(completion_status, ensure_ascii=False, indent=2) + "\n")
 
@@ -511,13 +519,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "5.3-p4.1"
+    previous_validation["schema_version"] = "5.4-p4.2"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v5-p41"
-    manifest["package_version"] = "5.3.0-p4.1"
+    manifest["package_id"] = "sky-valuation-v5-p42"
+    manifest["package_version"] = "5.4.0-p4.2"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),

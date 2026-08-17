@@ -28,6 +28,62 @@ LEDGER_KINDS = {
     "market_claim_gold": ("gold_id", ("annotator_a", "annotator_b", "adjudicator")),
     "market_near_miss_approved_evidence": ("evidence_id", ("reviewer_a", "reviewer_b", "adjudicator")),
 }
+KEYED_RECEIPT_REL = Path("data/review/market-keyed-finalization-receipt.json")
+
+
+def keyed_market_finalization_errors(
+    root: Path, claim_gold: list[dict[str, Any]],
+    custodian_authority_bundle: str | Path | None = None, custodian_authority_bundle_sha256: str | None = None,
+    review_authority_bundle: str | Path | None = None, review_authority_bundle_sha256: str | None = None,
+    contract: str | Path | None = None, assignment_ledger: str | Path | None = None,
+    decisions_a: str | Path | None = None, decisions_b: str | Path | None = None, adjudications: str | Path | None = None,
+    resolution_map: str | Path | None = None, candidate: str | Path | None = None,
+    candidate_signature: str | Path | None = None, binding_signature: str | Path | None = None,
+) -> tuple[list[str], dict[str, Any] | None]:
+    """Replay the external keyed finalization without exposing its private map.
+
+    The finalizer owns protocol validation; this adapter only supplies the
+    externally injected artifacts and compares the public release bytes.
+    """
+    required = (custodian_authority_bundle, custodian_authority_bundle_sha256, review_authority_bundle,
+        review_authority_bundle_sha256, contract, assignment_ledger, decisions_a, decisions_b,
+        adjudications, resolution_map, candidate, candidate_signature, binding_signature)
+    if not all(required):
+        return ["nonempty keyed market gold requires every external keyed finalization input"], None
+    try:
+        from tools.market_review.finalization import (
+            BINDING_NAMESPACE, FINALIZATION_NAMESPACE, _verify, build_candidate_bundle,
+            load_review_authorities, verify_finalization,
+        )
+        from tools.market_review.keyed_custodian import _outside, load_authorities
+        labels = ("custodian contract", "assignment ledger", "annotator A decisions", "annotator B decisions",
+            "adjudications", "private resolution map", "signed candidate", "candidate signature", "binding signature")
+        paths = [_outside(Path(value), root, label) for value, label in zip(
+            (contract, assignment_ledger, decisions_a, decisions_b, adjudications, resolution_map, candidate, candidate_signature, binding_signature), labels)]
+        rows = read_jsonl(Path(resolution_map))
+        verified = verify_finalization(paths[0], paths[1], paths[2], paths[3], paths[4], Path(custodian_authority_bundle), str(custodian_authority_bundle_sha256), Path(review_authority_bundle), str(review_authority_bundle_sha256), root)
+        contract_value = json.loads(paths[0].read_text(encoding="utf-8"))
+        rebuilt = build_candidate_bundle(verified, rows, contract_value, root)
+        supplied = json.loads(paths[6].read_text(encoding="utf-8"))
+        if supplied != rebuilt:
+            raise ValueError("external candidate does not exactly reproduce keyed finalization")
+        authority = load_authorities(custodian_authority_bundle, custodian_authority_bundle_sha256, root).get(contract_value.get("authority_id"))
+        if authority is None:
+            raise ValueError("contracted keyed market custodian authority is unavailable")
+        _verify(supplied, authority, paths[7], contract_value["authority_id"], FINALIZATION_NAMESPACE)
+        _verify(supplied["binding_payload"], authority, paths[8], contract_value["authority_id"], BINDING_NAMESPACE)
+        gold_bytes = b"".join(canonical_bytes(row) for row in rebuilt["public_gold"])
+        release_gold = (root / "data/review/market-claim-gold.jsonl").read_bytes()
+        if release_gold != gold_bytes or claim_gold != rebuilt["public_gold"]:
+            raise ValueError("public market gold does not exactly match keyed candidate")
+        receipt = json.loads((root / KEYED_RECEIPT_REL).read_text(encoding="utf-8"))
+        expected = {"schema_version":"1.0-p4.2", "status":"keyed_market_gold_imported", "cohort_id":contract_value["cohort_id"], "custodian_contract_sha256":contract_value["contract_sha256"], "public_gold_sha256":rebuilt["finalization"]["public_gold_sha256"], "finalization_sha256":rebuilt["finalization"]["finalization_sha256"], "candidate_sha256":rebuilt["candidate_sha256"], "binding_payload_sha256":sha256_bytes(canonical_bytes(rebuilt["binding_payload"])), "candidate_signature_sha256":sha256_bytes(paths[7].read_bytes()), "binding_signature_sha256":sha256_bytes(paths[8].read_bytes()), "formal_gold_written":True}
+        expected["receipt_sha256"] = sha256_bytes(canonical_bytes(expected))
+        if receipt != expected:
+            raise ValueError("keyed market finalization receipt does not exactly bind candidate and signatures")
+        return [], rebuilt["binding_payload"]
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [str(exc)], None
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -161,11 +217,40 @@ def audit_market_ledgers(
     root: Path,
     claim_queue: list[dict[str, Any]], claim_gold: list[dict[str, Any]], near_queue: list[dict[str, Any]], near_evidence: list[dict[str, Any]],
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+    keyed_custodian_authority_bundle: str | Path | None = None, keyed_custodian_authority_bundle_sha256: str | None = None,
+    keyed_review_authority_bundle: str | Path | None = None, keyed_review_authority_bundle_sha256: str | None = None,
+    keyed_contract: str | Path | None = None, keyed_assignment_ledger: str | Path | None = None,
+    keyed_decisions_a: str | Path | None = None, keyed_decisions_b: str | Path | None = None, keyed_adjudications: str | Path | None = None,
+    keyed_resolution_map: str | Path | None = None, keyed_candidate: str | Path | None = None,
+    keyed_candidate_signature: str | Path | None = None, keyed_binding_signature: str | Path | None = None,
 ) -> list[str]:
     """Fail closed unless every nonempty-ledger row has three valid attestations."""
     ledgers = {"market_claim_gold": (claim_queue, claim_gold), "market_near_miss_approved_evidence": (near_queue, near_evidence)}
+    keyed = (root / KEYED_RECEIPT_REL).exists()
+    keyed_args = (keyed_custodian_authority_bundle, keyed_custodian_authority_bundle_sha256, keyed_review_authority_bundle, keyed_review_authority_bundle_sha256, keyed_contract, keyed_assignment_ledger, keyed_decisions_a, keyed_decisions_b, keyed_adjudications, keyed_resolution_map, keyed_candidate, keyed_candidate_signature, keyed_binding_signature)
     if not any(rows for _, rows in ledgers.values()):
+        if keyed:
+            errors, _ = keyed_market_finalization_errors(root, claim_gold, *keyed_args)
+            return errors
+        if any(keyed_args):
+            return ["keyed market finalization inputs require a keyed finalization receipt"]
         return []
+    if keyed:
+        if near_evidence:
+            return ["keyed market finalization and legacy market audit ledgers are mutually exclusive"]
+        if authority_bundle or authority_bundle_sha256:
+            return ["keyed market finalization and v2 market audit inputs are mutually exclusive"]
+        try:
+            legacy_attestations = read_jsonl(root / ATTESTATIONS_REL)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            return [f"market audit attestation ledger is unreadable: {exc}"]
+        signature_root = root / SIGNATURES_REL
+        if legacy_attestations or (signature_root.is_dir() and any(path.is_file() for path in signature_root.rglob("*"))):
+            return ["keyed market finalization and legacy market audit artifacts are mutually exclusive"]
+        errors, _ = keyed_market_finalization_errors(root, claim_gold, *keyed_args)
+        return errors
+    if any(keyed_args):
+        return ["keyed market finalization inputs require a keyed finalization receipt"]
     authorities, errors = _external_bundle(authority_bundle, authority_bundle_sha256, root)
     if authorities is None:
         return errors

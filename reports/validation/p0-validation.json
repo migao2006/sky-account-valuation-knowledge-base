@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.3-p4.1",
+  "schema_version": "5.4-p4.2",
   "offline_only": true,
   "valid": true,
   "checks": {
@@ -41,20 +41,19 @@
     "p3_4_market_gold_replayed_fail_closed": true,
     "p3_4_catalog_completion_replayed": true,
     "p3_4_visual_capability_replayed_non_model": true,
-    "p3_4_parser_review_queue_replayed_private": true,
-    "fresh_lf_checkout": true
+    "p3_4_parser_review_queue_replayed_private": true
   },
-  "schema_records_checked": 22341,
+  "schema_records_checked": 22382,
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 496,
+    "run": 506,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 485,
+    "hashed_files": 498,
     "mismatches": []
   },
   "release_residue": [],
@@ -86,11 +85,11 @@
     "seasons": 30,
     "events": 24,
     "ancestors": 132,
-    "items": 152,
+    "items": 155,
     "sets": 10,
     "aliases": 320,
-    "availability_events": 81,
-    "sources": 42,
+    "availability_events": 84,
+    "sources": 43,
     "visual_references": 10,
     "unresolved": 39,
     "unmapped": 14,
@@ -110,16 +109,10 @@
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
     "P3.1 保留 16 筆匿名 near-miss；只有外部信任根驗證的三方 OpenSSH attestations 才可接受非空人工 ledger，且不會自動取得市場訓練授權。",
-    "P3.1 的 2532 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 74，model eligible 仍為 19。",
+    "P3.1 的 2535 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 77，model eligible 仍為 19。",
     "P3.1 保留帳號 lexical catalog sidecar 供人工複核：1022 個帳號中有 86 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
-    "P3.1 的 74 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
+    "P3.1 的 77 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
-  ],
-  "fresh_lf_checkout": {
-    "checked": true,
-    "valid": true,
-    "commit": "f5a2d09eaf49d3ec27daa6e5faa559a05df86696",
-    "result": "{\"valid\": true, \"tests\": {\"run\": 496, \"failures\": 0, \"errors\": 0, \"skipped\": 0}, \"manifest_mismatches\": 0, \"source_zip_unchanged\": true}"
-  }
+  ]
 }

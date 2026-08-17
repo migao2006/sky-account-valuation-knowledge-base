@@ -184,6 +184,9 @@ def verify_fresh_lf_checkout(
     parser_keyed_replay_binding_sha256: str | None = None,
     canonical_review_authority_bundle: Path | None = None,
     canonical_review_authority_bundle_sha256: str | None = None,
+    market_keyed_custodian_authority_bundle: Path | None = None, market_keyed_custodian_authority_bundle_sha256: str | None = None,
+    market_keyed_review_authority_bundle: Path | None = None, market_keyed_review_authority_bundle_sha256: str | None = None,
+    market_keyed_contract: Path | None = None, market_keyed_assignment_ledger: Path | None = None, market_keyed_decisions_a: Path | None = None, market_keyed_decisions_b: Path | None = None, market_keyed_adjudications: Path | None = None, market_keyed_resolution_map: Path | None = None, market_keyed_candidate: Path | None = None, market_keyed_candidate_signature: Path | None = None, market_keyed_binding_signature: Path | None = None,
 ) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
@@ -236,6 +239,8 @@ def verify_fresh_lf_checkout(
         if parser_keyed_replay_binding_sha256 is not None: command.extend(["--parser-keyed-replay-binding-sha256", parser_keyed_replay_binding_sha256])
         if canonical_review_authority_bundle is not None: command.extend(["--canonical-review-authority-bundle", str(canonical_review_authority_bundle)])
         if canonical_review_authority_bundle_sha256 is not None: command.extend(["--canonical-review-authority-bundle-sha256", canonical_review_authority_bundle_sha256])
+        for flag, value in (("--market-keyed-custodian-authority-bundle", market_keyed_custodian_authority_bundle), ("--market-keyed-custodian-authority-bundle-sha256", market_keyed_custodian_authority_bundle_sha256), ("--market-keyed-review-authority-bundle", market_keyed_review_authority_bundle), ("--market-keyed-review-authority-bundle-sha256", market_keyed_review_authority_bundle_sha256), ("--market-keyed-contract", market_keyed_contract), ("--market-keyed-assignment-ledger", market_keyed_assignment_ledger), ("--market-keyed-decisions-a", market_keyed_decisions_a), ("--market-keyed-decisions-b", market_keyed_decisions_b), ("--market-keyed-adjudications", market_keyed_adjudications), ("--market-keyed-resolution-map", market_keyed_resolution_map), ("--market-keyed-candidate", market_keyed_candidate), ("--market-keyed-candidate-signature", market_keyed_candidate_signature), ("--market-keyed-binding-signature", market_keyed_binding_signature)):
+            if value is not None: command.extend([flag, str(value)])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -254,6 +259,9 @@ def main() -> None:
     parser.add_argument("--verify-fresh-lf-checkout", action="store_true", help="also validate an actual clean Git LF checkout")
     parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
     parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
+    parser.add_argument("--market-keyed-custodian-authority-bundle", type=Path); parser.add_argument("--market-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-review-authority-bundle", type=Path); parser.add_argument("--market-keyed-review-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-contract", type=Path); parser.add_argument("--market-keyed-assignment-ledger", type=Path); parser.add_argument("--market-keyed-decisions-a", type=Path); parser.add_argument("--market-keyed-decisions-b", type=Path); parser.add_argument("--market-keyed-adjudications", type=Path); parser.add_argument("--market-keyed-resolution-map", type=Path); parser.add_argument("--market-keyed-candidate", type=Path); parser.add_argument("--market-keyed-candidate-signature", type=Path); parser.add_argument("--market-keyed-binding-signature", type=Path)
     parser.add_argument("--market-authorization-authority-bundle", type=Path)
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
@@ -297,6 +305,7 @@ def main() -> None:
         args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
         args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
         args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
@@ -380,6 +389,7 @@ def main() -> None:
     market_audit_errors = audit_market_ledgers(
         root, market_claim_review, market_claim_gold, market_near_miss_review, market_near_miss_evidence,
         args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+        args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
     )
     parser_gold_errors = audit_parser_gold(root, [json.loads(line) for line in (root / "data/review/parser-gold/claims.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()], args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256, args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256, args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256, args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256)
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -515,6 +525,7 @@ def main() -> None:
             args.parser_keyed_replay_binding_sha256,
             args.canonical_review_authority_bundle,
             args.canonical_review_authority_bundle_sha256,
+            args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
         ),
         "p3_1_parser_knowledge_coverage_replayed_non_model": (
             parser_knowledge_coverage == build_parser_knowledge_coverage(root)
@@ -527,7 +538,7 @@ def main() -> None:
             and parser_gold_evaluation.get("model_feature") is False
         ),
         "p3_4_market_gold_replayed_fail_closed": (
-            market_gold_evaluation == build_market_gold_evaluation(root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
+            market_gold_evaluation == build_market_gold_evaluation(root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256, args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature)
             and (market_gold_evaluation.get("publication_ready") is False or market_gold_evaluation.get("status") == "evaluated")
         ),
         "p3_4_catalog_completion_replayed": (
@@ -558,10 +569,11 @@ def main() -> None:
             args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
             args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
             args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
+            args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "5.3-p4.1", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "5.4-p4.2", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]; sys.path.insert(0, str(ROOT))
 from tools.parser_review.onboarding import canonical_bytes, digest, _fingerprint, _keyed_contract_payload, keyed_commitment_merkle_root, keyed_split_commitment, KEYED_CONTRACT_NAMESPACE
@@ -46,6 +47,8 @@ class KeyedFinalizationE2E(unittest.TestCase):
   candidate=build_candidate_bundle(verified,resolution,contract,self.root); candidate_path=self.ext/'candidate.json'; candidate_path.write_bytes(canonical_bytes(candidate)); candidate_sig=self.ext/'candidate.sig'; binding_sig=self.ext/'binding.sig'; self.sign(ck,NAMESPACE,candidate,candidate_sig); self.sign(ck,'sky-parser-keyed-replay-binding-v2',candidate['binding_payload'],binding_sig)
   import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
   self.assertEqual(len((self.root/'data/review/parser-gold/claims.jsonl').read_text().splitlines()),200)
+  # Replaying the same fully verified import is exact-idempotent.
+  import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
   # The binding stays external and is replayed by the evaluator.
   binding=candidate['binding_payload']|{'signature_file':'binding.sig','binding_sha256':digest(canonical_bytes(candidate['binding_payload']))}; bp=self.ext/'binding.json'; bp.write_bytes(canonical_bytes(binding)); replay_path=self.ext/'replay.jsonl'; replay_path.write_bytes(b''.join(canonical_bytes(x) for x in replay))
   queue={'schema_version':'1.0-p3.7','status':'keyed_frozen_pending_external_decisions','cohort_id':contract['cohort_id'],'keyed_protocol':contract['keyed_protocol'],'queue_size':200,'split_counts':contract['split_counts'],'required_strata':contract['required_strata'],'strata_distinct_value_counts':contract['strata_distinct_value_counts'],'commitment_merkle_root':contract['commitment_merkle_root'],'split_commitment':contract['split_commitment'],'packet_sha256':contract['packet_sha256'],'assignment_ledger_sha256':contract['assignment_ledger_sha256'],'custodian_id':contract['custodian_id'],'custodian_authority_id':contract['authority_id'],'custodian_fingerprint':contract['fingerprint'],'custodian_contract_sha256':contract['contract_sha256']}; queue['manifest_sha256']=digest(canonical_bytes(queue)); q=self.root/'data/review/parser-gold/review-queue-manifest.json'; q.write_bytes(canonical_bytes(queue))
@@ -62,6 +65,51 @@ class KeyedFinalizationE2E(unittest.TestCase):
   ck,cb,rb,cp,ledger,a,b,adj,contract,resolution,_=self.fixture(); verified=verify_finalization(cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root); candidate=build_candidate_bundle(verified,resolution,contract,self.root); p=self.ext/'candidate.json'; p.write_bytes(canonical_bytes(candidate)); cs=self.ext/'candidate.sig'; bs=self.ext/'binding.sig'; self.sign(ck,NAMESPACE,candidate,cs); self.sign(ck,'sky-parser-keyed-replay-binding-v2',candidate['binding_payload'],bs); candidate['public_gold'][0]['expected_polarity']='unknown'; p.write_bytes(canonical_bytes(candidate))
   with self.assertRaises(ValueError): import_signed_candidate(p,cs,bs,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
   self.assertFalse((self.root/'data/review/parser-gold/claims.jsonl').exists())
+ def test_import_interrupt_rolls_back_owned_files_and_preserves_racing_sentinel(self):
+  ck,cb,rb,cp,ledger,a,b,adj,contract,resolution,_=self.fixture()
+  verified=verify_finalization(cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root); candidate=build_candidate_bundle(verified,resolution,contract,self.root)
+  candidate_path=self.ext/'candidate.json'; candidate_path.write_bytes(canonical_bytes(candidate)); candidate_sig=self.ext/'candidate.sig'; binding_sig=self.ext/'binding.sig'
+  self.sign(ck,NAMESPACE,candidate,candidate_sig); self.sign(ck,'sky-parser-keyed-replay-binding-v2',candidate['binding_payload'],binding_sig)
+  foreign=self.root/'data/review/parser-gold/rule-development-manifest.json'; original_open=Path.open
+  def race_open(path, mode='r', *args, **kwargs):
+   if path == foreign and mode == 'xb':
+    foreign.parent.mkdir(parents=True,exist_ok=True)
+    with original_open(path,'wb') as handle: handle.write(b'foreign-sentinel')
+    raise FileExistsError('racing foreign sentinel')
+   return original_open(path,mode,*args,**kwargs)
+  with mock.patch.object(Path,'open',new=race_open):
+   with self.assertRaises(FileExistsError):
+    import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
+  self.assertEqual(foreign.read_bytes(),b'foreign-sentinel')
+  self.assertFalse((self.root/'data/review/parser-gold/claims.jsonl').exists())
+  self.assertFalse((self.root/'data/review/parser-gold/attestations.jsonl').exists())
+  self.assertFalse((self.root/'data/review/parser-gold/.finalization-import.lock').exists())
+ def test_import_keyboard_interrupt_rolls_back_all_owned_outputs(self):
+  ck,cb,rb,cp,ledger,a,b,adj,contract,resolution,_=self.fixture()
+  verified=verify_finalization(cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root); candidate=build_candidate_bundle(verified,resolution,contract,self.root)
+  candidate_path=self.ext/'candidate.json'; candidate_path.write_bytes(canonical_bytes(candidate)); candidate_sig=self.ext/'candidate.sig'; binding_sig=self.ext/'binding.sig'
+  self.sign(ck,NAMESPACE,candidate,candidate_sig); self.sign(ck,'sky-parser-keyed-replay-binding-v2',candidate['binding_payload'],binding_sig)
+  original_copy=shutil.copyfileobj; calls=0
+  def interrupt_copy(*args, **kwargs):
+   nonlocal calls
+   calls+=1
+   if calls == 2: raise KeyboardInterrupt('fault injection')
+   return original_copy(*args,**kwargs)
+  with mock.patch('tools.parser_review.finalization.shutil.copyfileobj',side_effect=interrupt_copy):
+   with self.assertRaises(KeyboardInterrupt):
+    import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
+  for name in ('claims.jsonl','rule-development-manifest.json','attestations.jsonl','.finalization-import.lock'):
+   self.assertFalse((self.root/'data/review/parser-gold'/name).exists())
+ def test_journal_resumes_exact_prefix_but_foreign_prefix_is_rejected(self):
+  ck,cb,rb,cp,ledger,a,b,adj,contract,resolution,_=self.fixture(); verified=verify_finalization(cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root); candidate=build_candidate_bundle(verified,resolution,contract,self.root)
+  candidate_path=self.ext/'candidate.json'; candidate_path.write_bytes(canonical_bytes(candidate)); candidate_sig=self.ext/'candidate.sig'; binding_sig=self.ext/'binding.sig'; self.sign(ck,NAMESPACE,candidate,candidate_sig); self.sign(ck,'sky-parser-keyed-replay-binding-v2',candidate['binding_payload'],binding_sig)
+  import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
+  target=self.root/'data/review/parser-gold'; complete=(target/'claims.jsonl').read_bytes(); (target/'claims.jsonl').write_bytes(complete[:101]); (target/'rule-development-manifest.json').unlink(); (target/'attestations.jsonl').unlink()
+  stem=f"sky-parser-gold-{digest(str(self.root.resolve()).encode('utf-8'))[:24]}"; journal=Path(tempfile.gettempdir())/f'{stem}.journal.json'; expected={'claims.jsonl':complete,'rule-development-manifest.json':canonical_bytes(candidate['rule_manifest']),'attestations.jsonl':b''}; journal.write_bytes(canonical_bytes({'candidate_sha256':candidate['candidate_sha256'],'expected_sha256':{name:digest(value) for name,value in expected.items()}})); self.addCleanup(journal.unlink,missing_ok=True)
+  import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root); self.assertEqual((target/'claims.jsonl').read_bytes(),complete); self.assertFalse(journal.exists())
+  (target/'claims.jsonl').write_bytes(b'foreign-prefix'); (target/'rule-development-manifest.json').unlink(); (target/'attestations.jsonl').unlink()
+  with self.assertRaisesRegex(ValueError,'not this exact signed import'): import_signed_candidate(candidate_path,candidate_sig,binding_sig,resolution,cp,ledger,a,b,adj,cb,digest(cb.read_bytes()),rb,digest(rb.read_bytes()),self.root)
+  self.assertEqual((target/'claims.jsonl').read_bytes(),b'foreign-prefix')
  def test_v2_confirmed_missing_false_positive_blocks_50_over_51(self):
   rows=[]; private=[]; replay=[]
   for i in range(200):
