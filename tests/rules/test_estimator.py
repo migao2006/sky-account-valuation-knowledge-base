@@ -7,8 +7,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
 sys.path.insert(0, str(ROOT / "tools" / "classify"))
-from estimate import WEIGHTS, adapt_profile, estimate, hard_pool, normalize_price_type, score
+from estimate import WEIGHTS, adapt_profile, estimate as raw_estimate, hard_pool as raw_hard_pool, normalize_price_type, score
 from classify import classify
+
+
+def authorized_market_data():
+    return {
+        "status": "authorized_model_training", "allowed_uses": ["research", "model_training", "comparable_estimation"],
+        "source_snapshot": {"artifact_path": "tests/fixture.json", "sha256": "a" * 64, "captured_at": "2026-08-01", "replayable": True},
+        "license_evidence": {"kind": "explicit_data_license", "evidence_id": "fixture-license", "verified": True},
+        "replay_evidence": [{"evidence_id": "fixture-replay", "source_locator": "fixture://market", "content_sha256": "b" * 64, "reviewed_at": "2026-08-01"}],
+        "authorization_record_id": "fixture-authorized-record",
+    }
+
+
+def fixture_authority(row):
+    return row.get("market_data_authorization") == authorized_market_data()
+
+
+def estimate(account, comparables):
+    return raw_estimate(account, comparables, authorization_evaluator=fixture_authority)
+
+
+def hard_pool(account, comparable):
+    return raw_hard_pool(account, comparable, authorization_evaluator=fixture_authority)
 
 
 class EstimatorRulesTest(unittest.TestCase):
@@ -20,7 +42,7 @@ class EstimatorRulesTest(unittest.TestCase):
         # formal valuation input; the estimator never infers it from absence.
         self.account.update({"offer_kind": "seller_listing", "entity_kind": "single_account"})
         for row in self.rows:
-            row.update({"offer_kind": "seller_listing", "entity_kind": "single_account"})
+            row.update({"offer_kind": "seller_listing", "entity_kind": "single_account", "market_data_authorization": authorized_market_data()})
 
     def test_weights_are_exactly_one_hundred(self):
         self.assertEqual(sum(WEIGHTS.values()), 100)
@@ -340,7 +362,7 @@ class EstimatorRulesTest(unittest.TestCase):
             changed = dict(self.rows[0]); changed[key] = value
             self.assertLess(score(self.account, changed)["score"], baseline, key)
 
-    def test_official_nested_accounts_form_hard_pool_but_fail_sparse_quality_gate(self):
+    def test_legacy_official_nested_accounts_are_not_a_hard_pool_without_training_authorization(self):
         rows = [json.loads(line) for line in (ROOT / "data" / "comparables" / "accounts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         target = {
             "base_account": {"account_type": "winged_or_unspecified"},
@@ -348,12 +370,12 @@ class EstimatorRulesTest(unittest.TestCase):
             "evidence_quality": {"listing_text": "high"}, "valuation_date": "2026-08-16",
         }
         hard = [row for row in rows if hard_pool(target, row)[0]]
-        self.assertEqual(len(hard), 2)
+        self.assertEqual(len(hard), 0)
         result = estimate(target, rows)
-        self.assertEqual(result["strict_candidate_count"], 2)
+        self.assertEqual(result["strict_candidate_count"], 0)
         self.assertFalse(result["eligible"])
-        self.assertIn("fewer_than_three_comparables_meet_similarity_and_content_thresholds", result["insufficiency_reasons"])
         self.assertIn("fewer_than_three_hard_pool_compatible_comparables", result["insufficiency_reasons"])
+        self.assertTrue(any("market_data_not_authorized_for_model_training" in entry["reasons"] for entry in result["rejected_by_hard_pool"]))
 
     def test_winged_or_unspecified_is_unknown_not_a_similarity_match(self):
         target = {"base_account": {"account_type": "winged_or_unspecified"}}

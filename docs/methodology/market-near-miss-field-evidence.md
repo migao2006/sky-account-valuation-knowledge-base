@@ -22,3 +22,11 @@ price-cleaning, item-vector, or model tooling. Any future use requires a
 separate reviewed migration of normalized facts, followed by ordinary rebuild
 and validation. It cannot create a verified sale or imply ownership of 凜冬、
 絆愛、阿努、多禮 or any other item.
+
+Non-empty approved evidence additionally uses the same external OpenSSH audit
+contract as market-claim gold. `reviewer_a`, `reviewer_b`, and `adjudicator`
+must have three distinct, non-revoked authority fingerprints and each signs
+the complete evidence row plus the committed queue row. The external authority
+bundle path and its SHA-256 must be injected into validation; local or
+self-attested reviewer IDs cannot unlock the ledger. Private keys, source
+text, URLs, and contact data must never be committed.

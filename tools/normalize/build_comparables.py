@@ -26,6 +26,22 @@ INSTALLMENT_SURCHARGE_RE = re.compile(
 INSTALLMENT_MARKER_RE = re.compile(r"分期|分\s*(?:\d+|[一二三四五六七八九十]+)\s*期")
 
 
+def legacy_research_authorization() -> dict[str, Any]:
+    """Legacy anonymous research has no replayable training authorization."""
+    return {
+        "status": "legacy_research_only",
+        "allowed_uses": ["research"],
+        "source_snapshot": {
+            "artifact_path": "data/source/listings.jsonl",
+            "sha256": "50E6719A847C90E46F4439B8477A2F906F3AF2CD3D55D717152AEC41188DD897",
+            "captured_at": "2026-08-16",
+            "replayable": False,
+        },
+        "license_evidence": {"kind": "legacy_anonymous_research", "evidence_id": "p0_legacy_anonymous_market_snapshot", "verified": False},
+        "replay_evidence": [],
+    }
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -192,6 +208,7 @@ def recovered_history(listing: dict[str, Any], profile: dict[str, Any], predicat
         "legacy_risks": list(listing.get("risk_summary") or []),
         "evidence_quality": listing.get("evidence_quality", "unknown"),
         "sale_outcome": {"status": "not_observed", "completed_sale_price_twd": None, "verified": False},
+        "market_data_authorization": legacy_research_authorization(),
         "recovery": {
             "method": "strict_normalized_listing_recovery_v1",
             "reason": "Normalized listing met every strict normal-listing predicate but has no legacy curated history.",
@@ -242,6 +259,9 @@ def build(root: Path) -> dict[str, int]:
     histories = recover_histories(root, existing_histories, profiles)
     listings = {row["listing_id"]: row for row in read_jsonl(root / "data/normalized/listings.jsonl")}
     for history in histories:
+        # Legacy records are retained for research, but cannot silently retain
+        # a pre-P3 model-use permission when rebuilt from the anonymous source.
+        history["market_data_authorization"] = legacy_research_authorization()
         source_ids = history.get("source_listing_ids", [])
         listing = listings.get(source_ids[0]) if isinstance(source_ids, list) and len(source_ids) == 1 else None
         # A migration-level review may cover explicit multi-price terms, while
@@ -271,6 +291,7 @@ def build(root: Path) -> dict[str, int]:
             "offer_kind": history["offer_kind"], "entity_kind": history["entity_kind"],
             "market_pool": history["market_pool"], "market_evidence_quality": history["evidence_quality"],
             "sale_outcome": history["sale_outcome"],
+            "market_data_authorization": history["market_data_authorization"],
         })
         if "price_semantic_review" in history:
             profile["price_semantic_review"] = history["price_semantic_review"]

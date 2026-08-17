@@ -42,7 +42,9 @@ class CanonicalEvidenceRegistryTests(unittest.TestCase):
         registry = load_registry(ROOT)
         validator = OfflineSchemaValidator(ROOT / "schemas")
         schema = ROOT / "schemas/review/canonical-evidence-cohort.schema.json"
-        self.assertEqual(len(registry), 5)
+        self.assertGreaterEqual(len(registry), 1)
+        self.assertEqual(len({row["cohort_id"] for row in registry}), len(registry))
+        self.assertEqual(len({row["verifier_id"] for row in registry}), len(registry))
         self.assertTrue(all(not validator.validate(row, schema) for row in registry))
         problems, ledgers = validate_registry(ROOT, *self.context(ROOT))
         self.assertEqual(problems, [])

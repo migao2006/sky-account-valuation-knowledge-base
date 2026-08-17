@@ -34,6 +34,7 @@
 
 ## 市場資料與成交證據門檻
 
+0. 新市場資料必須符合 [`market-data-authorization-policy.md`](market-data-authorization-policy.md)：來源授權、去識別、可重播 snapshot 與外部信任根人審缺一不可；不得以公開抓取第三方帳號交易貼文擴樣。
 1. normal listing、urgent sale、last public price、sold claim 與 verified sale 永不互相升級或混池。
 2. 模型列必須有已驗證 currency、server、seller listing、single account、price 與 dedup cluster。
 3. offer/entity/price type/currency/server 的正式雙標 gold set 至少 200 筆，各欄 held-out accuracy 至少 98%；verified-sale false positive 必須為 0。
@@ -58,10 +59,10 @@
 
 ## 圖片證據門檻
 
-P0 至 P2.9 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
+P0 至 P3.0 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
 
 ## 目前狀態
 
-截至 P2.9，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,480 筆離線查詢索引。Nintendo 四件、AURORA FAQ 968 六件、Journey Pack 三件、Moomintroll Accessory Set 兩件與 Kizuna AI 2022 三件 canonical item 具有受限、可重播的 identity 證據鏈，但 1,386 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場人工 gold 與 near-miss approved evidence 都是 0，正式正常刊登只有 2 筆，Catalog、Item Vector、價格資料、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
+截至 P3.0，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,485 筆離線查詢索引。23 筆 canonical item 具有受限、可重播的 identity 證據鏈，但 1,381 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場人工 gold、near-miss approved evidence 與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P2.9 也沒有固定 holdout bytes、不可交疊 cluster 與時間切分的可重算發布評估器；因此 runtime 與離線 evaluator 都拒絕未通過獨立發布證據的 `trained` artifact 對外估價。模型發布必須在後續版本先建立可重播 evaluator，不能由 artifact 自填指標解鎖。
+P3.0 新增 publication-readiness 的可重播容量報告，但仍沒有足量、具驗證日期的固定 holdout bytes 與可重算模型發布評估器；因此 runtime 與離線 evaluator 都拒絕未通過獨立發布證據的 `trained` artifact 對外估價。模型發布必須在後續版本先建立可重播 evaluator，不能由 artifact 自填指標解鎖。

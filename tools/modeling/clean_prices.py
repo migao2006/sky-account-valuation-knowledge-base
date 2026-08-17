@@ -15,6 +15,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from market_authorization import model_training_authorization_reasons
+
 
 ROOT = Path(__file__).resolve().parents[2]
 NORMAL_TYPES = {"asking", "normal_listing"}
@@ -48,9 +52,10 @@ def base_account_type(row: dict[str, Any]) -> str:
     return value if isinstance(value, str) and value else "unknown"
 
 
-def basic_reasons(row: dict[str, Any]) -> tuple[str, list[str]]:
+def basic_reasons(row: dict[str, Any], authorization_evaluator: Any = None) -> tuple[str, list[str]]:
     """Return the training line and all hard rejection reasons for one row."""
     reasons: list[str] = []
+    reasons.extend(model_training_authorization_reasons(row, authorization_evaluator))
     line = normalized_price_type(row)
     price = row.get("selected_price_twd")
     if not isinstance(price, (int, float)) or isinstance(price, bool) or not math.isfinite(float(price)) or price <= 0:
@@ -117,17 +122,18 @@ def cleaned(row: dict[str, Any], line: str, rank: int) -> dict[str, Any]:
         "history_id": row["history_id"], "account_id": row["account_id"], "cluster_id": "cluster_" + row["account_id"].removeprefix("account_"),
         "cluster_rank": rank, "selected_price_twd": price, "log_price_twd": math.log(price),
         "price_line": line, "normalized_price_type": line, "base_account_type": base_account_type(row),
-        "post_date": row.get("post_date"), "observed_at": row["observed_at"], "currency": "TWD", "server": "international",
+        "post_date": row.get("post_date"), "date_verified": row.get("date_verified") is True,
+        "observed_at": row["observed_at"], "currency": "TWD", "server": "international",
         "evidence_quality": row.get("market_evidence_quality", row.get("evidence_quality", "unknown")), "review_status": "accepted",
     }
 
 
-def clean(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def clean(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Return normal rows, urgent rows and a complete excluded/review ledger."""
     candidates: list[tuple[dict[str, Any], str]] = []
     ledger: list[dict[str, Any]] = []
     for row in rows:
-        line, reasons = basic_reasons(row)
+        line, reasons = basic_reasons(row, authorization_evaluator)
         if reasons:
             disposition = "needs_review" if {"brokerage_included_price", "multiple_price_terms"} & set(reasons) else "excluded"
             ledger.append(exclusion(row, line, reasons, disposition))

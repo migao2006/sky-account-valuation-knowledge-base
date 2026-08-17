@@ -17,6 +17,9 @@ sys.path.insert(0, str(ROOT / "tools" / "validate"))
 from validate import validate  # noqa: E402
 from release_files import HASH_EXCLUSIONS, lf_violations, release_files  # noqa: E402
 from canonical_evidence_registry import load_registry, validate_registry  # noqa: E402
+from market_audit import audit_market_ledgers  # noqa: E402
+from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
+from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -57,13 +60,13 @@ def item_value_rows_release_valid(rows: list[dict[str, object]], canonical_item_
 
 
 def human_review_ledgers_release_valid(
-    market_claim_gold: list[dict[str, object]], near_miss_approved_evidence: list[dict[str, object]],
+    market_claim_gold: list[dict[str, object]], near_miss_approved_evidence: list[dict[str, object]], market_audit_errors: list[str] | None = None,
 ) -> bool:
-    """Fail closed until external human review identities have replayable audit evidence."""
-    return not market_claim_gold and not near_miss_approved_evidence
+    """A nonempty ledger is legal only after replaying the injected trust root."""
+    return (not market_claim_gold and not near_miss_approved_evidence) or (market_audit_errors == [])
 
 
-def verify_fresh_lf_checkout(root: Path, source_zip: Path) -> dict[str, object]:
+def verify_fresh_lf_checkout(root: Path, source_zip: Path, authority_bundle: Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain"], text=True, capture_output=True, check=False
@@ -81,6 +84,10 @@ def verify_fresh_lf_checkout(root: Path, source_zip: Path) -> dict[str, object]:
         if clone.returncode:
             return {"checked": True, "valid": False, "reason": "git_clone_failed"}
         command = [sys.executable, str(checkout / "tools/validate/release_check.py"), "--root", str(checkout), "--source-zip", str(source_zip)]
+        if authority_bundle is not None:
+            command.extend(["--market-audit-authority-bundle", str(authority_bundle)])
+        if authority_bundle_sha256 is not None:
+            command.extend(["--market-audit-authority-bundle-sha256", authority_bundle_sha256])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -97,9 +104,11 @@ def main() -> None:
     parser.add_argument("--source-zip", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--verify-fresh-lf-checkout", action="store_true", help="also validate an actual clean Git LF checkout")
+    parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
+    parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
     args = parser.parse_args()
     root = args.root.resolve()
-    integrity = validate(root)
+    integrity = validate(root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
     # discovery can shadow the top-level `modeling` package and make release
@@ -178,10 +187,16 @@ def main() -> None:
     market_claim_gold = [json.loads(line) for line in (root / "data/review/market-claim-gold.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     market_near_miss_review = [json.loads(line) for line in (root / "data/review/market-near-miss-field-review.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     market_near_miss_evidence = [json.loads(line) for line in (root / "data/review/market-near-miss-approved-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    market_audit_errors = audit_market_ledgers(
+        root, market_claim_review, market_claim_gold, market_near_miss_review, market_near_miss_evidence,
+        args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+    )
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
     account_catalog_resolution = [json.loads(line) for line in (root / "data/review/account-catalog-resolution.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    historical_cost_references = [json.loads(line) for line in (root / "data/derived/official-historical-cost-references.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    publication_readiness = json.loads((root / "reports/model-publication-readiness.json").read_text(encoding="utf-8"))
     vendor_item_evidence = [json.loads(line) for line in (root / "data/review/skygame-data-1.3.4-item-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     canonical_item_ids = {row["item_id"] for row in items}
@@ -228,7 +243,7 @@ def main() -> None:
         "p2_1_catalog_universe_reconciled": len(catalog_universe) == 3266 and coverage.get("p2_1_review_infrastructure", {}).get("catalog_universe_reconciled") is True,
         "p2_1_promotion_ledger_complete": len(item_promotions) == len(candidate_item_ids) and {row.get("candidate_item_id") for row in item_promotions} == candidate_item_ids and all(isinstance(row.get("decision"), str) and isinstance(row.get("canonical_write"), str) for row in item_promotions),
         "p2_1_human_gold_integrity": len({row.get("review_id") for row in market_claim_review}) == len(market_claim_review),
-        "human_review_ledgers_externally_audited": human_review_ledgers_release_valid(market_claim_gold, market_near_miss_evidence),
+        "human_review_ledgers_externally_audited": human_review_ledgers_release_valid(market_claim_gold, market_near_miss_evidence, market_audit_errors),
         "p2_3_source_scoped_identities_fail_closed": len(reference_identities) == len(source_reference_ids) and all(row.get("link_status") in {"canonical_link", "candidate_link", "unresolved"} and row.get("identity_scope") == "source_snapshot_only" and row.get("canonical_identity_status") == "unverified" and row.get("promotion_eligibility") == "prohibited" and row.get("model_feature_status") == "excluded_pending_verification" for row in reference_identities),
         "p2_4_near_miss_evidence_integrity": len({row.get("review_id") for row in market_near_miss_review}) == len(market_near_miss_review),
         "p2_5_catalog_query_truth_layers": len(catalog_query_index) == len(canonical_item_ids) + len(candidate_item_ids) + len(source_reference_ids) and len({row.get("query_entity_id") for row in catalog_query_index}) == len(catalog_query_index) and query_ids_by_type["canonical_item"] == canonical_item_ids and query_ids_by_type["review_candidate"] == candidate_item_ids and query_ids_by_type["source_reference"] == source_reference_ids and resolved_query_ids == verified_item_ids and catalog_query_summary.get("canonical_item_count") == len(canonical_item_ids) and catalog_query_summary.get("review_candidate_count") == len(candidate_item_ids) and catalog_query_summary.get("source_reference_count") == len(source_reference_ids) and catalog_query_summary.get("query_row_count") == len(catalog_query_index),
@@ -248,13 +263,25 @@ def main() -> None:
         "formal_models_publication_gated": model_artifacts_release_valid(model_artifacts),
         "item_values_provenance_gated": item_value_rows_release_valid(item_values, canonical_item_ids),
         "verified_identity_cohort_not_over_promoted_to_model": all(row.get("model_feature_status") != "eligible" or row.get("verification_status") == "verified" for row in items),
+        "p3_official_historical_costs_replayable_and_non_valuative": (
+            historical_cost_references == build_historical_cost_references(root)
+            and {row.get("item_id") for row in historical_cost_references} == verified_item_ids
+            and len(historical_cost_references) == len(verified_item_ids)
+            and all(row.get("model_feature") is False and row.get("resale_value_effect") == "not_inferred" for row in historical_cost_references)
+        ),
+        "p3_publication_readiness_replayed_and_not_ready": (
+            publication_readiness == build_publication_readiness(root)
+            and publication_readiness.get("status") == "not_ready"
+            and publication_readiness.get("artifact_publication_fields_consulted") is False
+            and publication_readiness.get("trained_models_treated_as_passed") is False
+        ),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
-        fresh_checkout = verify_fresh_lf_checkout(root, source_zip)
+        fresh_checkout = verify_fresh_lf_checkout(root, source_zip, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.1-p2.9", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.2-p3.0", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

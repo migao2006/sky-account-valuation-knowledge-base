@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/market-audit-attestation.schema.json",
+  "description": "Detached OpenSSH signature binding one external authority to a complete anonymous market ledger row and its committed queue row.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["attestation_id", "ledger_kind", "ledger_id", "role", "authority_id", "fingerprint", "payload_sha256", "signature_file"],
+  "properties": {
+    "attestation_id": {"type": "string", "pattern": "^market_audit_attestation_[0-9]{4}$"},
+    "ledger_kind": {"enum": ["market_claim_gold", "market_near_miss_approved_evidence"]},
+    "ledger_id": {"type": "string", "pattern": "^market_(claim_gold|near_miss_evidence)_[0-9]{4}$"},
+    "role": {"enum": ["annotator_a", "annotator_b", "reviewer_a", "reviewer_b", "adjudicator"]},
+    "authority_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
+    "fingerprint": {"type": "string", "pattern": "^SHA256:[A-Za-z0-9+/]+$"},
+    "payload_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "signature_file": {"type": "string", "pattern": "^data/review/market-audit/signatures/[a-z0-9_./-]+\\.sig$"}
+  }
+}

@@ -3,7 +3,7 @@
   "$id": "market/history.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "history_id", "legacy_key", "source_listing_ids", "account_id", "selected_price_twd", "price_history_twd", "price_type", "status", "post_date", "observed_at", "date_verified", "date_evidence_state", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "market_pool", "legacy_features", "legacy_risks", "evidence_quality", "sale_outcome"],
+  "required": ["schema_version", "history_id", "legacy_key", "source_listing_ids", "account_id", "selected_price_twd", "price_history_twd", "price_type", "status", "post_date", "observed_at", "date_verified", "date_evidence_state", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "market_pool", "legacy_features", "legacy_risks", "evidence_quality", "sale_outcome", "market_data_authorization"],
   "properties": {
     "schema_version": {"const": "3.0-p0"},
     "history_id": {"type": "string", "pattern": "^history_[a-z0-9_]+$"},
@@ -29,6 +29,7 @@
     "legacy_risks": {"type": "array", "items": {"type": "string"}},
     "evidence_quality": {"enum": ["high", "medium", "low", "unknown"]},
     "sale_outcome": {"type": "object", "additionalProperties": false, "required": ["status", "completed_sale_price_twd", "verified"], "properties": {"status": {"enum": ["not_observed", "sold_claimed", "completed_verified", "unknown"]}, "completed_sale_price_twd": {"type": ["number", "null"], "minimum": 0}, "verified": {"type": "boolean"}}},
+    "market_data_authorization": {"$ref": "market-data-authorization.schema.json"},
     "price_semantic_review": {"type": "object", "additionalProperties": false, "required": ["urgency", "evidence_state", "review_status", "reason_codes"], "properties": {"urgency": {"enum": ["urgent_sale", "unknown"]}, "brokerage_included": {"const": true}, "multi_price": {"const": true}, "evidence_state": {"const": "text_claim"}, "review_status": {"const": "needs_review"}, "reason_codes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9_]+$"}}}},
     "recovery": {"type": "object", "additionalProperties": false, "required": ["method", "reason", "source_layer", "source_listing_id", "legacy_history_match", "predicates"], "properties": {"method": {"const": "strict_normalized_listing_recovery_v1"}, "reason": {"type": "string", "minLength": 1}, "source_layer": {"const": "data/normalized/listings.jsonl"}, "source_listing_id": {"type": "string", "pattern": "^listing_[a-z0-9_]+$"}, "legacy_history_match": {"const": "none"}, "predicates": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true}}}
   },

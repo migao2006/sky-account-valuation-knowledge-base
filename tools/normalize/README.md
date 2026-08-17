@@ -141,3 +141,16 @@ permanent ownership, formal Chinese names, visual identity, or model eligibility
 ```powershell
 python tools/normalize/apply_kizuna_ai_2022_cohort.py --root .
 ```
+
+`build_historical_cost_references.py` discovers every active, replayable
+canonical-evidence cohort through the formal registry and writes one conservative
+reference per verified target item. It separates an exact historical item cost,
+an in-game-currency cost, an unallocated historical bundle price, and unknown.
+Bundle amounts remain on the set reference: the individual `item_amount` is
+always `null`. The output is strictly non-model and has
+`resale_value_effect=not_inferred`; it must never be presented as a resale value
+or supplied to the estimator.
+
+```powershell
+python tools/normalize/build_historical_cost_references.py --root .
+```

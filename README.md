@@ -1,12 +1,14 @@
-# Sky 光遇帳號估價知識庫 v4.1 P2.9
+# Sky 光遇知識庫與授權估價框架 v4.2 P3.0
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v4.1 P2.9 新增 Kizuna AI 2022 FAQ 879 三件組的可重播官方摘要與固定 vendor identity，確認 Hair、Bow、Cape 及歷史套組價格／檔期，但不把歷史販售冒充目前供應。新增 1,022 筆帳號 lexical Catalog sidecar，以碰撞抑制及 seller-single gate 找出待人工複核的名稱命中；它不寫入持有狀態、Item Vector 或模型。所有正式工具只處理本機檔案，不主動連網。
+v4.2 P3.0 新增 SkyFest FAQ 1330 core-five 的可重播官方摘要、固定 vendor identity 與歷史取得成本參考；成本表不分攤 bundle、不推論轉售價。市場人工審核新增外部信任根與三方 OpenSSH attestations 契約；市場列另需獨立、可重播的資料授權才能進訓練。所有正式工具只處理本機檔案，不主動連網。
 
-目前資料仍不足以訓練可信模型：102 個 legacy 可比歷程加 1 筆明示人工覆核恢復歷程；56,000 元案例因分期明示加價而進語義覆核，清洗後只剩 2 筆正常刊登、0 筆可訓練急售。100 個 canonical item 中 18 筆 identity 已驗證、82 筆仍待審；因取得狀態、辨識 token、永久性及持有觀測等建模證據仍不足，正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
+目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，沒有外部授權 evaluator，因此正式正常／急售訓練列皆為 0。105 個 canonical item 中 23 筆 identity 已驗證，但正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
-P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P2.9 重建後的 relation 與 lexical sidecar 都只是來源／文字覆核關係，不會自動提升 ownership 或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.0 重建後的 relation、成本參考與 lexical sidecar 都只是來源／文字覆核關係，不會自動提升 ownership、轉售價或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+
+本專案不會抓取公開第三方帳號交易貼文來補足訓練資料。官方條款禁止帳號出售／轉讓，新的市場資料必須具備明確授權、去識別、固定來源 bytes 與可驗證人審；詳見 [`docs/methodology/market-data-authorization-policy.md`](docs/methodology/market-data-authorization-policy.md)。在此之前，轉售估價維持 fail closed；官方歷史取得成本也不得被解讀為帳號轉售價。
 
 P2.4 也修正 Item Vector 的套組三態：任何 required 成員未知或尚未達 model eligibility 時，套組比例與完整旗標維持 `null`，不再把缺資料寫成 0%／不完整。每筆 vector 與模型 artifact 都綁定 canonical item、alias、set 的 Catalog provenance；Catalog 變更但未重建時會 fail closed。3,266 筆 vendor 列均有逐列 scope disposition，但其中 1,508 筆仍需範圍審查，不能據此宣稱全物品完成。
 
@@ -30,7 +32,7 @@ P2.4 也修正 Item Vector 的套組三態：任何 required 成員未知或尚�
 
 市場資料只保存匿名 ID 與必要的交易事實。不得加入玩家姓名、帳號、UID、電話、Email、付款資料、登入資訊、社群帳號或可回推至原貼文的 locator。
 
-本版本不把單件物品換算為固定價格。Item Value Table 是控制其他特徵後的條件歸因，不能逐件相加；未達持有、具證據的確認缺少、跨 refit fold 方向穩定度及模型 provenance 門檻時不顯示數值。單一模型內的 bootstrap 只作診斷，不能自行解鎖物品歸因。正式市場資料中，目前只有兩筆正常刊登同時確認幣別為 TWD、伺服器為國際服且價格語義單一；56,000 元案例有分期加價，唯一急售觀察含仲，均不可作模型資料，因此模型保持停用。
+本版本不把單件物品換算為固定價格。Item Value Table 是控制其他特徵後的條件歸因，不能逐件相加；未達持有、具證據的確認缺少、跨 refit fold 方向穩定度及模型 provenance 門檻時不顯示數值。單一模型內的 bootstrap 只作診斷，不能自行解鎖物品歸因。正式市場資料中沒有任何一筆同時具備外部可重播資料授權與訓練資格，因此模型保持停用。
 
 ## 分類、估價與證據
 
@@ -52,4 +54,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P2.9 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.0 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。

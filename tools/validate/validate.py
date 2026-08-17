@@ -35,7 +35,11 @@ from build_market_claim_review import build_queue as build_market_claim_queue, v
 from build_market_near_miss_review import build_queue as build_market_near_miss_queue, validate_approved_evidence  # noqa: E402
 from build_source_scoped_item_identities import build_source_scoped_identities  # noqa: E402
 from canonical_evidence_registry import load_registry, validate_registry  # noqa: E402
+from market_audit import audit_market_ledgers  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
+from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
+from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
+from tools.modeling.clean_prices import clean as clean_model_prices  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -63,6 +67,7 @@ SCHEMA_FILES = {
     "data/modeling/price-cleaned-urgent.jsonl": "schemas/modeling/cleaned-price.schema.json",
     "data/modeling/model-exclusions.jsonl": "schemas/modeling/price-exclusion.schema.json",
     "data/modeling/item-value-table.jsonl": "schemas/modeling/item-value-table.schema.json",
+    "data/derived/official-historical-cost-references.jsonl": "schemas/knowledge/official-historical-cost-reference.schema.json",
     "data/curated/image-evidence.jsonl": "schemas/evidence/image-evidence.schema.json",
     "data/review/item-candidates.jsonl": "schemas/review/item-candidate.schema.json",
     "data/review/alias-conflicts.jsonl": "schemas/review/alias-conflict.schema.json",
@@ -80,6 +85,7 @@ SCHEMA_FILES = {
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
     "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
+    "data/review/market-audit/attestations.jsonl": "schemas/review/market-audit-attestation.schema.json",
     "data/review/account-catalog-resolution.jsonl": "schemas/review/account-catalog-resolution.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
     "data/normalized/source-scoped-item-identities.jsonl": "schemas/normalized/source-scoped-item-identity.schema.json",
@@ -94,6 +100,7 @@ JSON_SCHEMA_FILES = {
     "reports/migration/migration-summary.json": "schemas/reports/migration-summary.schema.json",
     "reports/migration/file-inventory.json": "schemas/reports/file-inventory.schema.json",
     "reports/validation/p0-validation.json": "schemas/reports/validation.schema.json",
+    "reports/model-publication-readiness.json": "schemas/modeling/publication-readiness.schema.json",
     "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/xgboost-normal_listing.json": "schemas/modeling/xgboost-artifact.schema.json",
@@ -112,6 +119,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1308-journey-pack.json": "schemas/knowledge/journey-pack-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1356-moomintroll-accessory-set.json": "schemas/knowledge/moomintroll-accessory-set-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-879-kizuna-ai-2022.json": "schemas/knowledge/kizuna-ai-2022-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1330-skyfest-core-five.json": "schemas/knowledge/skyfest-faq-1330-core-five-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -119,6 +127,7 @@ REQUIRED_FORMAL_JSONL = {
     "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
     "data/modeling/item-value-table.jsonl",
+    "data/derived/official-historical-cost-references.jsonl",
     "data/review/account-catalog-resolution.jsonl",
 }
 PRIVATE_KEYS = {"player_name", "account_name", "uid", "phone", "email", "payment", "login", "password", "social_handle", "source_url", "url", "raw_ocr", "ocr_text"}
@@ -143,6 +152,24 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def formal_price_rebuild_errors(
+    comparable_accounts: list[dict[str, Any]],
+    actual_normal: list[dict[str, Any]],
+    actual_urgent: list[dict[str, Any]],
+    actual_exclusions: list[dict[str, Any]],
+) -> list[str]:
+    """Reject any formal model-price row not produced by the authorization gate."""
+    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(comparable_accounts)
+    problems: list[str] = []
+    if actual_normal != expected_normal:
+        problems.append("price-cleaned-normal differs from deterministic authorized rebuild")
+    if actual_urgent != expected_urgent:
+        problems.append("price-cleaned-urgent differs from deterministic authorized rebuild")
+    if actual_exclusions != expected_exclusions:
+        problems.append("model-exclusions differs from deterministic authorized rebuild")
+    return problems
+
+
 def validate_canonical_field_evidence(
     evidence_groups: list[tuple[str, list[dict[str, Any]]]],
     items: dict[str, dict[str, Any]],
@@ -153,7 +180,7 @@ def validate_canonical_field_evidence(
     problems: list[str] = []
     seen: set[str] = set()
     item_fields = {
-        "canonical_name_en", "identity_description", "item_category", "vendor_item_type", "source_type",
+        "canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_type", "source_type",
         "set_membership", "availability_status", "availability_history", "original_cost",
         "original_currency", "first_release_date", "free_or_premium",
         "permanent_account_item", "collaboration", "visual_reference",
@@ -274,7 +301,10 @@ def validate_vendor_evidence_links(vendor_metadata: dict[str, Any], vendor_snaps
     return errors
 
 
-def validate(root: Path = ROOT) -> dict[str, Any]:
+def validate(
+    root: Path = ROOT, market_audit_authority_bundle: str | Path | None = None,
+    market_audit_authority_bundle_sha256: str | None = None,
+) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     ids: dict[str, set[str]] = {}
@@ -632,16 +662,19 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         errors.append("market-claim-review: committed queue differs from deterministic fixed selection")
     market_claim_gold = read_jsonl(root / "data/review/market-claim-gold.jsonl")
     errors.extend(f"market-claim-gold: {issue}" for issue in validate_gold_links(market_claim_queue, market_claim_gold))
-    if market_claim_gold:
-        errors.append("market-claim-gold: nonempty ledger requires a replayable external human-audit or signature artifact")
     near_miss_queue = read_jsonl(root / "data/review/market-near-miss-field-review.jsonl")
     expected_near_miss_queue = build_market_near_miss_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if near_miss_queue != expected_near_miss_queue:
         errors.append("market-near-miss: committed queue differs from deterministic single-hard-evidence selection")
     near_miss_evidence = read_jsonl(root / "data/review/market-near-miss-approved-evidence.jsonl")
     errors.extend(f"market-near-miss: {issue}" for issue in validate_approved_evidence(near_miss_queue, near_miss_evidence))
-    if near_miss_evidence:
-        errors.append("market-near-miss: nonempty approved-evidence ledger requires a replayable external human-audit or signature artifact")
+    errors.extend(
+        f"market-audit: {issue}"
+        for issue in audit_market_ledgers(
+            root, market_claim_queue, market_claim_gold, near_miss_queue, near_miss_evidence,
+            market_audit_authority_bundle, market_audit_authority_bundle_sha256,
+        )
+    )
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -735,6 +768,16 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
                 errors.append(f"item-vector:{account_id}:{state.get('item_id')}: unknown cannot be confirmed missing")
     if set(vectors_by_account) != account_ids:
         errors.append("item-vector: account coverage differs from normalized profiles")
+    # Formal price inputs are not hand-authored.  Rebuild all three outputs
+    # with the production authorization evaluator intentionally absent; any
+    # injected row, stale authorization, or edited exclusion must fail closed.
+    actual_normal = read_jsonl(root / "data/modeling/price-cleaned-normal.jsonl")
+    actual_urgent = read_jsonl(root / "data/modeling/price-cleaned-urgent.jsonl")
+    actual_exclusions = read_jsonl(root / "data/modeling/model-exclusions.jsonl")
+    errors.extend(formal_price_rebuild_errors(
+        read_jsonl(root / "data/comparables/accounts.jsonl"),
+        actual_normal, actual_urgent, actual_exclusions,
+    ))
     # Clean model prices must be a strict, reproducible subset of vectors.
     for relative, expected_line in (
         ("data/modeling/price-cleaned-normal.jsonl", "normal_listing"),
@@ -896,7 +939,26 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if migration_summary.get(key) != formal_counts[key]:
             errors.append(f"migration summary mismatch: {key} summary={migration_summary.get(key)!r} actual={formal_counts[key]}")
     if migration_summary.get("migrated_histories", 0) + migration_summary.get("not_migrated_histories", 0) != migration_summary.get("legacy_histories"):
-        errors.append("migration summary mismatch: migrated and unmigrated histories do not account for legacy histories")
+            errors.append("migration summary mismatch: migrated and unmigrated histories do not account for legacy histories")
+    # P3.0 derived knowledge and publication-readiness reports are formal,
+    # deterministic views over the canonical evidence and modeling inputs.
+    # Reject hand-edited or stale copies rather than trusting their claims.
+    historical_cost_path = root / "data/derived/official-historical-cost-references.jsonl"
+    try:
+        actual_historical_costs = read_jsonl(historical_cost_path)
+        expected_historical_costs = build_historical_cost_references(root)
+        if actual_historical_costs != expected_historical_costs:
+            errors.append("historical cost references differ from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"historical cost references: {exc}")
+    publication_readiness_path = root / "reports/model-publication-readiness.json"
+    try:
+        actual_publication_readiness = json.loads(publication_readiness_path.read_text(encoding="utf-8"))
+        expected_publication_readiness = build_publication_readiness(root)
+        if actual_publication_readiness != expected_publication_readiness:
+            errors.append("model publication readiness differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"model publication readiness: {exc}")
     # Date invariant at every market stage.
     for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl", "data/review/market-near-miss-approved-evidence.jsonl"):
         path = root / rel
@@ -947,7 +1009,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.1-p2.9", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.2-p3.0", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -958,8 +1020,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Validate the offline P0 package")
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
+    parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
     args = parser.parse_args()
-    result = validate(args.root.resolve())
+    result = validate(args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.write_text(text, encoding="utf-8")

@@ -11,6 +11,7 @@ from typing import Any
 
 from release_files import HASH_EXCLUSIONS, release_files
 from canonical_evidence_registry import load_registry, validate_registry
+from market_audit import audit_market_ledgers
 
 BUILT_AT = "2026-08-17T00:00:00+08:00"
 
@@ -50,6 +51,8 @@ def derived_model_status(artifacts: list[dict[str, Any]]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
+    parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
     args = parser.parse_args()
     root = args.root.resolve()
 
@@ -90,10 +93,12 @@ def main() -> None:
         "market_claim_gold": root / "data/review/market-claim-gold.jsonl",
         "market_near_miss_review": root / "data/review/market-near-miss-field-review.jsonl",
         "market_near_miss_evidence": root / "data/review/market-near-miss-approved-evidence.jsonl",
+        "market_audit_attestations": root / "data/review/market-audit/attestations.jsonl",
         "fandom_crosswalk": root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl",
         "source_scoped_item_identities": root / "data/normalized/source-scoped-item-identities.jsonl",
         "catalog_query_index": root / "data/normalized/catalog-query-index.jsonl",
         "account_catalog_resolution": root / "data/review/account-catalog-resolution.jsonl",
+        "historical_cost_references": root / "data/derived/official-historical-cost-references.jsonl",
     }
     migration_aliases = read_jsonl(root / "data/review/unmapped-season-aliases.jsonl") + read_jsonl(root / "data/review/unmapped-item-aliases.jsonl")
     unmapped_rows = [
@@ -106,6 +111,12 @@ def main() -> None:
     ]
     write_utf8_lf(paths["unmapped"], "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in unmapped_rows))
     rows = {name: read_jsonl(path) for name, path in paths.items()}
+    market_audit_errors = audit_market_ledgers(
+        root, rows["market_claim_review"], rows["market_claim_gold"], rows["market_near_miss_review"], rows["market_near_miss_evidence"],
+        args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+    )
+    if market_audit_errors:
+        raise RuntimeError(f"market audit contract is invalid: {market_audit_errors}")
     cohorts = load_registry(root)
     registry_problems, cohort_evidence = validate_registry(
         root,
@@ -139,7 +150,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.1-p2.9",
+        "schema_version": "4.2-p3.0",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -249,6 +260,7 @@ def main() -> None:
             "model_eligible_rows": sum(row.get("model_feature_status") == "eligible" for row in rows["source_scoped_item_identities"]),
             "market_near_miss_review_rows": len(rows["market_near_miss_review"]),
             "market_near_miss_approved_evidence_rows": len(rows["market_near_miss_evidence"]),
+            "market_audit_attestation_rows": len(rows["market_audit_attestations"]),
         },
         "p2_4_catalog_resolution": {
             "query_index_rows": len(rows["catalog_query_index"]),
@@ -282,20 +294,28 @@ def main() -> None:
                 for row in rows["account_catalog_resolution"]
             ),
         },
+        "p3_0_authorized_evidence_and_cost_reference": {
+            "authorized_clean_normal_rows": len(rows["clean_normal"]),
+            "authorized_clean_urgent_rows": len(rows["clean_urgent"]),
+            "historical_cost_reference_rows": len(rows["historical_cost_references"]),
+            "historical_cost_model_features": sum(row.get("model_feature") is True for row in rows["historical_cost_references"]),
+            "resale_value_inferences": sum(row.get("resale_value_effect") != "not_inferred" for row in rows["historical_cost_references"]),
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-            "P2.9 已以受限、可重播的官方摘要與獨立次級來源確認 Nintendo 四件、AURORA FAQ 968 六件、Journey Pack 三件、Moomintroll Accessory Set 兩件及 Kizuna AI 2022 三件英文 identity；未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+            "P3.0 新增 SkyFest FAQ 1330 core-five 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
-            "可驗證成交價為零；估價只能輸出匿名刊登／急售可比觀察。",
+            "可驗證成交價與獲外部授權的市場訓練列均為零；正式估價器維持 fail closed，不輸出轉售價格。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
             "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
             "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
             "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
             "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-            f"P2.9 保留 {len(rows['market_near_miss_review'])} 筆僅缺單一硬證據群組的匿名 near-miss；沒有任何案例因缺乏核准 evidence 而自動進入可比池。",
-            f"P2.9 的 {len(rows['catalog_query_index'])} 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
-            f"P2.9 的帳號 lexical catalog sidecar 僅供人工複核：{len(rows['account_catalog_resolution'])} 個帳號中有 {sum(bool(row.get('matches')) for row in rows['account_catalog_resolution'])} 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
+            f"P3.0 保留 {len(rows['market_near_miss_review'])} 筆匿名 near-miss；只有外部信任根驗證的三方 OpenSSH attestations 才可接受非空人工 ledger，且不會自動取得市場訓練授權。",
+            f"P3.0 的 {len(rows['catalog_query_index'])} 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 {sum(row.get('resolution_eligibility') == 'canonical_resolved' for row in rows['catalog_query_index'])}，model eligible 仍為 {sum(row.get('model_feature_status') == 'eligible' for row in rows['items'])}。",
+            f"P3.0 保留帳號 lexical catalog sidecar 供人工複核：{len(rows['account_catalog_resolution'])} 個帳號中有 {sum(bool(row.get('matches')) for row in rows['account_catalog_resolution'])} 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
+            f"P3.0 的 {len(rows['historical_cost_references'])} 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
             "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
             "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。",
         ],
@@ -354,13 +374,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.1-p2.9"
+    previous_validation["schema_version"] = "4.2-p3.0"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p29"
-    manifest["package_version"] = "4.1.0-p2.9"
+    manifest["package_id"] = "sky-valuation-v4-p30"
+    manifest["package_version"] = "4.2.0-p3.0"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -403,6 +423,7 @@ def main() -> None:
         "verified_canonical_items": sum(row.get("verification_status") == "verified" for row in rows["items"]),
         "canonical_evidence_cohort_rows": len(active_cohorts),
         "canonical_field_evidence_rows": sum(len(evidence) for evidence in cohort_evidence.values()),
+        "historical_cost_reference_rows": len(rows["historical_cost_references"]),
         "catalog_scope_needs_review_rows": sum(row.get("scope_disposition") != "collectible_item" for row in rows["catalog_universe"]),
     }
     manifest["derived_paths"] = [
@@ -410,6 +431,7 @@ def main() -> None:
         "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
         "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
         "data/modeling/item-value-table.jsonl",
+        "data/derived/official-historical-cost-references.jsonl",
         "data/review/catalog-universe.jsonl", "data/review/catalog-universe-summary.json",
         "data/review/item-evidence.jsonl", "data/review/item-promotion-ledger.jsonl",
         "data/review/market-claim-review.jsonl",
@@ -419,7 +441,8 @@ def main() -> None:
         "data/normalized/catalog-query-index.jsonl", "data/normalized/catalog-query-index-summary.json",
         "modeling/artifacts/elastic-net-normal_listing.json", "modeling/artifacts/elastic-net-urgent_sale.json",
         "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
-        "reports/coverage/catalog-coverage.json", "reports/validation/p0-validation.json",
+        "reports/coverage/catalog-coverage.json", "reports/model-publication-readiness.json",
+        "reports/validation/p0-validation.json",
     ]
     # Human decisions are curated inputs. They are never implied to be
     # reproducible derived output merely because the ledger currently starts empty.

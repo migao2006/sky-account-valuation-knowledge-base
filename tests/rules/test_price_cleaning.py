@@ -4,7 +4,22 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-from tools.modeling.clean_prices import build, clean
+from tools.modeling.clean_prices import build, clean as raw_clean
+
+
+def authorized_market_data():
+    return {
+        "status": "authorized_model_training", "allowed_uses": ["research", "model_training", "comparable_estimation"],
+        "source_snapshot": {"artifact_path": "tests/fixture.json", "sha256": "a" * 64, "captured_at": "2026-08-01", "replayable": True},
+        "license_evidence": {"kind": "explicit_data_license", "evidence_id": "fixture-license", "verified": True},
+        "replay_evidence": [{"evidence_id": "fixture-replay", "source_locator": "fixture://market", "content_sha256": "b" * 64, "reviewed_at": "2026-08-01"}],
+        "authorization_record_id": "fixture-authorized-record",
+    }
+
+
+def clean(rows):
+    """Unit-test price semantics with an explicitly injected authority."""
+    return raw_clean(rows, authorization_evaluator=lambda row: row.get("market_data_authorization") == authorized_market_data())
 
 
 def row(number, **changes):
@@ -14,6 +29,7 @@ def row(number, **changes):
         "server": "international", "server_verified": True, "offer_kind": "seller_listing", "entity_kind": "single_account",
         "base_account": {"account_type": "winged_or_unspecified"}, "post_date": "2026-08-01", "observed_at": "2026-08-16",
         "market_evidence_quality": "high",
+        "market_data_authorization": authorized_market_data(),
     }
     value.update(changes)
     return value
@@ -45,6 +61,25 @@ class PriceCleaningTest(unittest.TestCase):
         self.assertIn("invalid_price", reasons["history_test_0007"])
         self.assertIn("price_type_not_training_line", reasons["history_test_0008"])
         self.assertIn("mixed_price", reasons["history_test_0009"])
+
+    def test_market_training_authorization_is_fail_closed(self):
+        unauthorized = row(1, market_data_authorization={"status": "authorized_model_training", "allowed_uses": ["model_training", "comparable_estimation"]})
+        legacy = row(2, market_data_authorization={
+            "status": "legacy_research_only", "allowed_uses": ["research"],
+            "source_snapshot": {"artifact_path": "legacy", "sha256": "a" * 64, "captured_at": "2026-08-01", "replayable": False},
+            "license_evidence": {"kind": "legacy_anonymous_research", "evidence_id": "legacy", "verified": False}, "replay_evidence": [],
+        })
+        normal, urgent, ledger = clean([unauthorized, legacy])
+        self.assertEqual((normal, urgent), ([], []))
+        by_history = {entry["history_id"]: entry["reason_codes"] for entry in ledger}
+        self.assertIn("market_data_replay_evidence_missing", by_history["history_test_0001"])
+        self.assertIn("market_data_license_evidence_missing", by_history["history_test_0001"])
+        self.assertIn("market_data_not_authorized_for_model_training", by_history["history_test_0002"])
+
+    def test_complete_self_filled_authorization_still_requires_external_evaluator(self):
+        normal, urgent, ledger = raw_clean([row(3)])
+        self.assertEqual((normal, urgent), ([], []))
+        self.assertIn("market_data_external_authorization_evaluator_required", ledger[0]["reason_codes"])
 
     def test_normal_and_urgent_lines_are_separate_and_account_cluster_is_deduped(self):
         duplicate = row(2, account_id="account_test_0001", post_date="2026-08-02")
@@ -100,7 +135,8 @@ class PriceCleaningTest(unittest.TestCase):
         self.assertEqual(urgent, [])
         self.assertEqual(ledger[0]["history_id"], "history_0068")
         self.assertEqual(ledger[0]["disposition"], "needs_review")
-        self.assertEqual(ledger[0]["reason_codes"], ["multiple_price_terms"])
+        self.assertIn("multiple_price_terms", ledger[0]["reason_codes"])
+        self.assertIn("market_data_not_authorized_for_model_training", ledger[0]["reason_codes"])
 
     def test_modified_z_outlier_requires_ten_independent_same_type_clusters(self):
         sparse = [row(index, selected_price_twd=1000 + index * 10) for index in range(1, 9)]
@@ -122,22 +158,23 @@ class PriceCleaningTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             summary = build(ROOT, output_dir=output)
-            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 2, "urgent_sale": 0, "excluded_or_review": 101})
+            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 0, "urgent_sale": 0, "excluded_or_review": 103})
             normal = [json.loads(line) for line in (output / "price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines()]
             urgent = [json.loads(line) for line in (output / "price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines()]
-            self.assertEqual({item["history_id"] for item in normal}, {"history_0085", "history_recovered_0792"})
+            self.assertEqual(normal, [])
             accounts = {
                 item["history_id"]: item
                 for item in (json.loads(line) for line in (ROOT / "data/comparables/accounts.jsonl").read_text(encoding="utf-8").splitlines() if line)
             }
             self.assertEqual(
                 {tuple(accounts[item["history_id"]]["source_listing_ids"]) for item in normal},
-                {("listing_0708",), ("listing_0792",)},
+                set(),
             )
             self.assertEqual(urgent, [])
             self.assertTrue(all(item["currency"] == "TWD" and item["server"] == "international" for item in normal))
             ledger = [json.loads(line) for line in (output / "model-exclusions.jsonl").read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(len(ledger), 101)
+            self.assertEqual(len(ledger), 103)
+            self.assertTrue(all("market_data_not_authorized_for_model_training" in item["reason_codes"] for item in ledger))
             installment = next(item for item in ledger if item["history_id"] == "history_0068")
             self.assertEqual(installment["disposition"], "needs_review")
             self.assertIn("multiple_price_terms", installment["reason_codes"])

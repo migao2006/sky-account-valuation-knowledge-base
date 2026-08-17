@@ -660,6 +660,13 @@ class MigrationContractTests(unittest.TestCase):
         self.assertGreater(len(claimed), 0)
         self.assertTrue(all(not row["sale_outcome"]["verified"] and row["sale_outcome"]["completed_sale_price_twd"] is None for row in claimed))
 
+    def test_legacy_market_records_are_research_only_and_propagated_to_comparables(self):
+        histories = {row["history_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/curated/histories.jsonl")}
+        accounts = {row["history_id"]: row for row in MIGRATE.read_jsonl(ROOT / "data/comparables/accounts.jsonl")}
+        self.assertTrue(all(row["market_data_authorization"]["status"] == "legacy_research_only" for row in histories.values()))
+        self.assertTrue(all(row["market_data_authorization"]["allowed_uses"] == ["research"] for row in histories.values()))
+        self.assertEqual({key: row["market_data_authorization"] for key, row in accounts.items()}, {key: row["market_data_authorization"] for key, row in histories.items()})
+
     def test_committed_derivatives_reflect_alias_binding_and_urgent_fixes(self):
         profiles = {
             row["account_id"]: row for row in (

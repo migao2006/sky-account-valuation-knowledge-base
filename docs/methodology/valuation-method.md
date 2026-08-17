@@ -1,4 +1,4 @@
-# 估價方法（v4.1 P2.9）
+# 估價方法（v4.2 P3.0）
 
 P2.9 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 與 lexical review sidecar 不會自動成為 ownership、canonical promotion 或模型物品特徵；十八件已驗證 Nintendo／AURORA／Journey／Moomintroll／Kizuna identity 也因建模欄位與持有證據不足而維持模型排除。`winged_or_unspecified` 仍是 unknown，不因共享 fallback 值獲得帳型分數。
 
@@ -35,7 +35,7 @@ collection 維度是下列集合的聯集：graduation rewards、collaboration i
 
 刊登、急售、最後公開、已售聲稱和可驗證成交各自獨立，輸出的 `price_type` 正規化為 `normal_listing`、`urgent_sale`、`last_public_price`、`verified_sale` 或 `unknown`。已售聲稱不是成交；沒有符合契約的成交證據時不得輸出 `verified_sale`。未知資料不補值，綁定風險是獨立維度，不能取代帳號內容分類。
 
-正式市場資料目前只有兩筆正常刊登同時確認幣別為 TWD、伺服器為國際服且價格語義單一，因此結果的適用範圍有限，不代表完整市場。來源明示「急售」會保留 urgent 語意，不因舊欄位曾寫 asking 而污染正常線；若公開價格明示含仲或分期加價，則不猜測費用或替代價格，改列 `needs_review` 並排除模型訓練。
+正式市場資料目前沒有任何一筆通過外部可重播資料授權 evaluator，因此 normal／urgent 訓練池皆為 0，估價器維持 fail closed。來源明示「急售」會保留 urgent 語意；含仲、分期加價或多價格條件不猜測費用或替代價格，並排除模型訓練。
 
 ## 三態 Item Vector 與模型線
 

@@ -14,6 +14,7 @@ from release_check import (  # noqa: E402
     item_value_rows_release_valid,
     model_artifacts_release_valid,
 )
+from validate import formal_price_rebuild_errors  # noqa: E402
 
 
 def publication_gate() -> dict[str, object]:
@@ -56,6 +57,15 @@ class ProgressionContractTests(unittest.TestCase):
             },
         }
         self.assertFalse(item_value_rows_release_valid([row], {"item_example"}))
+
+    def test_handwritten_clean_price_cannot_bypass_authorization_rebuild(self):
+        injected = {
+            "cleaned_price_id": "cleaned_price_forged", "history_id": "history_forged",
+            "account_id": "account_forged", "cluster_id": "cluster_forged",
+            "selected_price_twd": 1000.0, "price_line": "normal_listing",
+        }
+        problems = formal_price_rebuild_errors([], [injected], [], [])
+        self.assertIn("price-cleaned-normal differs from deterministic authorized rebuild", problems)
 
 
 if __name__ == "__main__":

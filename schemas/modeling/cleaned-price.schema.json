@@ -4,7 +4,7 @@
   "title": "Offline price observation admitted to a P1 training line",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "cleaned_price_id", "history_id", "account_id", "cluster_id", "cluster_rank", "selected_price_twd", "log_price_twd", "price_line", "normalized_price_type", "base_account_type", "post_date", "observed_at", "currency", "server", "evidence_quality", "review_status"],
+  "required": ["schema_version", "cleaned_price_id", "history_id", "account_id", "cluster_id", "cluster_rank", "selected_price_twd", "log_price_twd", "price_line", "normalized_price_type", "base_account_type", "post_date", "date_verified", "observed_at", "currency", "server", "evidence_quality", "review_status"],
   "properties": {
     "schema_version": {"const": "3.1-p1"},
     "cleaned_price_id": {"type": "string", "pattern": "^cleaned_price_[a-z0-9_]+$"},
@@ -18,6 +18,7 @@
     "normalized_price_type": {"enum": ["normal_listing", "urgent_sale"]},
     "base_account_type": {"type": "string", "minLength": 1},
     "post_date": {"type": ["string", "null"], "format": "date"},
+    "date_verified": {"type": "boolean"},
     "observed_at": {"type": "string", "format": "date"},
     "currency": {"const": "TWD"},
     "server": {"const": "international"},
