@@ -8,7 +8,7 @@
   "properties": {
     "cohort_id": {"type": "string", "pattern": "^canonical_cohort_[a-z0-9_]+$"},
     "evidence_path": {"type": "string", "pattern": "^data/review/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+\\.jsonl$"},
-    "verifier_id": {"enum": ["nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack", "kizuna_ai_bundle", "skyfest_faq1330_core_five", "tournament_of_triumph_faq1330_core_four", "days_of_color_faq1323_core_three", "days_of_sunlight_faq1343_core_three", "cinnamoroll_popup_cafe_faq1308", "days_of_fortune_faq1264_core_five", "days_of_love_faq1374_core_four", "days_of_treasure_bloom_faq1381_core_six", "days_of_nature_color_faq1391_core_eleven", "declarative_v2"]},
+    "verifier_id": {"enum": ["nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack", "kizuna_ai_bundle", "skyfest_faq1330_core_five", "tournament_of_triumph_faq1330_core_four", "days_of_color_faq1323_core_three", "days_of_sunlight_faq1343_core_three", "cinnamoroll_popup_cafe_faq1308", "days_of_fortune_faq1264_core_five", "days_of_love_faq1374_core_four", "days_of_treasure_bloom_faq1381_core_six", "days_of_nature_color_faq1391_core_eleven", "days_of_music_faq1362_core_four", "declarative_v2"]},
     "snapshot_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^data/source/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+\\.json$"}},
     "source_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}},
     "target_item_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}},

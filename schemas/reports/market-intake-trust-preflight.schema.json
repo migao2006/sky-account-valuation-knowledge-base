@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/market-intake-trust-preflight.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "reason_codes", "formal_registry_sha256", "formal_dataset_count", "manifest_version_counts", "v2_or_v3_dataset_count", "v3_dataset_count", "identity_binding_status", "receipt_binding_status", "training_projection_status", "input_sha256", "verification_error_count"],
+  "properties": {
+    "schema_version": {"const": "market-intake-trust-preflight-v1"},
+    "status": {"enum": ["ready", "not_ready"]},
+    "reason_codes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "formal_registry_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{0,64}$"},
+    "formal_dataset_count": {"type": "integer", "minimum": 0},
+    "manifest_version_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "v2_or_v3_dataset_count": {"type": "integer", "minimum": 0}, "v3_dataset_count": {"type": "integer", "minimum": 0},
+    "identity_binding_status": {"enum": ["ready", "not_ready"]}, "receipt_binding_status": {"enum": ["ready", "not_ready"]}, "training_projection_status": {"enum": ["ready", "not_ready"]},
+    "input_sha256": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}},
+    "verification_error_count": {"type": "integer", "minimum": 0}
+  }
+}

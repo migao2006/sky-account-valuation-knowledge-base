@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/external-market-authorization-statement-bundle.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "statements"],
+  "properties": {
+    "schema_version": {"const": "authorized-market-statement-bundle-v2"},
+    "statements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "dataset_id", "manifest_sha256", "observations_sha256", "expires_at"],
+        "properties": {
+          "schema_version": {"const": "authorized-market-statement-v1"},
+          "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+          "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+          "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+          "expires_at": {"type": "string", "format": "date"}
+        }
+      }
+    }
+  }
+}

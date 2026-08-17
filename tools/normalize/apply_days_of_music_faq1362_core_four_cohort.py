@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Replay the bounded official FAQ 1362 Days of Music 2024 core-four cohort."""
+from __future__ import annotations
+import argparse, json, sys
+from pathlib import Path
+from typing import Any
+ROOT=Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status
+from tools.normalize.apply_moomintroll_accessory_set_cohort import evidence, read, safe, sha, vendor, write
+
+OFFICIAL_SOURCE="source_tgc_faq_1362_days_of_music_core_four"; SECONDARY_SOURCE="source_skygame_data_1_3_4"
+OFFICIAL_LINEAGE="lineage_tgc_support_faq_1362"; SECONDARY_LINEAGE="lineage_skygame_data_1_3_4"
+OFFICIAL_PATH="data/source/research/tgc-faq-1362-days-of-music-core-four.json"; SECONDARY_PATH="data/source/vendor/skygame-data-1.3.4-items.json"
+OFFICIAL_SHA="7BFFA699B7163DE63B9D27354C5ECCC4F061285E589ACB231E040B46FBFD1FAC"; SECONDARY_SHA="21CCAD77006C425B27EE9314870BB5BB77E8436459C6DA214ABCB2B0D8329BBB"; AS_OF="2026-08-17"
+# canonical id, vendor numeric id/GUID/title/type, official title, category, currency/cost, post-event permanence.
+ITEMS=(
+ ("item_days_of_music_marching_band_cape",2404,"XCTyx0K4zm","Marching Band Cape","Cape","Marching Band Cape","cape","event_currency",50,False),
+ ("item_days_of_music_music_marching_uniform",2405,"n6S9sKtNlW","Music Marching Uniform","OutfitShoes","Music Marching Uniform outfit","outfit","USD",9.99,False),
+ ("item_permanent_jam_station",2407,"WMNr4yo_35","Jam Station","Furniture","Jam Station","furniture","Candles",250,True),
+ ("item_permanent_fledgling_upright_piano",2406,"10Ol7H9jKg","Fledgling Upright Piano","Prop","Fledgling Upright Piano","instrument","USD",4.99,True),
+)
+SOURCE_ROW={"source_id":OFFICIAL_SOURCE,"source_name":"thatgamecompany Help Center FAQ 1362 — Patch Notes, November 21, 2024 (Days of Music 2024)","source_type":"official_support","url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1362-patch-notes---november-21-2024---0-27-5-302936-android-huawei-ios-playstation-304181-steam-303477-switch/","retrieved_at":AS_OF,"evidence_level":"official_explicit","source_lineage_id":OFFICIAL_LINEAGE,"notes":"Fact-limited locally pinned transcription: FAQ 1362's Days of Music 2024 Pacific window, four named individual costs, and its stated post-event permanent Harmony Hall availability for Jam Station and Fledgling Upright Piano. This historical policy statement does not verify a current storefront state. Wonderland Pinafore Set and all packs/bundles are excluded; it does not establish formal Traditional Chinese names, images, visual matches, resale prices, first release dates, or account ownership properties."}
+class DaysOfMusicEvidenceError(ValueError): pass
+def registry_contract(): return {"cohort_id":"canonical_cohort_days_of_music_faq1362_core_four","evidence_path":"data/review/days-of-music-faq1362-core-four-canonical-evidence.jsonl","snapshot_paths":[OFFICIAL_PATH,SECONDARY_PATH],"source_ids":[SECONDARY_SOURCE,OFFICIAL_SOURCE],"target_item_ids":sorted(x[0] for x in ITEMS),"target_set_ids":[]}
+def valid_title_relation(official_name,vendor_name): return (official_name,vendor_name) in {(x[5],x[3]) for x in ITEMS}
+def source_rows(rows):
+ indexed={r["source_id"]:dict(r) for r in rows}
+ if indexed.get(OFFICIAL_SOURCE) not in (None,SOURCE_ROW): raise DaysOfMusicEvidenceError("official source registry conflicts with cohort contract")
+ indexed[OFFICIAL_SOURCE]=SOURCE_ROW; ordered=[r["source_id"] for r in rows]
+ if OFFICIAL_SOURCE not in ordered: ordered.append(OFFICIAL_SOURCE)
+ return [indexed[i] for i in ordered]
+def item_row(iid,name,category,currency,cost,permanent):
+ subcategory="days_of_music_2024_historical_item" if not permanent else ("held_prop" if iid.endswith("upright_piano") else "harmony_hall_item")
+ return {"item_id":iid,"canonical_name_zh_tw":f"待確認（{name}）","canonical_name_en":name,"aliases":[],"item_category":category,"item_subcategory":subcategory,"source_type":"event" if not permanent else "shop","source_id":OFFICIAL_SOURCE,"season_id":None,"event_id":None,"ancestor_id":None,"set_ids":[],"free_or_premium":"unknown","pass_required":"unknown","ultimate_reward":False,"collaboration":False,"permanent_account_item":"unknown","consumable":False,"original_currency":currency,"original_cost":cost,"availability_status":"unknown","first_release_date":None,"availability_event_ids":[f"availability_faq1362_{iid.removeprefix('item_')}_historical"]+([f"availability_faq1362_{iid.removeprefix('item_')}_post_event_permanent"] if permanent else []),"visual_reference_ids":[],"valuation_role":"collection_structure","source_ids":[OFFICIAL_SOURCE,SECONDARY_SOURCE],"last_verified_at":AS_OF,"verification_status":"verified","evidence_tier":"official_with_secondary","model_feature_status":declared_model_feature_status(iid),"notes":("FAQ 1362 establishes this named Days of Music 2024 historical offer, exact cost, and Pacific event window only." if not permanent else "FAQ 1362 establishes this named Days of Music 2024 historical offer, exact cost, Pacific event window, and its stated post-event permanent Harmony Hall availability. That historical policy statement does not establish current storefront availability.")+" The vendor snapshot independently supplies exact vendor ID, GUID, title, and type. Wonderland Pinafore Set and all packs/bundles are excluded. Formal Traditional Chinese name, visual identity, resale price, first release date, account ownership property, and model eligibility remain unknown or unasserted."}
+def build(root:Path):
+ root=root.resolve(); official_bytes=safe(root,OFFICIAL_PATH).read_bytes(); secondary_bytes=safe(root,SECONDARY_PATH).read_bytes()
+ if sha(official_bytes)!=OFFICIAL_SHA or sha(secondary_bytes)!=SECONDARY_SHA: raise DaysOfMusicEvidenceError("official or secondary snapshot hash mismatch")
+ official=json.loads(official_bytes); secondary=json.loads(secondary_bytes); facts=official.get("facts",{})
+ expected=[{"item_id":a,"official_name_en":f,"original_currency":h,"original_cost":i,"availability_kind":"historical_event_and_post_event_permanent" if j else "historical_event_only"} for a,_b,_c,_d,_e,f,_g,h,i,j in ITEMS]
+ if official.get("source_id")!=OFFICIAL_SOURCE or facts.get("items")!=expected or (facts.get("historical_window_start_date"),facts.get("historical_window_end_date"))!=("2024-11-25","2024-12-08") or facts.get("post_event_permanent_item_ids")!=[a for a,*_x,j in ITEMS if j]: raise DaysOfMusicEvidenceError("official FAQ 1362 contract changed")
+ targets={k:read(root/p) for k,p in (("items","knowledge/items/items.jsonl"),("sources","knowledge/sources/sources.jsonl"))}; sources={r["source_id"]:r for r in source_rows(targets["sources"])}
+ for sid,typ,lineage in ((OFFICIAL_SOURCE,"official_support",OFFICIAL_LINEAGE),(SECONDARY_SOURCE,"community_database",SECONDARY_LINEAGE)):
+  if sources.get(sid,{}).get("source_type")!=typ or sources[sid].get("source_lineage_id")!=lineage: raise DaysOfMusicEvidenceError("source registry or lineage mismatch: "+sid)
+ ledger=[]
+ for n,(iid,vid,guid,vname,vtype,oname,category,currency,cost,permanent) in enumerate(ITEMS):
+  vi,vrow=vendor(secondary,vid)
+  if (vrow.get("guid"),vrow.get("name"),vrow.get("type"))!=(guid,vname,vtype): raise DaysOfMusicEvidenceError("secondary identity changed: "+str(vid))
+  if not valid_title_relation(oname,vname): raise DaysOfMusicEvidenceError("unsupported official/vendor title relation: "+str(vid))
+  path=f"/facts/items/{n}"; note="Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred." if not permanent else "Historical FAQ cost/window and stated post-event permanent availability only; no current storefront availability or model eligibility is inferred."
+  title_note="FAQ and vendor titles are byte-identical." if oname==vname else "FAQ/vendor wording is reconciled only by the explicit contract pair 'Music Marching Uniform outfit'/'Music Marching Uniform'."
+  ledger.extend((evidence("item",iid,"canonical_name_en",oname,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,path+"/official_name_en","independent_identity",title_note),evidence("item",iid,"original_currency",currency,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,path+"/original_currency","independent_field",note),evidence("item",iid,"original_cost",cost,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,path+"/original_cost","independent_field",note),evidence("item",iid,"availability_history",facts["historical_window_start_date"],OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,"/facts/historical_window_start_date","independent_field",note),evidence("item",iid,"availability_history",facts["historical_window_end_date"],OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,"/facts/historical_window_end_date","independent_field",note),evidence("item",iid,"vendor_item_name",vname,SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,secondary_bytes,f"/items/{vi}/name","secondary_field","Pinned vendor spelling; title reconciliation is limited by this apply contract."),evidence("item",iid,"vendor_item_type",vtype,SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,secondary_bytes,f"/items/{vi}/type","secondary_field",f"Apply contract maps vendor type to canonical category {category}."),evidence("item",iid,"vendor_item_guid",guid,SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,secondary_bytes,f"/items/{vi}/guid","secondary_field","Pinned vendor GUID is an identity guard, not a model feature.")))
+  if permanent: ledger.append(evidence("item",iid,"availability_history",iid,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,official_bytes,f"/facts/post_event_permanent_item_ids/{sum(1 for x in ITEMS[:n] if x[-1])}","independent_field","FAQ states post-event permanent Harmony Hall availability; it does not verify a current storefront state."))
+ ledger.sort(key=lambda r:(r["target_type"],r["target_id"],r["field_path"],r["source_id"],r["claim_locator"])); return targets,ledger
+def apply_targets(targets):
+ items={r["item_id"]:dict(r) for r in targets["items"]}; order=[r["item_id"] for r in targets["items"]]
+ for iid,_vid,_guid,_vname,_vtype,name,category,currency,cost,permanent in ITEMS:
+  items[iid]=item_row(iid,name,category,currency,cost,permanent)
+  if iid not in order: order.append(iid)
+ return {"items":[items[i] for i in order],"sources":source_rows(targets["sources"])}
+def availability_rows():
+ rows=[]
+ for iid,*_rest,permanent in ITEMS:
+  rows.append({"availability_id":f"availability_faq1362_{iid.removeprefix('item_')}_historical","item_id":iid,"availability_status":"limited_time","start_date":"2024-11-25","end_date":"2024-12-08","event_id":None,"source_ids":[OFFICIAL_SOURCE],"last_verified_at":AS_OF,"verification_status":"verified"})
+  if permanent: rows.append({"availability_id":f"availability_faq1362_{iid.removeprefix('item_')}_post_event_permanent","item_id":iid,"availability_status":"permanent","start_date":"2024-12-09","end_date":None,"event_id":None,"source_ids":[OFFICIAL_SOURCE],"last_verified_at":AS_OF,"verification_status":"verified"})
+ return rows
+def verify(root:Path,require_applied=True):
+ targets,ledger=build(root); expected=apply_targets(targets); problems=[]
+ if require_applied:
+  for path,key in (("knowledge/items/items.jsonl","items"),("knowledge/sources/sources.jsonl","sources")):
+   if read(root/path)!=expected[key]: problems.append("committed target differs from replayable apply contract: "+path)
+  available={r["availability_id"]:r for r in read(root/"knowledge/acquisition/availability-events.jsonl")}
+  for r in availability_rows():
+   if available.get(r["availability_id"])!=r: problems.append("availability differs: "+r["availability_id"])
+  lp=root/"data/review/days-of-music-faq1362-core-four-canonical-evidence.jsonl"
+  if not lp.is_file() or read(lp)!=ledger: problems.append("canonical field evidence differs from replayable source claims")
+  for iid,*_ in ITEMS:
+   item=next(r for r in expected["items"] if r["item_id"]==iid)
+   if (item["availability_status"],item["permanent_account_item"],item["first_release_date"],item["model_feature_status"],item["set_ids"],item["visual_reference_ids"]) != ("unknown","unknown",None,declared_model_feature_status(iid),[],[]): problems.append("unsupported current availability, account permanence, first-release, visual, model promotion, or bundle membership"); break
+ return problems
+def main():
+ p=argparse.ArgumentParser(); p.add_argument("--root",type=Path,default=ROOT); p.add_argument("--apply",action="store_true"); args=p.parse_args(); root=args.root.resolve()
+ if args.apply:
+  targets,ledger=build(root); output=apply_targets(targets)
+  for path,key in (("knowledge/items/items.jsonl","items"),("knowledge/sources/sources.jsonl","sources")): write(root/path,output[key])
+  available={r["availability_id"]:r for r in read(root/"knowledge/acquisition/availability-events.jsonl")}; available.update({r["availability_id"]:r for r in availability_rows()}); write(root/"knowledge/acquisition/availability-events.jsonl",sorted(available.values(),key=lambda r:r["availability_id"])); write(root/"data/review/days-of-music-faq1362-core-four-canonical-evidence.jsonl",ledger)
+ problems=verify(root); print(json.dumps({"applied":args.apply,"valid":not problems,"problems":problems},sort_keys=True)); raise SystemExit(bool(problems))
+if __name__=="__main__": main()

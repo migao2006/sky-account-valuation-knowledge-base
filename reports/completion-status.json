@@ -37,7 +37,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1347
+        "source_references": 1345
       },
       "requirement": "no catalog review scope or source-scoped reference remains unresolved",
       "evidence_paths": [
@@ -71,8 +71,8 @@
       "contract_id": "catalog.all_canonical_verified",
       "passed": false,
       "actual": {
-        "canonical_items": 144,
-        "non_verified_count": 79,
+        "canonical_items": 147,
+        "non_verified_count": 78,
         "non_verified_item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -119,7 +119,6 @@
           "item_office_cape",
           "item_permanent_blue_electric_guitar",
           "item_permanent_fledgling_harp",
-          "item_permanent_fledgling_upright_piano",
           "item_permanent_rhythm_guitar",
           "item_regular_apologetic_lumberjack_face_accessory",
           "item_regular_apologetic_lumberjack_hair",
@@ -164,7 +163,7 @@
       "contract_id": "catalog.required_field_evidence",
       "passed": false,
       "actual": {
-        "items_missing_required_fields": 144,
+        "items_missing_required_fields": 147,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_as_of",
@@ -969,9 +968,7 @@
           ],
           "item_permanent_fledgling_upright_piano": [
             "availability_as_of",
-            "availability_history",
             "availability_status",
-            "canonical_name_en",
             "first_release_date",
             "free_or_premium",
             "item_category",
@@ -2039,6 +2036,42 @@
             "set_membership",
             "source_type",
             "ultimate_reward"
+          ],
+          "item_days_of_music_marching_band_cape": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_music_music_marching_uniform": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_permanent_jam_station": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
           ]
         },
         "registry_replay_error_count": 0,
@@ -2055,8 +2088,8 @@
       "contract_id": "catalog.independent_identity_evidence",
       "passed": false,
       "actual": {
-        "items_missing_independent_identity": 97,
-        "official_identity_count": 47,
+        "items_missing_independent_identity": 96,
+        "official_identity_count": 51,
         "two_secondary_identity_count": 0,
         "item_ids": [
           "item_anniversary_bass",
@@ -2122,7 +2155,6 @@
           "item_office_cape",
           "item_permanent_blue_electric_guitar",
           "item_permanent_fledgling_harp",
-          "item_permanent_fledgling_upright_piano",
           "item_permanent_rhythm_guitar",
           "item_regular_apologetic_lumberjack_face_accessory",
           "item_regular_apologetic_lumberjack_hair",
@@ -2168,7 +2200,7 @@
       "contract_id": "catalog.visual_state_verified",
       "passed": false,
       "actual": {
-        "items_without_complete_visual_state": 144,
+        "items_without_complete_visual_state": 147,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -2233,6 +2265,8 @@
           "item_days_of_love_amethyst_tipped_tails",
           "item_days_of_love_braids",
           "item_days_of_love_violet_crystal_prop",
+          "item_days_of_music_marching_band_cape",
+          "item_days_of_music_music_marching_uniform",
           "item_days_of_nature_earth_cape",
           "item_days_of_nature_ocean_cape",
           "item_days_of_nature_ocean_manta_hair",
@@ -2270,6 +2304,7 @@
           "item_permanent_blue_electric_guitar",
           "item_permanent_fledgling_harp",
           "item_permanent_fledgling_upright_piano",
+          "item_permanent_jam_station",
           "item_permanent_rhythm_guitar",
           "item_regular_apologetic_lumberjack_face_accessory",
           "item_regular_apologetic_lumberjack_hair",
@@ -3087,7 +3122,7 @@
       "contract_id": "catalog.model_eligible_positive",
       "passed": true,
       "actual": {
-        "verified": 65,
+        "verified": 69,
         "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",

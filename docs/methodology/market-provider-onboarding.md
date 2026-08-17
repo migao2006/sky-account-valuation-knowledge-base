@@ -91,3 +91,29 @@ publication freezer receive no raw identity commitment.
 For the exact unsigned payload used by the existing OpenSSH verifier, import
 `canonical_signing_payload(dataset_candidate, manifest, statement, attestation)`.
 It returns bytes only; it never creates a signature.
+
+## P4.0 external finalization
+
+`tools/market_intake/finalization.py` is the only supported importer for a
+candidate that has completed the external authorization process.  It accepts
+the candidate directory, authority bundle, authorization statement, detached
+signatures, and a `authorized-market-finalization-handoff-v1` handoff only from
+outside the release root; each file is accompanied by its actual SHA-256.
+The handoff pins candidate manifest/observations/training examples/registry
+bytes, trust bundle and statement bytes, and the canonical bytes plus signature
+digest of all three attestation receipts.
+
+Each receipt must name exactly one `data_steward`, `privacy_reviewer`, or
+`method_reviewer`; they must be three different non-revoked OpenSSH public-key
+fingerprints.  The statement, manifest, observations, registry and each
+signature payload must agree exactly. The importer never reads a private key,
+creates a signature, or overwrites a dataset, registry, attestation, or
+signature path. It currently imports one dataset only when the formal registry
+and attestation ledger are empty; a non-empty registry fails closed rather than
+claiming one external statement authorizes multiple datasets.
+
+It stages the candidate under the fixed formal dataset location, invokes
+`verify_authorized_market_intake` with the same external trust files, and rolls
+back all newly-created files if replay fails. A successful import therefore
+immediately passes formal authorization replay, though it still does not claim
+identity independence, sale-receipt evidence, or model readiness.

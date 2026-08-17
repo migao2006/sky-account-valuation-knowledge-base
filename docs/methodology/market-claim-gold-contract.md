@@ -70,3 +70,30 @@ python tools/normalize/build_market_claim_review.py --root .
 
 The script does not contact a network and never modifies normalized listings,
 formal profiles, comparables, market reports, or canonical knowledge.
+
+## External onboarding foundation
+
+`tools/market_review/onboarding.py` is an external-only handoff helper. It
+does not generate labels, OpenSSH signatures, public/private keys, receipts, or
+formal gold, and it refuses every output inside the release root and every
+reserved formal-gold filename. The committed market queue has public listing
+hashes; issuing A/B packets from it would make assignments linkable. Therefore
+`issue-blind-packets` is deliberately fail-closed until a separately reviewed,
+keyed custodian protocol provides a private assignment map. Supplying an
+arbitrary secret or a local mapping is not supported.
+
+The helper can make the exact unsigned v2 annotation-receipt payload for an
+already-human external submission, and can build a minimal conflict packet from
+two complete 200-row ledgers. Conflict packets carry receipt commitments only,
+not listing text, listing hashes, or labels. Candidate import also fails closed
+unless an external authority bundle, its exact SHA-256, a keyed custodian
+issuance record, and three verifiable distinct-key receipts are available.
+Formal gold remains exclusively governed by the v2 market-audit contract above.
+
+Example handoff commands (all paths other than the committed queue are outside
+the repository):
+
+```powershell
+python tools/market_review/onboarding.py receipt-payload --queue-row D:\restricted\queue-row.json --submission D:\restricted\human-submission.json --output D:\restricted\unsigned-receipt.json
+python tools/market_review/onboarding.py build-conflict-packet --decisions-a D:\restricted\annotator-a.jsonl --decisions-b D:\restricted\annotator-b.jsonl --output D:\restricted\conflicts.json
+```
