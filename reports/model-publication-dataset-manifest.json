@@ -25,17 +25,17 @@
     },
     {
       "path": "data/modeling/account-item-vectors.jsonl",
-      "sha256": "48422A4BC771DE0A933F484E1F005EAEC0BE43A45A37B3C06FD8B7CAC856A82A"
+      "sha256": "134410644757A4D7AE86D51A98C71DED25583E388E8CB502FC5F14E20207694C"
     }
   ],
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "4EA82136A961C75B9BF13C97ED66D3B303F6597593C57985F59BC604480CC3E3",
+    "canonical_item_ids_sha256": "DC08745261360F73E070641F407100CAE7CE347F4CF92A923D20F113EB2C85AA",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "BD621578FF1562103D24C35EF020BA457CF449F72B286A4C5165B8084C2C4F17"
+    "pinned_catalog_sha256": "2CE8DF4448F87A8BDA0B460C3D98B275D3F9FD9AF4A20C9EEB24CB9DDAC47948"
   },
   "market_pools": [],
   "rejected_clean_row_count": 0,

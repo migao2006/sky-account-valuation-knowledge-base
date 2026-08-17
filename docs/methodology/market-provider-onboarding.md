@@ -117,3 +117,25 @@ It stages the candidate under the fixed formal dataset location, invokes
 back all newly-created files if replay fails. A successful import therefore
 immediately passes formal authorization replay, though it still does not claim
 identity independence, sale-receipt evidence, or model readiness.
+
+## P4.1 append-only v2 finalization
+
+`finalization.py --append-v2` is a separate protocol for a formal ledger that
+uses `authorized-market-statement-bundle-v2`.  It accepts exactly one new,
+outside-root candidate and a `authorized-market-finalization-handoff-v2`.
+The externally SHA-pinned statement bundle must contain one canonical v1-shaped
+claim for every already-imported dataset **and** the new candidate—no missing,
+extra, or duplicate dataset claim is accepted.
+
+Before mutation the importer replays the entire existing ledger against that
+bundle. It then validates the new candidate's exact bytes and three distinct
+role signatures, rejects collisions in dataset ID, authorization record ID,
+attestation ID and signature path, and obtains an exclusive append lock. It
+stages all bytes, checks the old ledger preimage through the same file handle,
+creates new paths exclusively, and replays the complete resulting ledger. The
+advisory lock serializes cooperating finalizer processes; operators must not
+run a non-cooperating writer against the same ledger inode during a transaction.
+On error or interrupt, rollback removes only matching file identities/dataset
+hashes and restores an aggregate ledger only when its observed preimage is the
+transaction output. The importer never signs, stores a private key, or turns a
+candidate into model readiness.
