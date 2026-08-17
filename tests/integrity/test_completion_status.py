@@ -80,6 +80,48 @@ class CompletionStatusTests(unittest.TestCase):
         model_check = next(row for row in report["checks"] if row["contract_id"] == "model.replayable_publication_passed")
         self.assertTrue(model_check["passed"])
 
+    def test_forged_parser_report_cannot_complete_without_external_replay(self):
+        from tools.validate import build_completion_status as completion_module
+
+        forged = {
+            "status": "evaluated", "publication_ready": True,
+            "gold_row_count": 200,
+            "rule_development_manifest_sha256": "A" * 64,
+            "development": {"row_count": 100},
+            "heldout": {"row_count": 100, "precision": 1.0, "recall": 1.0},
+            "strata_distinct_value_counts": {},
+        }
+        actual_json = completion_module._json
+
+        def report_override(path):
+            if path.name == "parser-gold-evaluation.json":
+                return forged
+            return actual_json(path)
+
+        with (
+            patch.object(completion_module, "_json", side_effect=report_override),
+            patch("tools.modeling.parser_gold_evaluator.build", return_value={
+                "status": "not_ready", "publication_ready": False,
+                "gold_row_count": 0,
+            }) as replay,
+        ):
+            report = completion_module.build(
+                ROOT, None, None,
+                "external-replay.jsonl", "A" * 64,
+                "external-gold-authority.json", "B" * 64,
+                "external-custodian-authority.json", "C" * 64,
+                "external-contract.json", "D" * 64,
+                "external-binding.json", "E" * 64,
+            )
+
+        self.assertEqual(1, replay.call_count)
+        parser_checks = {
+            row["contract_id"]: row for row in report["checks"]
+            if row["contract_id"].startswith("parser.")
+        }
+        self.assertFalse(parser_checks["parser.human_gold_200"]["passed"])
+        self.assertFalse(parser_checks["parser.metrics_passed"]["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

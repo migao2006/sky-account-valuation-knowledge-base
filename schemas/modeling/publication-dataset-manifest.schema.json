@@ -5,7 +5,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["schema_version", "status", "lineage_mode", "feature_payload_contract", "dataset_path", "dataset_sha256", "dataset_row_count", "input_snapshots", "catalog_provenance", "market_pools", "rejected_clean_row_count", "rejection_counts", "blockers", "dataset_rows"],
   "properties": {
-    "schema_version": {"const": "1.3-p3.7"}, "status": {"enum": ["not_ready", "ready_for_evaluation"]},
+    "schema_version": {"const": "1.4-p3.8"}, "status": {"enum": ["not_ready", "ready_for_evaluation"]},
     "lineage_mode": {"const": "production_signed"},
     "feature_payload_contract": {"type": "object", "additionalProperties": false, "required": ["schema_version", "evaluator_feature_source", "evaluation_subgroup_derivation"], "properties": {"schema_version": {"const": "signed-account-feature-payload-v1"}, "evaluator_feature_source": {"const": "feature_payload.feature_groups"}, "evaluation_subgroup_derivation": {"const": "feature_payload.feature_groups.base_account.account_type_or_unknown"}}},
     "dataset_path": {"const": "reports/model-publication-dataset-manifest.json#dataset_rows"},

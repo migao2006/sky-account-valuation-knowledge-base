@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3-p3.7",
+  "schema_version": "1.4-p3.8",
   "status": "not_ready",
   "lineage_mode": "production_signed",
   "feature_payload_contract": {

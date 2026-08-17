@@ -5,7 +5,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["schema_version", "status", "dataset_path", "dataset_sha256", "requirements", "market_pools"],
   "properties": {
-    "schema_version": {"const": "1.3-p3.7"}, "status": {"enum": ["not_ready", "ready_for_evaluation"]},
+    "schema_version": {"const": "1.4-p3.8"}, "status": {"enum": ["not_ready", "ready_for_evaluation"]},
     "dataset_path": {"const": "reports/model-publication-dataset-manifest.json#dataset_rows"}, "dataset_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
     "requirements": {"type": "object", "additionalProperties": false, "required": ["training_clusters", "holdout_clusters"], "properties": {"training_clusters": {"const": 300}, "holdout_clusters": {"const": 100}}},
     "market_pools": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["currency", "server", "price_line", "row_count", "cut_date", "training_cluster_ids", "holdout_cluster_ids", "excluded_spanning_cluster_ids", "cluster_overlap", "requirements_met"], "properties": {"currency": {"const": "TWD"}, "server": {"const": "international"}, "price_line": {"enum": ["normal_listing", "urgent_sale", "verified_sale"]}, "row_count": {"type": "integer", "minimum": 0}, "cut_date": {"type": ["string", "null"], "format": "date"}, "training_cluster_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "holdout_cluster_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "excluded_spanning_cluster_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "cluster_overlap": {"const": false}, "requirements_met": {"type": "boolean"}}}}

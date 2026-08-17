@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3-p3.7",
+  "schema_version": "1.4-p3.8",
   "publication_ready": false,
   "artifact_publication_fields_consulted": false,
   "feature_evaluator_contract": {
@@ -12,8 +12,8 @@
     ]
   },
   "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
-  "dataset_manifest_sha256": "B7D2379F3836C5721D4050B870A9DD21603DD600CBEC7D047D60109FA6D21B51",
-  "split_sha256": "E3917DC50B732E47EBEDF02F7AC8CD6317383B10C00D68C6C186E22C9FEA0E4B",
+  "dataset_manifest_sha256": "83DF004172D95E35B64B2C5EFC625396201102AFBE55FC65DF8A64CBFB8BBC0A",
+  "split_sha256": "410AA33A040A3A5E8876CFE42A7E1FAA2708AD3122638DFF56F84F60B2781064",
   "artifact_bindings": [],
   "requirements": {
     "training_clusters": 300,

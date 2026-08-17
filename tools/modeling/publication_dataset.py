@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 DATASET_PATH = "reports/model-publication-dataset-manifest.json#dataset_rows"
-DATASET_SCHEMA_VERSION = "1.3-p3.7"
-SPLIT_SCHEMA_VERSION = "1.3-p3.7"
+DATASET_SCHEMA_VERSION = "1.4-p3.8"
+SPLIT_SCHEMA_VERSION = "1.4-p3.8"
 LINEAGE_FIELDS = (
     "training_example_id", "training_example_digest", "feature_payload_sha256",
     "catalog_provenance_sha256", "dedup_cluster_digest",
@@ -204,16 +204,14 @@ def _assert_signed_lineage(
     if payload["dedup_cluster_digest"].upper() != _signed_payload_sha256(payload["cluster_id"]).upper():
         raise PublicationDatasetError(f"signed_dedup_cluster_mismatch:{payload['account_id']}")
     observation = example.get("_registered_observation")
-    expected_lines = {
-        "normal_listing": {"asking", "reduced"},
-        "urgent_sale": {"urgent_sale"},
-        "verified_sale": {"verified_sale"},
-    }
+    # Use the exact cleaner mapping, rather than a second hand-maintained
+    # source-type table.  A signed ``reduced`` observation is urgent_sale.
+    from tools.modeling.clean_prices import training_price_line
     if (
         not isinstance(observation, dict)
         or observation.get("price_twd") != payload["selected_price_twd"]
         or observation.get("post_date") != payload["post_date"]
-        or observation.get("price_line") not in expected_lines[payload["price_line"]]
+        or training_price_line(observation.get("price_line", observation.get("price_type"))) != payload["price_line"]
     ):
         raise PublicationDatasetError(f"signed_observation_price_or_date_mismatch:{payload['training_example_id']}")
     if payload["price_line"] == "verified_sale":

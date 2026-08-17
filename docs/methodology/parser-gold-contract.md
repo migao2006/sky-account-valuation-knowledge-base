@@ -33,3 +33,14 @@ held-out 各至少 100 筆；每筆必須覆蓋 account type、era、season、co
 context，且每個 strata 至少兩種值。held-out 必須達 owned/known-state precision >=
 98%、recall >= 95%、canonical collision = 0、unknown→confirmed-missing = 0。空 ledger 的 deterministic report 是 `not_ready`，
 不是聲稱沒有錯誤率的正式準確率。
+# P3.8 keyed finalization boundary
+
+Formal public rows use `keyed_commitment` only. They must not contain an
+`input_sha256` or `split`: those fields are retained exclusively in the
+external replay binding. A valid V2 binding is custodian-signed, covers all
+200 opaque leaves exactly once, recomputes the fixed 100/100 split commitment,
+and carries the digests of both independently signed decision ledgers plus the
+disagreement-only adjudication ledger. The accompanying finalization receipt
+binds those three ledgers and the public gold ledger. No receipt, arbitrary
+split digest, duplicate leaf, 201st row, or post-hoc held-out assignment can
+make the evaluator publication-ready.

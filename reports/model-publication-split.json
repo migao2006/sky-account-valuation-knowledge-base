@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3-p3.7",
+  "schema_version": "1.4-p3.8",
   "status": "not_ready",
   "dataset_path": "reports/model-publication-dataset-manifest.json#dataset_rows",
   "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",

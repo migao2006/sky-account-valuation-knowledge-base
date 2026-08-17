@@ -36,15 +36,27 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text(payload, encoding="utf-8", newline="\n")
 
 
-def normalized_price_type(row: dict[str, Any]) -> str:
-    value = str(row.get("price_type", "unknown")).strip().lower()
-    if value in NORMAL_TYPES:
+def training_price_line(value: object) -> str:
+    """Map every source price type to its sole training-line meaning.
+
+    This mapping is deliberately shared by cleaning and signed-publication
+    lineage checks.  In particular, a source's ``reduced`` observation is an
+    urgent-sale listing; it must never be cleaned as urgent and then rejected
+    during freeze because another module called it normal.
+    """
+    normalized = str(value if value is not None else "unknown").strip().lower()
+    if normalized in NORMAL_TYPES:
         return "normal_listing"
-    if value in URGENT_TYPES:
+    if normalized in URGENT_TYPES:
         return "urgent_sale"
-    if value in VERIFIED_SALE_TYPES:
+    if normalized in VERIFIED_SALE_TYPES:
         return "verified_sale"
     return "unknown"
+
+
+def normalized_price_type(row: dict[str, Any]) -> str:
+    """Compatibility wrapper for row-shaped callers."""
+    return training_price_line(row.get("price_type"))
 
 
 def base_account_type(row: dict[str, Any]) -> str:

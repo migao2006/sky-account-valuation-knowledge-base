@@ -1,5 +1,15 @@
 # 變更紀錄
 
+## 5.0.0-p3.8 — 2026-08-17
+
+- 完成 keyed parser review 的 A/B 獨立簽章、分歧裁決、custodian finalization、200-row commitment 雙射與 100/100 split 重播；公開 gold 不保存可連回原文的 hash 或逐列 split。
+- 將 signed `reduced` observation 一致映射至 `urgent_sale`，並讓 normal／urgent Elastic runtime 各自擁有 train-only artifact、holdout evaluation 與 exact release binding。
+- Catalog completion 擴展至季節、活動、先祖、套組、availability 與 aliases，補齊 pass／ultimate／set／first-release／as-of evidence 與 freshness gate。
+- 視覺權利不可用狀態改為 item-bound、官方來源 registry-backed、snapshot/locator 可重播；generic claim 與跨 item 重用不再能完成 visual gate。
+- 新增受外部雙 OpenSSH reviewer 核准的 restricted declarative production cohort；禁止 shadow promotion、任意 transform、路徑穿越、來源外 claim 與 target overlap。
+- Completion status 現會重播 parser gold 與所有外部 trust inputs，不再直接信任 committed report。
+- 更新 verified-sale intake runbook；receipt 是成交 provenance gate，不冒充已發布成交價模型。
+
 ## 4.9.0-p3.7 — 2026-08-17
 
 - 新增 Days of Treasure／Days of Bloom FAQ 1381 core-six 的六件 canonical identity、歷史取得成本與活動期間證據。

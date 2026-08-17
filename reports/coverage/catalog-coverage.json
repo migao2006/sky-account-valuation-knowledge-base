@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.9-p3.7",
+  "schema_version": "5.0-p3.8",
   "as_of_date": "2026-08-17",
   "catalog_claim": "partial_verified_catalog",
   "full_item_catalog_complete": false,
@@ -250,7 +250,7 @@
   },
   "p3_4_completion_evidence": {
     "catalog_status": "partial",
-    "catalog_blocking_contracts": 8,
+    "catalog_blocking_contracts": 10,
     "market_gold_status": "not_ready",
     "market_gold_rows": 0,
     "parser_review_queue_status": "not_ready",

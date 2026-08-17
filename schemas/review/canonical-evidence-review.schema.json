@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/canonical-evidence-review.schema.json",
+  "description": "Two independent offline attestations binding a production declarative cohort to one pinned declaration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_format", "cohort_id", "declaration_sha256", "review_status", "release_required", "approvals"],
+  "properties": {
+    "review_format": {"const": "canonical_evidence_review_v1"},
+    "cohort_id": {"type": "string", "pattern": "^canonical_cohort_[a-z0-9_]+$"},
+    "declaration_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "review_status": {"const": "approved"},
+    "release_required": {"const": true},
+    "approvals": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["authority_id", "fingerprint", "reviewed_at", "payload_sha256", "signature"], "properties": {"authority_id": {"type": "string", "minLength": 1}, "fingerprint": {"type": "string", "minLength": 1}, "reviewed_at": {"type": "string", "format": "date"}, "payload_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "signature": {"type": "string", "minLength": 1}}}}
+  }
+}

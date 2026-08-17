@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 MINIMUM_SUBGROUP_HOLDOUT_CASES = 30
-EVALUATION_SCHEMA_VERSION = "1.3-p3.7"
+EVALUATION_SCHEMA_VERSION = "1.4-p3.8"
 
 
 class PublicationEvaluationError(ValueError):
@@ -387,41 +387,45 @@ def _evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None =
     runtime_artifacts: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for pool in eligible:
         rows = rows_by_pool[(pool["currency"], pool["server"], pool["price_line"])]
-        if runtime_production and pool["price_line"] == "normal_listing":
+        if runtime_production and pool["price_line"] in {"normal_listing", "urgent_sale"}:
             try:
                 metric, runtime_artifact = _runtime_replay_metrics(ROOT if root is None else root, manifest, rows, pool)
                 runtime_artifacts.append((pool, runtime_artifact))
             except (PublicationRuntimeError, ValueError, ImportError, KeyError, TypeError) as exc:
                 metric, runtime_artifact = ({"scorer": "runtime_elastic_net_unavailable", "reason": str(exc), "training_row_count": 0, "holdout_row_count": 0}, None)
         elif runtime_production:
-            metric, runtime_artifact = ({"scorer": "runtime_unsupported_price_line", "reason": "runtime_contract_not_available_for_price_line", "training_row_count": 0, "holdout_row_count": 0}, None)
+            # A ready pool which the runtime cannot model is a release blocker;
+            # it must not be treated as a harmless informational metric.
+            metric, runtime_artifact = ({"scorer": "runtime_elastic_net_unavailable", "reason": "runtime_contract_not_available_for_price_line", "training_row_count": 0, "holdout_row_count": 0}, None)
         else:
             metric, runtime_artifact = _replay_metrics(rows, pool)
         pool_metrics.append({"currency": pool["currency"], "server": pool["server"], "price_line": pool["price_line"], **metric})
         pool_summary.append({"currency": pool["currency"], "server": pool["server"], "price_line": pool["price_line"],
                              "training_cluster_count": len(pool["training_cluster_ids"]),
                              "holdout_cluster_count": len(pool["holdout_cluster_ids"]), "cut_date": pool["cut_date"]})
-    pool_reasons = {f"{metric['currency']}:{metric['server']}:{metric['price_line']}": _gate_reasons(metric) if metric["scorer"] not in {"runtime_elastic_net_unavailable", "runtime_unsupported_price_line"} else ([] if metric["scorer"] == "runtime_unsupported_price_line" else [metric["reason"]]) for metric in pool_metrics}
+    pool_reasons = {f"{metric['currency']}:{metric['server']}:{metric['price_line']}": _gate_reasons(metric) if metric["scorer"] != "runtime_elastic_net_unavailable" else [metric["reason"]] for metric in pool_metrics}
     failed = [f"{name}:{reason}" for name, reasons in pool_reasons.items() for reason in reasons]
     metrics = {"replay_kind": "evaluator_owned_train_only_signed_account_feature_linear", "market_pools": pool_metrics}
     if failed:
         return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
                 "blocking_reasons": sorted(set(failed))}
-    if runtime_production and len(runtime_artifacts) == 1 and not failed:
-        pool, expected_artifact = runtime_artifacts[0]
-        artifact_path = (ROOT if root is None else root) / "modeling/artifacts/elastic-net-normal_listing.json"
-        try:
-            actual_artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            actual_artifact = None
-        if actual_artifact != expected_artifact:
-            return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
-                    "blocking_reasons": ["runtime_artifact_missing_or_not_exact_train_only_replay"]}
-        binding = {"price_line": "normal_listing", "model_type": "elastic_net", "dataset_sha256": common["dataset_sha256"],
-                   "dataset_manifest_sha256": common["dataset_manifest_sha256"], "split_sha256": common["split_sha256"],
-                   "model_sha256": canonical_sha256(expected_artifact["prediction_contract"]),
-                   "artifact_sha256": hashlib.sha256(artifact_path.read_bytes()).hexdigest().upper()}
-        return {**common, "status": "passed", "publication_ready": True, "artifact_bindings": [binding],
+    if runtime_production and len(runtime_artifacts) == len(eligible) and not failed:
+        bindings = []
+        for pool, expected_artifact in runtime_artifacts:
+            price_line = pool["price_line"]
+            artifact_path = (ROOT if root is None else root) / f"modeling/artifacts/elastic-net-{price_line}.json"
+            try:
+                actual_artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                actual_artifact = None
+            if actual_artifact != expected_artifact:
+                return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
+                        "blocking_reasons": [f"runtime_artifact_missing_or_not_exact_train_only_replay:{price_line}"]}
+            bindings.append({"price_line": price_line, "model_type": "elastic_net", "dataset_sha256": common["dataset_sha256"],
+                             "dataset_manifest_sha256": common["dataset_manifest_sha256"], "split_sha256": common["split_sha256"],
+                             "model_sha256": canonical_sha256(expected_artifact["prediction_contract"]),
+                             "artifact_sha256": hashlib.sha256(artifact_path.read_bytes()).hexdigest().upper()})
+        return {**common, "status": "passed", "publication_ready": True, "artifact_bindings": sorted(bindings, key=lambda row: row["price_line"]),
                 "eligible_market_pools": pool_summary, "metrics": metrics, "blocking_reasons": []}
     # This proves a replayable account-feature path, but it is not an Elastic
     # Net/XGBoost runtime artifact.  Keep publication locked until that exact

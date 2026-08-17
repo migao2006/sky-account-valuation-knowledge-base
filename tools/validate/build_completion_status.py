@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -51,6 +54,18 @@ def build(
     root: Path,
     market_audit_authority_bundle: str | Path | None = None,
     market_audit_authority_bundle_sha256: str | None = None,
+    parser_gold_replay_inputs: str | Path | None = None,
+    parser_gold_replay_inputs_sha256: str | None = None,
+    parser_gold_authority_bundle: str | Path | None = None,
+    parser_gold_authority_bundle_sha256: str | None = None,
+    parser_keyed_custodian_authority_bundle: str | Path | None = None,
+    parser_keyed_custodian_authority_bundle_sha256: str | None = None,
+    parser_keyed_custodian_contract: str | Path | None = None,
+    parser_keyed_custodian_contract_sha256: str | None = None,
+    parser_keyed_replay_binding: str | Path | None = None,
+    parser_keyed_replay_binding_sha256: str | None = None,
+    canonical_review_authority_bundle: str | Path | None = None,
+    canonical_review_authority_bundle_sha256: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     parser = _json(root / "reports/parser-knowledge-coverage.json")
@@ -66,7 +81,7 @@ def build(
             from .catalog_completion import build as build_catalog_completion
         except ImportError:  # direct script execution
             from catalog_completion import build as build_catalog_completion
-    catalog_completion = build_catalog_completion(root)
+    catalog_completion = build_catalog_completion(root, canonical_review_authority_bundle, canonical_review_authority_bundle_sha256)
     items = _jsonl(root / "knowledge/items/items.jsonl")
     eligible = sum(row.get("verification_status") == "verified" and row.get("model_feature_status") == "eligible" for row in items)
     verified = sum(row.get("verification_status") == "verified" for row in items)
@@ -100,6 +115,23 @@ def build(
         )
     except Exception:
         market_gold_replayed = False
+    try:
+        from tools.modeling.parser_gold_evaluator import build as replay_parser_gold_evaluation
+        parser_gold_replayed = parser_gold == replay_parser_gold_evaluation(
+            root,
+            Path(parser_gold_replay_inputs) if parser_gold_replay_inputs is not None else None,
+            parser_gold_replay_inputs_sha256,
+            parser_gold_authority_bundle,
+            parser_gold_authority_bundle_sha256,
+            parser_keyed_custodian_authority_bundle,
+            parser_keyed_custodian_authority_bundle_sha256,
+            parser_keyed_custodian_contract,
+            parser_keyed_custodian_contract_sha256,
+            parser_keyed_replay_binding,
+            parser_keyed_replay_binding_sha256,
+        )
+    except Exception:
+        parser_gold_replayed = False
     runtime_publication_bound = (
         evaluation.get("publication_ready") is True
         and evaluation.get("status") == "passed"
@@ -110,15 +142,15 @@ def build(
     checks = [
         *catalog_completion["checks"],
         _check("catalog.model_eligible_positive", eligible > 0, {"verified": verified, "model_eligible": eligible}, "verified canonical items with independently approved observation tokens", ["knowledge/items/items.jsonl", "reports/parser-knowledge-coverage.json"]),
-        _check("parser.human_gold_200", parser_gold.get("gold_row_count", 0) >= 200 and parser_gold.get("rule_development_manifest_sha256") is not None, {"rows": parser_gold.get("gold_row_count", 0), "development": parser_gold.get("development", {}).get("row_count", 0), "heldout": parser_gold.get("heldout", {}).get("row_count", 0), "signed_rule_manifest": parser_gold.get("rule_development_manifest_sha256") is not None}, "at least 200 independently double-annotated parser claims with adjudication, including >=100 development and >=100 held-out rows", ["reports/parser-gold-evaluation.json", "data/review/parser-gold/claims.jsonl"]),
-        _check("parser.metrics_passed", parser_gold.get("publication_ready") is True and parser_gold.get("status") == "evaluated", {"status": parser_gold.get("status"), "heldout": parser_gold.get("heldout"), "strata": parser_gold.get("strata_distinct_value_counts"), "verified_alias_tokens": parser.get("verified_alias_token_count", 0)}, "held-out precision >=98%, recall >=95%, collision error rate 0, no unknown-to-missing errors, and locked strata coverage", ["reports/parser-gold-evaluation.json", "reports/parser-knowledge-coverage.json"]),
+        _check("parser.human_gold_200", parser_gold_replayed and parser_gold.get("gold_row_count", 0) == 200 and parser_gold.get("rule_development_manifest_sha256") is not None, {"report_replayed": parser_gold_replayed, "rows": parser_gold.get("gold_row_count", 0), "development": parser_gold.get("development", {}).get("row_count", 0), "heldout": parser_gold.get("heldout", {}).get("row_count", 0), "signed_rule_manifest": parser_gold.get("rule_development_manifest_sha256") is not None}, "exactly 200 independently double-annotated parser claims with adjudication and a replayed keyed 100/100 development/held-out split", ["reports/parser-gold-evaluation.json", "data/review/parser-gold/claims.jsonl"]),
+        _check("parser.metrics_passed", parser_gold_replayed and parser_gold.get("publication_ready") is True and parser_gold.get("status") == "evaluated", {"report_replayed": parser_gold_replayed, "status": parser_gold.get("status"), "heldout": parser_gold.get("heldout"), "strata": parser_gold.get("strata_distinct_value_counts"), "verified_alias_tokens": parser.get("verified_alias_token_count", 0)}, "replayed held-out precision >=98%, recall >=95%, collision error rate 0, no unknown-to-missing errors, and locked strata coverage", ["reports/parser-gold-evaluation.json", "reports/parser-knowledge-coverage.json"]),
         _check("market.human_gold_evaluation_passed", market_gold_replayed and market_gold_report.get("publication_ready") is True and market_gold_report.get("status") == "evaluated", {"report_replayed": market_gold_replayed, "status": market_gold_report.get("status"), "rows": market_gold_report.get("gold_row_count"), "heldout_minimum_annotator_field_accuracy": market_gold_report.get("heldout_minimum_annotator_field_accuracy"), "verified_sale_false_positives": market_gold_report.get("heldout_verified_sale_false_positive_count"), "independent_blinded_decisions_proven": market_gold_report.get("independent_blinded_decisions_proven")}, "at least 200 externally attested independently double-annotated claims; 100/100 opaque-stratified development/held-out split; each five-field held-out accuracy >=98%; verified-sale false positives = 0", ["reports/market-gold-evaluation.json", "data/review/market-claim-gold.jsonl", "data/review/market-audit/attestations.jsonl"]),
         _check("market.train_holdout_capacity", _published_capacity_ready(readiness, bindings), [{"pool": pool.get("market_pool"), "train": pool.get("time_forward_split", {}).get("training_clusters"), "holdout": pool.get("time_forward_split", {}).get("holdout_clusters")} for pool in readiness.get("market_pools", [])], "each published pool has >=300 independent training clusters and >=100 later holdout clusters", ["reports/model-publication-readiness.json", "reports/model-publication-split.json", "reports/model-publication-evaluation.json"]),
         _check("market.verified_sales_positive", readiness.get("verified_completed_sale_count", 0) > 0, readiness.get("verified_completed_sale_count", 0), "verified completed-sale evidence available for claimed sale-price use", ["reports/model-publication-readiness.json"]),
         _check("model.replayable_publication_passed", runtime_publication_bound, {"evaluation_status": evaluation.get("status"), "publication_ready": evaluation.get("publication_ready"), "trained_artifacts": sum(row.get("status") == "trained" for row in artifacts), "runtime_artifact_bindings": len(bindings) if isinstance(bindings, list) else 0}, "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold and binds every published runtime artifact", ["reports/model-publication-evaluation.json", "modeling/artifacts"]),
     ]
     return {
-        "schema_version": "1.3-p3.7",
+        "schema_version": "1.4-p3.8",
         "goal": "precise_account_valuation_and_complete_knowledge_base",
         "status": "complete" if all(row["passed"] for row in checks) else "incomplete",
         "complete": all(row["passed"] for row in checks),
@@ -133,12 +165,36 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--market-audit-authority-bundle")
     parser.add_argument("--market-audit-authority-bundle-sha256")
+    parser.add_argument("--parser-gold-replay-inputs")
+    parser.add_argument("--parser-gold-replay-inputs-sha256")
+    parser.add_argument("--parser-gold-authority-bundle")
+    parser.add_argument("--parser-gold-authority-bundle-sha256")
+    parser.add_argument("--parser-keyed-custodian-authority-bundle")
+    parser.add_argument("--parser-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--parser-keyed-custodian-contract")
+    parser.add_argument("--parser-keyed-custodian-contract-sha256")
+    parser.add_argument("--parser-keyed-replay-binding")
+    parser.add_argument("--parser-keyed-replay-binding-sha256")
+    parser.add_argument("--canonical-review-authority-bundle")
+    parser.add_argument("--canonical-review-authority-bundle-sha256")
     args = parser.parse_args()
     payload = json.dumps(
         build(
             args.root,
             args.market_audit_authority_bundle,
             args.market_audit_authority_bundle_sha256,
+            args.parser_gold_replay_inputs,
+            args.parser_gold_replay_inputs_sha256,
+            args.parser_gold_authority_bundle,
+            args.parser_gold_authority_bundle_sha256,
+            args.parser_keyed_custodian_authority_bundle,
+            args.parser_keyed_custodian_authority_bundle_sha256,
+            args.parser_keyed_custodian_contract,
+            args.parser_keyed_custodian_contract_sha256,
+            args.parser_keyed_replay_binding,
+            args.parser_keyed_replay_binding_sha256,
+            args.canonical_review_authority_bundle,
+            args.canonical_review_authority_bundle_sha256,
         ),
         ensure_ascii=False,
         indent=2,

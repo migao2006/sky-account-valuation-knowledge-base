@@ -23,6 +23,9 @@
 7. `officially_discontinued` 只能由官方明示來源支持。
 8. Coverage 必須以封閉母體為分母，逐季、逐活動、逐類滿足 `expected = canonical + explicitly excluded`。
 9. 可視物品必須有 visual-reference 狀態；無權保存圖片時，保存來源描述、unavailable 原因，以及可重播的 rights snapshot SHA-256／claim locator，不得冒充已有圖像資產。
+10. 不只 item：season、event、ancestor、set、availability event 與 alias 都是完整知識庫的一部分。各 inventory 必須非空、ID 唯一、關聯只指向 canonical entity、所有記錄均為 `verified` 且具 registered source；任一 `needs_review`、未綁定 source、過期或 dangling reference 都使完整性失敗。若某類確實為空，必須另有經審核、簽署的 empty-universe evidence；預設空檔案不會完成該門檻。
+11. 所有 completion evidence 與其 source 的 `retrieved_at`／entity `last_verified_at` 必須落在 research cutoff 前 366 天內。截止日未宣告、日期無效或未來日期均 fail closed。
+12. `rights_not_granted_for_redistribution` 不是可自由填寫的例外：claim object 必須同時明示 exact `item_id` 與 rights value，並且是 item-bound 的 approved、release-required cohort evidence，精確重播相同 source、registered lineage、snapshot bytes SHA-256 與 RFC6901 locator；來源必須在 official-rights registry 由指定 verifier 核可。同一 snapshot SHA-256＋locator 不得以不同 source alias 重用來完成多個 item。純手寫 JSON、generic claim 或描述文字均不算完成。
 
 ## 文案解析與 Item Vector 門檻
 
@@ -65,4 +68,4 @@ P0 至 P3.2 的 image evidence 只是資料契約，不是 OCR 或圖示辨識�
 
 截至 P3.5，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,503 筆離線查詢索引。44 筆 canonical item 具有受限、可重播的 identity 證據鏈，其中 19 筆只允許官方精確英文 observation token；但 1,367 筆 collectible observation 仍 unresolved，且 3,266 筆 scope disposition 都尚未有獨立的 approved scope decision。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場／parser 人工 gold、near-miss approved evidence、verified sale、真實圖片資產與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P3.5 的 publication evaluator 已具備 normal-listing portable Elastic Net 的 train-only 重建、cluster-weighted holdout、OOD／subgroup／interval 門檻與 runtime parity；但正式市場資料尚無外部簽署 identity→cluster 獨立性證明，所以不會進入訓練池。Parser review 也因公開 unsalted input hash 可回推 split，在外部 keyed commitment 與私有 split mapping 完成前不發行盲檢 packet。正式資料仍未達樣本與真人標註門檻，因此 `publication_ready=false`；合成測試只能證明計算與 fail-closed 邊界，不能充當正式完成證據。
+P3.8 的 publication evaluator 已具備 normal-listing 與 urgent-sale 各自 portable Elastic Net 的 train-only 重建、cluster-weighted holdout、OOD／subgroup／interval 門檻與 runtime parity；每個達 300/100 的可支援 pool 都必須有精確 artifact binding，不能被靜默略過。verified sale 仍只是獨立成交證據池，不是 estimator。正式市場資料尚無外部簽署 identity→cluster 獨立性證明，所以不會進入訓練池。Parser review 已改用外部 custodian keyed commitment、私有 split mapping、A/B 獨立簽章與分歧裁決；正式 importer 會重播全部 provenance，公開 gold 不保存可重算原文 hash 或逐列 split。正式資料仍未達樣本與真人標註門檻，因此 `publication_ready=false`；合成測試只能證明計算與 fail-closed 邊界，不能充當正式完成證據。
