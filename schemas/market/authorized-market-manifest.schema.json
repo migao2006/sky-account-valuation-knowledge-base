@@ -6,12 +6,12 @@
   "required": ["schema_version", "dataset_id", "observations_path", "observations_sha256", "observation_digests"],
   "allOf": [
     {
-      "if": {"properties": {"schema_version": {"const": "authorized-market-manifest-v2"}}},
+      "if": {"properties": {"schema_version": {"enum": ["authorized-market-manifest-v2", "authorized-market-manifest-v3"]}}},
       "then": {"required": ["training_examples_path", "training_examples_sha256", "training_example_digests"]}
     }
   ],
   "properties": {
-    "schema_version": {"enum": ["authorized-market-manifest-v1", "authorized-market-manifest-v2"]},
+    "schema_version": {"enum": ["authorized-market-manifest-v1", "authorized-market-manifest-v2", "authorized-market-manifest-v3"]},
     "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
     "observations_path": {"type": "string", "pattern": "^data/review/market-authorization/datasets/[a-z0-9_/-]+/observations\\.jsonl$"},
     "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},

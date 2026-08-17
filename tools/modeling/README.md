@@ -10,4 +10,6 @@ the required grouped time-forward sample capacity. It is evidence accounting,
 not a model publication gate; see
 `docs/methodology/model-publication-readiness.md`. P3.2 also builds
 `publication_evaluator.py`; it replays dataset/split capacity without trusting
-artifact fields and remains non-publishing until every holdout metric exists.
+artifact fields. When capacity exists it fits its own fixed train-only
+verified-date trend, recomputes untouched-holdout gates, and emits a binding
+only for a replayed pass.

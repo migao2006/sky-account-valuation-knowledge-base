@@ -124,6 +124,7 @@ def _strict_source_provenance(root: Path, row: dict[str, Any], source_records: d
 
 def verify_replayable_sources(root: Path, evidence: list[dict[str, Any]], source_records: dict[str, dict[str, Any]], *, strict_contract: bool = False) -> set[str]:
     """Reject a ledger input whose claimed local source bytes no longer match."""
+    root = root.resolve()
     verified: set[str] = set()
     for row in evidence:
         if strict_contract:

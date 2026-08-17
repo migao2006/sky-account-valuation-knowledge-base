@@ -11,6 +11,19 @@
     "currency": {"const": "TWD"}, "currency_verified": {"const": true},
     "server": {"const": "international"}, "server_verified": {"const": true},
     "offer_kind": {"const": "seller_listing"}, "entity_kind": {"const": "single_account"},
-    "price_line": {"enum": ["asking", "reduced", "urgent_sale"]}, "price_twd": {"type": "integer", "minimum": 1}
-  }
+    "price_line": {"enum": ["asking", "reduced", "urgent_sale", "verified_sale"]}, "price_twd": {"type": "integer", "minimum": 1},
+    "completed_sale_verified": {"const": true},
+    "sale_verified": {"const": true},
+    "completed_sale_date": {"type": "string", "format": "date"},
+    "completion_evidence": {"type": "array", "minItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["evidence_id", "source_lineage_id", "evidence_sha256"], "properties": {"evidence_id": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}, "source_lineage_id": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"}, "evidence_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}}},
+    "completion_evidence_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "independent_evidence_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"price_line": {"const": "verified_sale"}}, "required": ["price_line"]},
+      "then": {"required": ["completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence", "completion_evidence_digest", "independent_evidence_ids"]},
+      "else": {"not": {"anyOf": [{"required": ["completed_sale_verified"]}, {"required": ["sale_verified"]}, {"required": ["completed_sale_date"]}, {"required": ["completion_evidence_digest"]}, {"required": ["independent_evidence_ids"]}]}}
+    }
+  ]
 }

@@ -16,6 +16,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status
 from tools.normalize.apply_moomintroll_accessory_set_cohort import chash, evidence, read, safe, sha, vendor, write
 
 OFFICIAL_SOURCE = "source_tgc_faq_1330_skyfest_core_five"
@@ -65,7 +66,7 @@ def item_row(item_id: str, name: str, category: str, currency: str, cost: int | 
         "availability_event_ids": ["availability_skyfest_faq1330_" + item_id.removeprefix("item_skyfest_")],
         "visual_reference_ids": [], "valuation_role": "collection_structure", "source_ids": [OFFICIAL_SOURCE, SECONDARY_SOURCE],
         "last_verified_at": AS_OF, "verification_status": "verified", "evidence_tier": "official_with_secondary",
-        "model_feature_status": "excluded_pending_verification",
+        "model_feature_status": declared_model_feature_status(item_id),
         "notes": "FAQ 1330 establishes this named SkyFest 2024 new item's historical cost and event window only; the pinned vendor snapshot independently supplies title spelling and vendor type. Current availability, return policy, permanent-account property, formal Traditional Chinese name, visual identity, and model eligibility remain unknown or unasserted. This is a bounded five-item FAQ slice, not a bundle or complete SkyFest catalog.",
     }
 
@@ -130,7 +131,9 @@ def verify(root: Path, require_applied: bool = True) -> list[str]:
     expected = apply_targets(targets)
     problems: list[str] = []
     if require_applied:
-        if read(root / "knowledge/items/items.jsonl") != expected["items"]:
+        current_items = {row["item_id"]: row for row in read(root / "knowledge/items/items.jsonl")}
+        expected_items = {row["item_id"]: row for row in expected["items"]}
+        if any(current_items.get(item_id) != expected_items.get(item_id) for item_id, *_ in ITEMS):
             problems.append("committed target differs from replayable apply contract: knowledge/items/items.jsonl")
         available = {row["availability_id"]: row for row in read(root / "knowledge/acquisition/availability-events.jsonl")}
         for row in availability_rows():
@@ -141,7 +144,7 @@ def verify(root: Path, require_applied: bool = True) -> list[str]:
             problems.append("canonical field evidence differs from replayable source claims")
         for item_id, *_ in ITEMS:
             item = next(row for row in expected["items"] if row["item_id"] == item_id)
-            if item["availability_status"] != "unknown" or item["permanent_account_item"] != "unknown" or item["first_release_date"] is not None or item["model_feature_status"] != "excluded_pending_verification" or item["set_ids"]:
+            if item["availability_status"] != "unknown" or item["permanent_account_item"] != "unknown" or item["first_release_date"] is not None or item["model_feature_status"] != declared_model_feature_status(item_id) or item["set_ids"]:
                 problems.append("unsupported availability, permanence, first-release, model promotion, or bundle membership")
                 break
     return problems

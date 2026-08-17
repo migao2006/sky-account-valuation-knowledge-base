@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.normalize.apply_days_of_color_faq1323_core_three_cohort import ITEMS, DaysOfColorEvidenceError, build, verify  # noqa: E402
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status  # noqa: E402
 from tools.validate.schema_validator import OfflineSchemaValidator  # noqa: E402
 
 
@@ -32,7 +33,7 @@ class DaysOfColorFaq1323CoreThreeEvidenceTests(unittest.TestCase):
         self.assertEqual({item_id: items[item_id]["canonical_name_en"] for item_id, _vendor, _guid, name, *_tail in ITEMS}, {item_id: name for item_id, _vendor, _guid, name, *_tail in ITEMS})
         for item_id, *_ in ITEMS:
             item = items[item_id]
-            self.assertEqual((item["availability_status"], item["permanent_account_item"], item["first_release_date"], item["model_feature_status"], item["set_ids"], item["visual_reference_ids"]), ("unknown", "unknown", None, "excluded_pending_verification", [], []))
+            self.assertEqual((item["availability_status"], item["permanent_account_item"], item["first_release_date"], item["model_feature_status"], item["set_ids"], item["visual_reference_ids"]), ("unknown", "unknown", None, declared_model_feature_status(item_id), [], []))
         availability = {row["availability_id"]: row for row in rows(ROOT / "knowledge/acquisition/availability-events.jsonl")}
         for item_id, *_ in ITEMS:
             row = availability["availability_days_of_color_faq1323_" + item_id.removeprefix("item_days_of_color_")]

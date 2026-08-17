@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 from tools.modeling.parse_item_vectors import build_vector, build_vectors, load_catalog
 from tools.modeling.catalog_provenance import catalog_provenance
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status
 from tools.validate.schema_validator import OfflineSchemaValidator
 
 
@@ -14,7 +15,7 @@ FAQ968_ITEMS = {
     "item_aurora_cure_for_me_mask": "Cure For Me Mask",
     "item_aurora_cure_for_me_outfit": "Cure For Me Outfit",
     "item_aurora_giving_in_cape": "Giving In Cape",
-    "item_aurora_to_the_love_outfit": "To The Love Outfit",
+            "item_aurora_to_the_love_outfit": "To the Love Outfit",
     "item_aurora_voice": "Voice of AURORA",
     "item_aurora_wings": "Wings of AURORA",
 }
@@ -54,7 +55,7 @@ class ItemVectorTests(unittest.TestCase):
         for item_id, canonical_name in FAQ968_ITEMS.items():
             self.assertEqual(selected[item_id]["canonical_name_en"], canonical_name)
             self.assertEqual(selected[item_id]["verification_status"], "verified")
-            self.assertEqual(selected[item_id]["model_feature_status"], "excluded_pending_verification")
+            self.assertEqual(selected[item_id]["model_feature_status"], declared_model_feature_status(item_id))
         return selected, selected_aliases
 
     def _copied_catalog_with_wings_eligible(self):
@@ -141,7 +142,7 @@ class ItemVectorTests(unittest.TestCase):
             vector = self._vector(canonical_name, items=items, aliases=aliases)
             state = next(row for row in vector["item_states"] if row["item_id"] == item_id)
             self.assertEqual(state["state"], "owned", canonical_name)
-            self.assertFalse(state["model_feature"], canonical_name)
+            self.assertEqual(state["model_feature"], declared_model_feature_status(item_id) == "eligible", canonical_name)
             self.assertEqual(state["matched_sources"], ["listing_text"])
             self.assertEqual(state["matched_aliases"], ["".join(char.lower() for char in canonical_name if char.isalnum())])
 

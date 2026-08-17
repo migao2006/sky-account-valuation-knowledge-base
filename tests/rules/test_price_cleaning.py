@@ -161,7 +161,7 @@ class PriceCleaningTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             summary = build(ROOT, output_dir=output)
-            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 0, "urgent_sale": 0, "excluded_or_review": 103})
+            self.assertEqual(summary, {"input_rows": 103, "normal_listing": 0, "urgent_sale": 0, "verified_sale": 0, "excluded_or_review": 103})
             normal = [json.loads(line) for line in (output / "price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines()]
             urgent = [json.loads(line) for line in (output / "price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual(normal, [])

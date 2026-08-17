@@ -23,6 +23,7 @@ from tools.modeling.publication_readiness import build as build_publication_read
 from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
 from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
+from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation  # noqa: E402
 from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
 from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
 
@@ -40,9 +41,75 @@ def write_utf8_lf(path: Path, content: str) -> None:
         handle.write(content)
 
 
-def model_artifacts_release_valid(artifacts: list[dict[str, object]]) -> bool:
-    """Fail closed until a publication evaluator can replay a trained artifact."""
-    return bool(artifacts) and all(artifact.get("status") == "insufficient_training_data" for artifact in artifacts)
+def _canonical_sha256(value: object) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest().upper()
+
+
+def _artifact_model_sha256(artifact: dict[str, object], path: Path) -> str | None:
+    """Derive the model payload digest; never use a self-attested gate."""
+    if artifact.get("model_type") == "xgboost":
+        model_file = artifact.get("model_file")
+        if not isinstance(model_file, str):
+            return None
+        model_path = (path.parent / model_file).resolve()
+        if model_path.parent != path.parent.resolve() or not model_path.is_file():
+            return None
+        return sha256(model_path)
+    contract = artifact.get("prediction_contract")
+    return _canonical_sha256(contract) if isinstance(contract, dict) else None
+
+
+def model_artifacts_release_valid(
+    artifacts: list[dict[str, object]], publication_evaluation: dict[str, object] | None = None,
+    artifact_paths: dict[tuple[str, str], Path] | None = None, publication_replayed: bool = False,
+) -> bool:
+    """Allow only an all-insufficient release or exact passed evaluator bindings.
+
+    Publication metadata embedded in an artifact is intentionally ignored.  A
+    trained release must be covered one-to-one by the evaluator's current
+    dataset/split/model/artifact binding.  Mixed trained/insufficient releases
+    are ambiguous and therefore rejected.
+    """
+    if not artifacts:
+        return False
+    states = {artifact.get("status") for artifact in artifacts}
+    if states == {"insufficient_training_data"}:
+        return True
+    if states != {"trained"} or not publication_replayed or not isinstance(publication_evaluation, dict) or artifact_paths is None:
+        return False
+    if publication_evaluation.get("status") != "passed" or publication_evaluation.get("publication_ready") is not True:
+        return False
+    shared = {
+        "dataset_sha256": publication_evaluation.get("dataset_sha256"),
+        "dataset_manifest_sha256": publication_evaluation.get("dataset_manifest_sha256"),
+        "split_sha256": publication_evaluation.get("split_sha256"),
+    }
+    if not all(isinstance(value, str) and len(value) == 64 for value in shared.values()):
+        return False
+    bindings = publication_evaluation.get("artifact_bindings")
+    if not isinstance(bindings, list):
+        return False
+    expected: list[dict[str, object]] = []
+    for artifact in artifacts:
+        model_type, price_line = artifact.get("model_type"), artifact.get("price_line")
+        if not isinstance(model_type, str) or not isinstance(price_line, str):
+            return False
+        path = artifact_paths.get((model_type, price_line))
+        if path is None or not path.is_file():
+            return False
+        model_sha = _artifact_model_sha256(artifact, path)
+        if model_sha is None:
+            return False
+        expected.append({
+            "price_line": price_line, "model_type": model_type, **shared,
+            "model_sha256": model_sha, "artifact_sha256": sha256(path),
+        })
+    if len({(row["model_type"], row["price_line"]) for row in expected}) != len(expected):
+        return False
+    return len(bindings) == len(expected) and all(
+        sum(isinstance(row, dict) and all(row.get(key) == value for key, value in candidate.items()) for row in bindings) == 1
+        for candidate in expected
+    )
 
 
 def item_value_rows_release_valid(rows: list[dict[str, object]], canonical_item_ids: set[str]) -> bool:
@@ -78,6 +145,10 @@ def verify_fresh_lf_checkout(
     market_authorization_authority_bundle_sha256: str | None = None,
     market_authorization_statement: Path | None = None,
     market_authorization_statement_sha256: str | None = None,
+    parser_gold_authority_bundle: Path | None = None,
+    parser_gold_authority_bundle_sha256: str | None = None,
+    parser_gold_replay_inputs: Path | None = None,
+    parser_gold_replay_inputs_sha256: str | None = None,
 ) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
@@ -108,6 +179,10 @@ def verify_fresh_lf_checkout(
             command.extend(["--market-authorization-statement", str(market_authorization_statement)])
         if market_authorization_statement_sha256 is not None:
             command.extend(["--market-authorization-statement-sha256", market_authorization_statement_sha256])
+        if parser_gold_authority_bundle is not None: command.extend(["--parser-gold-authority-bundle", str(parser_gold_authority_bundle)])
+        if parser_gold_authority_bundle_sha256 is not None: command.extend(["--parser-gold-authority-bundle-sha256", parser_gold_authority_bundle_sha256])
+        if parser_gold_replay_inputs is not None: command.extend(["--parser-gold-replay-inputs", str(parser_gold_replay_inputs)])
+        if parser_gold_replay_inputs_sha256 is not None: command.extend(["--parser-gold-replay-inputs-sha256", parser_gold_replay_inputs_sha256])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -130,12 +205,18 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--parser-gold-authority-bundle", type=Path)
+    parser.add_argument("--parser-gold-authority-bundle-sha256")
+    parser.add_argument("--parser-gold-replay-inputs", type=Path)
+    parser.add_argument("--parser-gold-replay-inputs-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
     integrity = validate(
         root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
+        args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
+        args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
     )
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
@@ -199,13 +280,14 @@ def main() -> None:
     vectors = [json.loads(line) for line in (root / "data/modeling/account-item-vectors.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     clean_normal = [json.loads(line) for line in (root / "data/modeling/price-cleaned-normal.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     clean_urgent = [json.loads(line) for line in (root / "data/modeling/price-cleaned-urgent.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    model_artifacts = [
-        json.loads((root / f"modeling/artifacts/{name}").read_text(encoding="utf-8"))
-        for name in (
-            "elastic-net-normal_listing.json", "elastic-net-urgent_sale.json",
-            "xgboost-normal_listing.json", "xgboost-urgent_sale.json",
-        )
-    ]
+    clean_verified_sales = [json.loads(line) for line in (root / "data/modeling/price-cleaned-verified-sales.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    model_artifact_paths = {
+        ("elastic_net", "normal_listing"): root / "modeling/artifacts/elastic-net-normal_listing.json",
+        ("elastic_net", "urgent_sale"): root / "modeling/artifacts/elastic-net-urgent_sale.json",
+        ("xgboost", "normal_listing"): root / "modeling/artifacts/xgboost-normal_listing.json",
+        ("xgboost", "urgent_sale"): root / "modeling/artifacts/xgboost-urgent_sale.json",
+    }
+    model_artifacts = [json.loads(path.read_text(encoding="utf-8")) for path in model_artifact_paths.values()]
     item_values = [json.loads(line) for line in (root / "data/modeling/item-value-table.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     items = [json.loads(line) for line in (root / "knowledge/items/items.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     item_candidates = [json.loads(line) for line in (root / "data/review/item-candidates.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -219,6 +301,7 @@ def main() -> None:
         root, market_claim_review, market_claim_gold, market_near_miss_review, market_near_miss_evidence,
         args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
     )
+    parser_gold_errors = audit_parser_gold(root, [json.loads(line) for line in (root / "data/review/parser-gold/claims.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()], args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
@@ -230,7 +313,9 @@ def main() -> None:
     publication_evaluation = json.loads((root / "reports/model-publication-evaluation.json").read_text(encoding="utf-8"))
     completion_status = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
     parser_knowledge_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
+    parser_gold_evaluation = json.loads((root / "reports/parser-gold-evaluation.json").read_text(encoding="utf-8"))
     expected_publication_dataset, expected_publication_split = build_publication_dataset(root)
+    publication_evaluation_replayed = publication_evaluation == build_publication_evaluation(root)
     authorized_market_errors = verify_authorized_market_intake(
         root, args.market_authorization_authority_bundle,
         args.market_authorization_authority_bundle_sha256,
@@ -269,6 +354,7 @@ def main() -> None:
             and coverage["market_migration"]["curated_histories"] == coverage["market_migration"]["comparable_histories"] == coverage["market_migration"]["comparable_accounts"]
             and coverage["modeling"]["clean_normal_rows"] == len(clean_normal)
             and coverage["modeling"]["clean_urgent_rows"] == len(clean_urgent)
+            and coverage["modeling"]["clean_verified_sale_rows"] == len(clean_verified_sales)
         ),
         "migration_history_accounting_consistent": migration["migrated_histories"] + migration["not_migrated_histories"] == migration["legacy_histories"],
         "verified_sales_state_reported": coverage["market_migration"]["verified_completed_sales"] >= 0,
@@ -299,7 +385,7 @@ def main() -> None:
         "p2_4_catalog_scope_is_auditable": bool(catalog_universe) and all(row.get("scope_disposition") and row.get("disposition_reason") and row.get("evidence_basis") for row in catalog_universe),
         "p2_4_unknown_sets_not_model_features": all(all(set_row.get("model_feature") is False and set_row.get("completion_ratio") is None and set_row.get("is_complete") is None for set_row in vector.get("feature_groups", {}).get("item_sets", [])) for vector in vectors),
         "p2_2_fandom_same_lineage_only": len(fandom_crosswalk) == 700 and sum(row.get("match_status") == "season_mapped_candidate_linked" for row in fandom_crosswalk) == 579 and all(row.get("source_independence") == "not_independent_same_fandom_wiki" and row.get("promotion_effect") == "none" for row in fandom_crosswalk),
-        "formal_models_publication_gated": model_artifacts_release_valid(model_artifacts),
+        "formal_models_publication_gated": model_artifacts_release_valid(model_artifacts, publication_evaluation, model_artifact_paths, publication_evaluation_replayed),
         "item_values_provenance_gated": item_value_rows_release_valid(item_values, canonical_item_ids),
         "verified_identity_cohort_not_over_promoted_to_model": all(row.get("model_feature_status") != "eligible" or row.get("verification_status") == "verified" for row in items),
         "p3_official_historical_costs_replayable_and_non_valuative": (
@@ -322,7 +408,7 @@ def main() -> None:
             and publication_dataset.get("status") in {"not_ready", "ready_for_evaluation"}
         ),
         "p3_2_publication_evaluation_replayed": (
-            publication_evaluation == build_publication_evaluation(root)
+            publication_evaluation_replayed
             and publication_evaluation.get("artifact_publication_fields_consulted") is False
             and (
                 publication_evaluation.get("publication_ready") is False
@@ -335,6 +421,11 @@ def main() -> None:
             and parser_knowledge_coverage.get("model_feature") is False
             and all(row.get("model_feature") is False for row in parser_knowledge_coverage.get("items", []))
         ),
+        "p3_3_parser_gold_replayed_non_model": (
+            not parser_gold_errors
+            and parser_gold_evaluation == build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
+            and parser_gold_evaluation.get("model_feature") is False
+        ),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
@@ -342,10 +433,12 @@ def main() -> None:
             root, source_zip, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
             args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
             args.market_authorization_statement, args.market_authorization_statement_sha256,
+            args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
+            args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.4-p3.2", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.5-p3.3", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

@@ -152,11 +152,12 @@ class ElasticNetModelingTest(unittest.TestCase):
         vectors = (ROOT / "data/modeling/account-item-vectors.jsonl").read_text(encoding="utf-8").splitlines()
         row = next(json.loads(line) for line in vectors if json.loads(line)["account_id"] == "account_0165")
         self.assertTrue(any(state["item_id"] == "item_moomin_ears" and not state["model_feature"] for state in row["item_states"]))
-        mapped = feature_mapping(row)
+        eligible = {state["item_id"] for state in row["item_states"] if state.get("model_feature") is True}
+        mapped = feature_mapping(row, eligible)
         serialized = json.dumps(mapped, ensure_ascii=False, sort_keys=True)
         self.assertNotIn("item_moomin_ears", serialized)
         self.assertNotIn("item_days_mischief_bat_cape", serialized)
-        self.assertFalse(any(key.startswith("items.item_") for key in mapped))
+        self.assertTrue(all(key.removeprefix("items.") in eligible for key in mapped if key.startswith("items.")))
         # Legacy aggregate rows have no explicit eligibility verdict, so they
         # are fail-closed.  Regenerated rows may expose only model_feature=true
         # sets after every required member is canonical and explicitly known.

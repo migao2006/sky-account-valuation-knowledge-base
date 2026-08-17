@@ -43,7 +43,7 @@ def load_catalog(root: Path = ROOT) -> tuple[dict[str, dict[str, Any]], dict[str
         # An entity-level verification can make its evidenced English
         # canonical identity searchable for modeling.  Localized names and
         # player aliases require their own approved alias record below.
-        if item.get("verification_status") == "verified" and isinstance(item.get("canonical_name_en"), str):
+        if item.get("verification_status") == "verified" and item.get("model_feature_status") == "eligible" and isinstance(item.get("canonical_name_en"), str):
             verified_tokens[item_id].add(normalize_text(item["canonical_name_en"]))
         for value in item.get("aliases", []):
             # Verifying the entity does not promote its unreviewed player
@@ -57,8 +57,9 @@ def load_catalog(root: Path = ROOT) -> tuple[dict[str, dict[str, Any]], dict[str
                 row.get("verification_status") == "verified" or len(normalize_text(value)) >= 3
             ):
                 aliases[normalize_text(value)].add(row["target_id"])
-                if row.get("verification_status") == "verified" and items[row["target_id"]].get("verification_status") == "verified":
-                    verified_tokens[row["target_id"]].add(normalize_text(value))
+                # Exact-English eligibility intentionally does not promote an
+                # alias-master row (including Chinese aliases) into a model
+                # observation token.  It remains useful only for review.
     for item_id, item in items.items():
         # Runtime-only audit metadata.  It is never serialized into the
         # canonical item master or vector, but prevents an unreviewed alias

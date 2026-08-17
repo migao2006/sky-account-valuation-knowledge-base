@@ -63,6 +63,6 @@ P0 至 P3.2 的 image evidence 只是資料契約，不是 OCR 或圖示辨識�
 
 ## 目前狀態
 
-截至 P3.2，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,492 筆離線查詢索引。30 筆 canonical item 具有受限、可重播的 identity 證據鏈，但 1,374 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場人工 gold、near-miss approved evidence 與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
+截至 P3.3，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,495 筆離線查詢索引。33 筆 canonical item 具有受限、可重播的 identity 證據鏈，其中 19 筆只允許官方精確英文 observation token；但 1,373 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場／parser 人工 gold、near-miss approved evidence、verified sale 與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P3.2 新增 publication evaluation boundary 與 completion-status state machine；dataset/readiness 可依證據進入 `ready_for_evaluation`，不再永久鎖死 `not_ready`。但仍沒有足量、具驗證日期的 holdout rows 或可重算完整模型指標，因此 `publication_ready=false`，runtime 拒絕未通過獨立發布證據的 `trained` artifact。模型發布不能由 artifact 自填指標解鎖。
+P3.3 的 publication evaluator 可在固定 300/100 時間前推資料上自行訓練、重播 holdout 指標並輸出 artifact binding；runtime 與 release 只接受相同 bytes 的唯一 binding。Parser gold 也具備外部三角色簽章、locked development/heldout 分割與正式 precision/recall/collision gate。正式資料仍未達樣本與真人標註門檻，因此 `publication_ready=false`；合成測試只能證明管線可前進，不能充當正式完成證據。

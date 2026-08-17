@@ -43,7 +43,9 @@ from tools.modeling.publication_readiness import build as build_publication_read
 from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
 from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
-from tools.modeling.clean_prices import clean_authorized as clean_model_prices  # noqa: E402
+from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation  # noqa: E402
+from tools.modeling.canonical_english_eligibility import evaluate as evaluate_exact_english_eligibility  # noqa: E402
+from tools.modeling.clean_prices import clean_authorized_with_verified_sales as clean_model_prices  # noqa: E402
 from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
 from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
 
@@ -71,6 +73,7 @@ SCHEMA_FILES = {
     "data/modeling/account-item-vectors.jsonl": "schemas/modeling/item-vector.schema.json",
     "data/modeling/price-cleaned-normal.jsonl": "schemas/modeling/cleaned-price.schema.json",
     "data/modeling/price-cleaned-urgent.jsonl": "schemas/modeling/cleaned-price.schema.json",
+    "data/modeling/price-cleaned-verified-sales.jsonl": "schemas/modeling/cleaned-price.schema.json",
     "data/modeling/model-exclusions.jsonl": "schemas/modeling/price-exclusion.schema.json",
     "data/modeling/item-value-table.jsonl": "schemas/modeling/item-value-table.schema.json",
     "data/derived/official-historical-cost-references.jsonl": "schemas/knowledge/official-historical-cost-reference.schema.json",
@@ -92,6 +95,8 @@ SCHEMA_FILES = {
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
     "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
     "data/review/market-audit/attestations.jsonl": "schemas/review/market-audit-attestation.schema.json",
+    "data/review/parser-gold/claims.jsonl": "schemas/review/parser-gold.schema.json",
+    "data/review/parser-gold/attestations.jsonl": "schemas/review/parser-gold-attestation.schema.json",
     "data/review/market-authorization/registry.jsonl": "schemas/market/authorized-market-dataset.schema.json",
     "data/review/market-authorization/attestations.jsonl": "schemas/market/authorized-market-attestation.schema.json",
     "data/review/account-catalog-resolution.jsonl": "schemas/review/account-catalog-resolution.schema.json",
@@ -113,6 +118,7 @@ JSON_SCHEMA_FILES = {
     "reports/model-publication-split.json": "schemas/modeling/publication-split.schema.json",
     "reports/model-publication-evaluation.json": "schemas/modeling/publication-evaluation.schema.json",
     "reports/parser-knowledge-coverage.json": "schemas/modeling/parser-knowledge-coverage.schema.json",
+    "reports/parser-gold-evaluation.json": "schemas/modeling/parser-gold-evaluation.schema.json",
     "reports/completion-status.json": "schemas/reports/completion-status.schema.json",
     "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
@@ -123,6 +129,7 @@ JSON_SCHEMA_FILES = {
     "data/review/skygame-data-1.3.4-crosswalk-summary.json": "schemas/review/vendor-catalog-summary.schema.json",
     "data/review/catalog-universe-summary.json": "schemas/review/catalog-universe-summary.schema.json",
     "data/source/vendor/fandom-seasonal-cosmetics-r107991-snapshot.json": "schemas/review/fandom-seasonal-cosmetics-snapshot.schema.json",
+    "data/review/parser-gold/rule-development-manifest.json": "schemas/review/parser-gold-rule-development-manifest.schema.json",
     "data/source/vendor/fandom-seasonal-cosmetics-r107991-metadata.json": "schemas/review/fandom-seasonal-cosmetics-metadata.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk-summary.json": "schemas/review/fandom-seasonal-cosmetics-crosswalk-summary.schema.json",
     "data/normalized/source-scoped-item-identities-summary.json": "schemas/normalized/source-scoped-item-identities-summary.schema.json",
@@ -135,6 +142,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1330-skyfest-core-five.json": "schemas/knowledge/skyfest-faq-1330-core-five-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1330-tournament-of-triumph-core-four.json": "schemas/knowledge/tournament-of-triumph-faq-1330-core-four-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1323-days-of-color-core-three.json": "schemas/knowledge/days-of-color-faq-1323-core-three-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1343-days-of-sunlight-core-three.json": "schemas/knowledge/days-of-sunlight-faq-1343-core-three-fact-snapshot.schema.json",
 }
 
 
@@ -173,6 +181,7 @@ REQUIRED_FORMAL_JSONL = {
     "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
     "data/modeling/account-item-vectors.jsonl", "data/modeling/price-cleaned-normal.jsonl",
     "data/modeling/price-cleaned-urgent.jsonl", "data/modeling/model-exclusions.jsonl",
+    "data/modeling/price-cleaned-verified-sales.jsonl",
     "data/modeling/item-value-table.jsonl",
     "data/derived/official-historical-cost-references.jsonl",
     "data/review/account-catalog-resolution.jsonl",
@@ -203,13 +212,14 @@ def formal_price_rebuild_errors(
     comparable_accounts: list[dict[str, Any]],
     actual_normal: list[dict[str, Any]],
     actual_urgent: list[dict[str, Any]],
+    actual_verified_sales: list[dict[str, Any]],
     actual_exclusions: list[dict[str, Any]],
     root: Path,
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
     statement: str | Path | None = None, statement_sha256: str | None = None,
 ) -> list[str]:
     """Reject any formal model-price row not produced by the authorization gate."""
-    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(
+    expected_normal, expected_urgent, expected_verified_sales, expected_exclusions = clean_model_prices(
         comparable_accounts, root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
     )
     problems: list[str] = []
@@ -217,6 +227,8 @@ def formal_price_rebuild_errors(
         problems.append("price-cleaned-normal differs from deterministic authorized rebuild")
     if actual_urgent != expected_urgent:
         problems.append("price-cleaned-urgent differs from deterministic authorized rebuild")
+    if actual_verified_sales != expected_verified_sales:
+        problems.append("price-cleaned-verified-sales differs from deterministic authorized rebuild")
     if actual_exclusions != expected_exclusions:
         problems.append("model-exclusions differs from deterministic authorized rebuild")
     return problems
@@ -360,6 +372,10 @@ def validate(
     market_authorization_authority_bundle_sha256: str | None = None,
     market_authorization_statement: str | Path | None = None,
     market_authorization_statement_sha256: str | None = None,
+    parser_gold_authority_bundle: str | Path | None = None,
+    parser_gold_authority_bundle_sha256: str | None = None,
+    parser_gold_replay_inputs: Path | None = None,
+    parser_gold_replay_inputs_sha256: str | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -706,6 +722,7 @@ def validate(
         verified_item_evidence_ids = verify_replayable_sources(root, item_evidence, source_records)
     except ValueError as exc:
         errors.append(f"item-evidence: {exc}")
+        verified_item_evidence_ids = set()
     promotion_ledger = read_jsonl(root / "data/review/item-promotion-ledger.jsonl")
     expected_promotions = evaluate_item_promotions(
         list(candidates.values()), set(items), read_jsonl(root / "data/review/alias-conflicts.jsonl"),
@@ -720,6 +737,14 @@ def validate(
     errors.extend(registry_problems)
     evidence_groups = list(registry_evidence.items())
     errors.extend(validate_canonical_field_evidence(evidence_groups, items, sets, source_records))
+    exact_english_decisions = evaluate_exact_english_eligibility(items, evidence_groups)
+    for decision in exact_english_decisions:
+        for issue in schema_validator.validate(decision, root / "schemas/review/canonical-exact-english-eligibility.schema.json"):
+            errors.append(f"canonical-exact-english-eligibility:{decision['item_id']}:{issue}")
+    expected_exact_english_ids = {row["item_id"] for row in exact_english_decisions if row["decision"] == "eligible"}
+    actual_eligible_ids = {item_id for item_id, row in items.items() if row.get("model_feature_status") == "eligible"}
+    if actual_eligible_ids != expected_exact_english_ids:
+        errors.append("canonical-exact-english-eligibility: catalog eligible IDs differ from replayed exact-English evidence")
     market_claim_queue = read_jsonl(root / "data/review/market-claim-review.jsonl")
     expected_market_claim_queue = build_market_claim_queue(read_jsonl(root / "data/normalized/listings.jsonl"))
     if market_claim_queue != expected_market_claim_queue:
@@ -739,6 +764,7 @@ def validate(
             market_audit_authority_bundle, market_audit_authority_bundle_sha256,
         )
     )
+    errors.extend(f"parser-gold: {issue}" for issue in audit_parser_gold(root, read_jsonl(root / "data/review/parser-gold/claims.jsonl"), parser_gold_authority_bundle, parser_gold_authority_bundle_sha256))
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -837,10 +863,11 @@ def validate(
     # injected row, stale authorization, or edited exclusion must fail closed.
     actual_normal = read_jsonl(root / "data/modeling/price-cleaned-normal.jsonl")
     actual_urgent = read_jsonl(root / "data/modeling/price-cleaned-urgent.jsonl")
+    actual_verified_sales = read_jsonl(root / "data/modeling/price-cleaned-verified-sales.jsonl")
     actual_exclusions = read_jsonl(root / "data/modeling/model-exclusions.jsonl")
     errors.extend(formal_price_rebuild_errors(
         read_jsonl(root / "data/comparables/accounts.jsonl"),
-        actual_normal, actual_urgent, actual_exclusions,
+        actual_normal, actual_urgent, actual_verified_sales, actual_exclusions,
         root, market_authorization_authority_bundle, market_authorization_authority_bundle_sha256,
         market_authorization_statement, market_authorization_statement_sha256,
     ))
@@ -848,6 +875,7 @@ def validate(
     for relative, expected_line in (
         ("data/modeling/price-cleaned-normal.jsonl", "normal_listing"),
         ("data/modeling/price-cleaned-urgent.jsonl", "urgent_sale"),
+        ("data/modeling/price-cleaned-verified-sales.jsonl", "verified_sale"),
     ):
         seen_cleaned: set[str] = set()
         for row in read_jsonl(root / relative):
@@ -1048,6 +1076,13 @@ def validate(
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"parser knowledge coverage: {exc}")
     try:
+        actual_parser_gold = json.loads((root / "reports/parser-gold-evaluation.json").read_text(encoding="utf-8"))
+        expected_parser_gold = build_parser_gold_evaluation(root, parser_gold_replay_inputs, parser_gold_replay_inputs_sha256, parser_gold_authority_bundle, parser_gold_authority_bundle_sha256)
+        if actual_parser_gold != expected_parser_gold:
+            errors.append("parser gold evaluation differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"parser gold evaluation: {exc}")
+    try:
         actual_completion = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
         if actual_completion != build_completion_status(root):
             errors.append("completion status differs from deterministic rebuild")
@@ -1103,7 +1138,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.4-p3.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.5-p3.3", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1120,11 +1155,17 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--parser-gold-authority-bundle", type=Path)
+    parser.add_argument("--parser-gold-authority-bundle-sha256")
+    parser.add_argument("--parser-gold-replay-inputs", type=Path)
+    parser.add_argument("--parser-gold-replay-inputs-sha256")
     args = parser.parse_args()
     result = validate(
         args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
+        args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
+        args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
     )
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

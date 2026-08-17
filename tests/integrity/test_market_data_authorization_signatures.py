@@ -9,8 +9,11 @@ from pathlib import Path
 from tools.market_authorization import (AuthorizedMarketEvaluator, NAMESPACE, attestation_payload, canonical_bytes,
     _valid_iso_date, make_authorization_evaluator, model_training_authorization_reasons, sha256_bytes, training_example_commitment, verify_authorized_market_intake)
 from tools.modeling.catalog_provenance import catalog_provenance
-from tools.modeling.clean_prices import clean as clean_prices, clean_authorized
+from tools.modeling.clean_prices import clean as clean_prices, clean_authorized, clean_authorized_with_verified_sales
 from tools.validate.validate import authorized_market_schema_files
+from tools.validate.schema_validator import OfflineSchemaValidator
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class AuthorizedMarketIntakeTest(unittest.TestCase):
@@ -140,7 +143,7 @@ class AuthorizedMarketIntakeTest(unittest.TestCase):
 
 class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
     """v2 binds each signed sale to exactly one anonymous model input."""
-    def _write_lineage_fixture(self):
+    def _write_lineage_fixture(self, verified_sales=False):
         (self.root / "knowledge/items").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge/aliases").mkdir(parents=True, exist_ok=True)
         (self.root / "knowledge/sets").mkdir(parents=True, exist_ok=True)
@@ -152,6 +155,19 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
             {"observation_id":"observation_fixture_0001", "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000},
             {"observation_id":"observation_fixture_0002", "dedup_cluster_id":"cluster_fixture_0002", "post_date":"2026-08-02", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"reduced", "price_twd":2000},
         ]
+        if verified_sales:
+            for observation in observations:
+                completion_evidence = [
+                    {"evidence_id": "evidence_fixture_a", "source_lineage_id": "lineage_fixture_a", "evidence_sha256": "A" * 64},
+                    {"evidence_id": "evidence_fixture_b", "source_lineage_id": "lineage_fixture_b", "evidence_sha256": "B" * 64},
+                ]
+                observation.update({
+                    "price_line": "verified_sale", "completed_sale_verified": True,
+                    "sale_verified": True, "completed_sale_date": observation["post_date"],
+                    "completion_evidence": completion_evidence,
+                    "completion_evidence_digest": sha256_bytes(canonical_bytes(completion_evidence)),
+                    "independent_evidence_ids": ["evidence_fixture_a", "evidence_fixture_b"],
+                })
         op=ddir/"observations.jsonl"; op.write_bytes(b"".join(canonical_bytes(row) for row in observations))
         provenance=catalog_provenance(self.root)
         examples=[]
@@ -160,10 +176,18 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
             example["feature_payload_sha256"]=sha256_bytes(canonical_bytes(example["feature_payload"]))
             example["catalog_provenance_sha256"]=sha256_bytes(canonical_bytes(provenance))
             example["dedup_cluster_digest"]=sha256_bytes(canonical_bytes(example["dedup_cluster_id"]))
+            if verified_sales:
+                example.update({
+                    "observation_row_digest": sha256_bytes(canonical_bytes(observation)),
+                    "price_line": "verified_sale", "completed_sale_verified": True,
+                    "sale_verified": True,
+                    "completion_evidence_digest": observation["completion_evidence_digest"],
+                    "independent_evidence_ids": observation["independent_evidence_ids"],
+                })
             example["training_example_digest"]=sha256_bytes(canonical_bytes(training_example_commitment(example)))
             examples.append(example)
         tp=ddir/"training-examples.jsonl"; tp.write_bytes(b"".join(canonical_bytes(row) for row in examples))
-        manifest={"schema_version":"authorized-market-manifest-v2", "dataset_id":dsid, "observations_path":f"data/review/market-authorization/datasets/{dsid}/observations.jsonl", "observations_sha256":self._sha(op), "observation_digests":[{"observation_id":row["observation_id"],"row_digest":sha256_bytes(canonical_bytes(row)),"dedup_cluster_digest":sha256_bytes(canonical_bytes(row["dedup_cluster_id"]))} for row in observations], "training_examples_path":f"data/review/market-authorization/datasets/{dsid}/training-examples.jsonl", "training_examples_sha256":self._sha(tp), "training_example_digests":[{"training_example_id":row["training_example_id"],"training_example_digest":row["training_example_digest"],"observation_id":row["observation_id"],"account_id":row["account_id"],"feature_payload_sha256":row["feature_payload_sha256"],"catalog_provenance_sha256":row["catalog_provenance_sha256"],"dedup_cluster_digest":row["dedup_cluster_digest"]} for row in examples]}
+        manifest={"schema_version":"authorized-market-manifest-v3" if verified_sales else "authorized-market-manifest-v2", "dataset_id":dsid, "observations_path":f"data/review/market-authorization/datasets/{dsid}/observations.jsonl", "observations_sha256":self._sha(op), "observation_digests":[{"observation_id":row["observation_id"],"row_digest":sha256_bytes(canonical_bytes(row)),"dedup_cluster_digest":sha256_bytes(canonical_bytes(row["dedup_cluster_id"]))} for row in observations], "training_examples_path":f"data/review/market-authorization/datasets/{dsid}/training-examples.jsonl", "training_examples_sha256":self._sha(tp), "training_example_digests":[{"training_example_id":row["training_example_id"],"training_example_digest":row["training_example_digest"],"observation_id":row["observation_id"],"account_id":row["account_id"],"feature_payload_sha256":row["feature_payload_sha256"],"catalog_provenance_sha256":row["catalog_provenance_sha256"],"dedup_cluster_digest":row["dedup_cluster_digest"]} for row in examples]}
         mp=ddir/"manifest.json"; self._write(mp,manifest)
         statement={"schema_version":"authorized-market-statement-v1", "dataset_id":dsid, "manifest_sha256":self._sha(mp), "observations_sha256":self._sha(op), "expires_at":(date.today()+timedelta(days=30)).isoformat()}
         self._write(self.statement_path,statement)
@@ -185,7 +209,11 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
     def _lineage_row(self, observations, examples, manifest, number=0):
         observation, example=observations[number], examples[number]
         authorization={"authorization_record_id":self.dataset["authorization_record_id"],"dataset_id":self.dataset["dataset_id"],"observation_id":observation["observation_id"],"row_digest":sha256_bytes(canonical_bytes(observation)),"manifest_sha256":self.dataset["manifest_sha256"]}
-        return {"market_data_authorization":authorization,"selected_price_twd":observation["price_twd"],"price_type":"asking" if observation["price_line"]=="asking" else "reduced","post_date":observation["post_date"],"date_verified":True,"currency":"TWD","currency_verified":True,"server":"international","server_verified":True,"offer_kind":"seller_listing","entity_kind":"single_account","account_id":example["account_id"],"dedup_cluster_id":example["dedup_cluster_id"],"feature_payload":example["feature_payload"],"catalog_provenance":example["catalog_provenance"],"feature_lineage":{key:example[key] for key in ("training_example_id","training_example_digest","feature_payload_sha256","catalog_provenance_sha256","dedup_cluster_digest")}}
+        row={"market_data_authorization":authorization,"selected_price_twd":observation["price_twd"],"price_type":"asking" if observation["price_line"]=="asking" else ("verified_sale" if observation["price_line"]=="verified_sale" else "reduced"),"post_date":observation["post_date"],"date_verified":True,"currency":"TWD","currency_verified":True,"server":"international","server_verified":True,"offer_kind":"seller_listing","entity_kind":"single_account","account_id":example["account_id"],"dedup_cluster_id":example["dedup_cluster_id"],"feature_payload":example["feature_payload"],"catalog_provenance":example["catalog_provenance"],"feature_lineage":{key:example[key] for key in ("training_example_id","training_example_digest","feature_payload_sha256","catalog_provenance_sha256","dedup_cluster_digest")}}
+        if observation["price_line"] == "verified_sale":
+            row.update({key: observation[key] for key in ("completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence_digest", "independent_evidence_ids")})
+            row["feature_lineage"].update({key: example[key] for key in ("observation_row_digest", "completion_evidence_digest")})
+        return row
 
     def test_v2_binds_exact_feature_price_cluster_and_catalog(self):
         observations, examples, manifest=self._write_lineage_fixture()
@@ -197,7 +225,7 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         authorized=dict(row, history_id="history_fixture_0001", observed_at="2026-08-01", base_account_type="unknown", market_data_authorization=dict(row["market_data_authorization"], status="authorized_model_training", allowed_uses=["model_training","comparable_estimation"], source_snapshot={"replayable":True,"sha256":"A"*64}, replay_evidence=[{"source_locator":"fixture","content_sha256":"A"*64}], license_evidence={"verified":True,"kind":"explicit_data_license"}))
         self.assertEqual([], model_training_authorization_reasons(authorized, evaluator))
         normal, urgent, exclusions=clean_authorized([authorized], self.root, *self.args())
-        self.assertEqual(([], []), (urgent, exclusions))
+        self.assertEqual((1, []), (len(urgent), exclusions))
         self.assertEqual(observations[0]["dedup_cluster_id"], normal[0]["cluster_id"])
         self.assertEqual(examples[0]["training_example_id"], normal[0]["training_example_id"])
         self.assertEqual(examples[0]["feature_payload_sha256"], normal[0]["feature_payload_sha256"])
@@ -207,6 +235,38 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         self.assertFalse(evaluator(swapped))
         reused=dict(row, account_id=examples[1]["account_id"])
         self.assertFalse(evaluator(reused))
+
+    def test_v3_verified_sale_requires_two_signed_completion_evidences_and_stays_separate(self):
+        observations, examples, manifest = self._write_lineage_fixture(verified_sales=True)
+        self.assertEqual([], self.errors())
+        evaluator = make_authorization_evaluator(self.root, *self.args())
+        row = self._lineage_row(observations, examples, manifest)
+        self.assertFalse(evaluator(row))
+        authorized = dict(row, history_id="history_verified_sale_0001", observed_at="2026-08-01", base_account_type="unknown",
+            market_data_authorization=dict(row["market_data_authorization"], status="authorized_model_training", allowed_uses=["model_training", "comparable_estimation"], source_snapshot={"replayable":True,"sha256":"A"*64}, replay_evidence=[{"source_locator":"fixture","content_sha256":"A"*64}], license_evidence={"verified":True,"kind":"explicit_data_license"}))
+        self.assertIn("market_data_external_authorization_evaluator_required", model_training_authorization_reasons(authorized, evaluator))
+        normal, urgent, sales, exclusions = clean_authorized_with_verified_sales([authorized], self.root, *self.args())
+        self.assertEqual(([], [], []), (normal, urgent, sales))
+        self.assertTrue(any("market_data_external_authorization_evaluator_required" in row["reason_codes"] for row in exclusions))
+        validator = OfflineSchemaValidator(REPO_ROOT / "schemas")
+        self.assertEqual([], validator.validate(exclusions[0], REPO_ROOT / "schemas/modeling/price-exclusion.schema.json"))
+        self.assertEqual([], clean_authorized([authorized], self.root, *self.args())[0])
+
+    def test_v3_verified_sale_rejects_tamper_asking_claim_single_evidence_uncompleted_and_reuse(self):
+        observations, examples, manifest = self._write_lineage_fixture(verified_sales=True)
+        evaluator = make_authorization_evaluator(self.root, *self.args())
+        row = self._lineage_row(observations, examples, manifest)
+        self.assertFalse(evaluator(row))
+        self.assertFalse(evaluator(dict(row, price_type="asking")))
+        self.assertFalse(evaluator(dict(row, completed_sale_verified=False)))
+        self.assertFalse(evaluator(dict(row, independent_evidence_ids=["evidence_fixture_a"])))
+        self.assertFalse(evaluator(dict(row, completion_evidence_digest="B" * 64)))
+        self.assertFalse(evaluator(dict(row, account_id=examples[1]["account_id"])))
+        observations_path = self.root / manifest["observations_path"]
+        tampered = [dict(value) for value in observations]
+        tampered[0]["price_twd"] = 999
+        observations_path.write_bytes(b"".join(canonical_bytes(value) for value in tampered))
+        self.assertTrue(any("digests" in error or "does not bind" in error for error in self.errors()))
 
     def test_v2_registry_dynamically_declares_every_dataset_schema(self):
         _observations, _examples, manifest = self._write_lineage_fixture()

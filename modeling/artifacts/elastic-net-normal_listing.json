@@ -11,7 +11,7 @@
     "knowledge/items/items.jsonl",
     "knowledge/sets/item-sets.jsonl"
   ],
-  "input_snapshot_sha256": "275fcc94ca879175fad63d9b0aa74e0be8eb8ac1588aaac728cfd1a8bd0d7620",
+  "input_snapshot_sha256": "353982481821b66f0838964952ec1766d719d963a1e63ba95af625da0b165c86",
   "training": {
     "eligible_rows": 0,
     "minimum_rows": 100,
@@ -53,12 +53,12 @@
   ],
   "artifact": null,
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "8AEEA98BE513DA5526DB0115A0B698EBCAC15B278428C27D69770C5C5E17FF5F",
+    "canonical_item_ids_sha256": "AE73A474300BA5FAA26A75BEDB3ED900DA9FF4B8EE35EEE373DDB86302273F1D",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "860DC87CCD7E6C6F4450D27631742D354859F22CADBF5D56EE33D1B9D85D2C48"
+    "pinned_catalog_sha256": "169B40B073299DA0E02A05393E1C24787C8A2160047624175CF58756C5062DD9"
   }
 }

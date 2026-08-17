@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/parser-gold-attestation.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["attestation_id", "gold_id", "role", "authority_id", "fingerprint", "rule_manifest_sha256", "payload_sha256", "signature_file"],
+  "properties": {
+    "attestation_id": {"type": "string", "pattern": "^parser_gold_attestation_[0-9]{4,}$"},
+    "gold_id": {"type": "string", "pattern": "^parser_gold_[0-9]{4,}$"},
+    "role": {"enum": ["annotator_a", "annotator_b", "adjudicator"]},
+    "authority_id": {"type": "string", "pattern": "^parser_human_[a-z0-9_]+$"},
+    "fingerprint": {"type": "string", "pattern": "^SHA256:[A-Za-z0-9+/]+$"},
+    "rule_manifest_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "payload_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "signature_file": {"type": "string", "pattern": "^data/review/parser-gold/signatures/[a-z0-9_./-]+\\.sig$"}
+  }
+}

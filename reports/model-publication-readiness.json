@@ -9,12 +9,11 @@
   },
   "formal_clean_price_rows": 0,
   "valid_vector_accounts": 1022,
-  "model_eligible_item_count": 0,
+  "model_eligible_item_count": 19,
   "verified_completed_sale_count": 0,
   "market_pools": [],
   "blocking_reasons": [
     "no_formal_clean_price_pool",
-    "no_model_eligible_catalog_items",
     "no_verified_completed_sales"
   ]
 }

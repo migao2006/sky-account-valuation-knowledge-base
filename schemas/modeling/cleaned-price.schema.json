@@ -5,7 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "cleaned_price_id", "history_id", "account_id", "cluster_id", "cluster_rank", "selected_price_twd", "log_price_twd", "price_line", "normalized_price_type", "base_account_type", "post_date", "date_verified", "observed_at", "currency", "server", "evidence_quality", "review_status"],
-  "allOf": [{"if": {"required": ["training_example_id"]}, "then": {"required": ["training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest"]}}],
+  "allOf": [
+    {"if": {"required": ["training_example_id"]}, "then": {"required": ["training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest"]}},
+    {"if": {"properties": {"price_line": {"const": "verified_sale"}}, "required": ["price_line"]}, "then": {"required": ["completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence_digest", "independent_evidence_ids", "observation_row_digest"]}}
+  ],
   "properties": {
     "schema_version": {"const": "3.1-p1"},
     "cleaned_price_id": {"type": "string", "pattern": "^cleaned_price_[a-z0-9_]+$"},
@@ -15,8 +18,8 @@
     "cluster_rank": {"type": "integer", "minimum": 1},
     "selected_price_twd": {"type": "number", "exclusiveMinimum": 0},
     "log_price_twd": {"type": "number"},
-    "price_line": {"enum": ["normal_listing", "urgent_sale"]},
-    "normalized_price_type": {"enum": ["normal_listing", "urgent_sale"]},
+    "price_line": {"enum": ["normal_listing", "urgent_sale", "verified_sale"]},
+    "normalized_price_type": {"enum": ["normal_listing", "urgent_sale", "verified_sale"]},
     "base_account_type": {"type": "string", "minLength": 1},
     "post_date": {"type": ["string", "null"], "format": "date"},
     "date_verified": {"type": "boolean"},
@@ -29,6 +32,12 @@
     "training_example_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "feature_payload_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "catalog_provenance_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
-    "dedup_cluster_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}
+    "dedup_cluster_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "completed_sale_verified": {"const": true},
+    "sale_verified": {"const": true},
+    "completed_sale_date": {"type": "string", "format": "date"},
+    "completion_evidence_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "independent_evidence_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}},
+    "observation_row_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}
   }
 }

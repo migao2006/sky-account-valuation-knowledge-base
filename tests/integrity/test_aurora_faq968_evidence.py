@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"tools"/"validate"))
 from tools.normalize.apply_aurora_faq968_cohort import ITEMS, IAP_IDS, AuroraEvidenceError, build, verify  # noqa: E402
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status  # noqa: E402
 from tools.validate.schema_validator import OfflineSchemaValidator  # noqa: E402
 
 def rows(path:Path): return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -21,7 +22,7 @@ class AuroraFaq968EvidenceTests(unittest.TestCase):
   for item_id,*_ in ITEMS:
    self.assertEqual(data[item_id]["availability_status"],"unknown")
    self.assertEqual(data[item_id]["permanent_account_item"],"unknown")
-   self.assertEqual(data[item_id]["model_feature_status"],"excluded_pending_verification")
+   self.assertEqual(data[item_id]["model_feature_status"],declared_model_feature_status(item_id))
    self.assertIsNone(data[item_id]["first_release_date"])
    self.assertTrue(data[item_id]["canonical_name_zh_tw"].startswith("待確認（"))
   aurora_set=next(r for r in rows(ROOT/"knowledge/sets/item-sets.jsonl") if r["set_id"]=="set_aurora_iap")
@@ -69,7 +70,7 @@ class AuroraFaq968EvidenceTests(unittest.TestCase):
    tracked=[root/"knowledge/items/items.jsonl",root/"knowledge/sets/item-sets.jsonl",root/"knowledge/sources/sources.jsonl",root/"knowledge/acquisition/availability-events.jsonl",root/"knowledge/visual-references/manifest.jsonl",root/"data/review/aurora-faq968-canonical-evidence.jsonl"]
    first_bytes={p:p.read_bytes() for p in tracked}; second=subprocess.run(command,check=True,capture_output=True,text=True)
    self.assertEqual(json.loads(first.stdout),json.loads(second.stdout)); self.assertEqual(first_bytes,{p:p.read_bytes() for p in tracked})
-   p=root/"knowledge/items/items.jsonl"; current=rows(p); next(r for r in current if r["item_id"]=="item_aurora_voice")["model_feature_status"]="eligible"
+   p=root/"knowledge/items/items.jsonl"; current=rows(p); next(r for r in current if r["item_id"]=="item_aurora_voice")["model_feature_status"]="excluded_pending_verification"
    p.write_text("".join(json.dumps(r,ensure_ascii=False,separators=(",",":"))+"\n" for r in current),encoding="utf-8",newline="\n")
    self.assertIn("committed target differs from replayable apply contract: knowledge/items/items.jsonl",verify(root))
 
