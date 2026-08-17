@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.2-p3.0",
+  "schema_version": "4.3-p3.1",
   "offline_only": true,
   "valid": true,
   "checks": {
@@ -31,19 +31,22 @@
     "item_values_provenance_gated": true,
     "verified_identity_cohort_not_over_promoted_to_model": true,
     "p3_official_historical_costs_replayable_and_non_valuative": true,
-    "p3_publication_readiness_replayed_and_not_ready": true
+    "p3_publication_readiness_replayed_and_not_ready": true,
+    "p3_1_authorized_market_intake_replayed": true,
+    "p3_1_publication_dataset_and_split_replayed": true,
+    "p3_1_parser_knowledge_coverage_replayed_non_model": true
   },
-  "schema_records_checked": 21683,
+  "schema_records_checked": 21737,
   "schema_errors": [],
   "schema_warnings": [],
   "unit_tests": {
-    "run": 288,
+    "run": 312,
     "failures": 0,
     "errors": 0,
     "skipped": 0
   },
   "manifest": {
-    "hashed_files": 290,
+    "hashed_files": 317,
     "mismatches": []
   },
   "release_residue": [],
@@ -75,11 +78,11 @@
     "seasons": 30,
     "events": 24,
     "ancestors": 132,
-    "items": 105,
+    "items": 109,
     "sets": 10,
     "aliases": 320,
-    "availability_events": 28,
-    "sources": 32,
+    "availability_events": 32,
+    "sources": 33,
     "visual_references": 10,
     "unresolved": 39,
     "unmapped": 14,
@@ -88,19 +91,20 @@
   },
   "known_limitations": [
     "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-    "P3.0 新增 SkyFest FAQ 1330 core-five 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+    "P3.1 新增 Tournament of Triumph FAQ 1330 core-four 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
     "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
     "可驗證成交價與獲外部授權的市場訓練列均為零；正式估價器維持 fail closed，不輸出轉售價格。",
+    "P3.1 外部授權 intake 只綁定 price observation；完整 account feature／Item Vector 與 signed dedup cluster lineage 尚未建立，因此即使 price-only 簽章合法也不得進入 production training 或估價。",
     "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
     "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
     "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
     "P2.3 將 1,758 筆 vendor collectible observations 正式化為唯一 source-scoped identity 層；它不是 1,758 個 canonical items，所有 promotion 均禁止、模型白名單提升為 0。",
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
-    "P3.0 保留 16 筆匿名 near-miss；只有外部信任根驗證的三方 OpenSSH attestations 才可接受非空人工 ledger，且不會自動取得市場訓練授權。",
-    "P3.0 的 2485 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 23，model eligible 仍為 0。",
-    "P3.0 保留帳號 lexical catalog sidecar 供人工複核：1022 個帳號中有 86 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
-    "P3.0 的 23 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
+    "P3.1 保留 16 筆匿名 near-miss；只有外部信任根驗證的三方 OpenSSH attestations 才可接受非空人工 ledger，且不會自動取得市場訓練授權。",
+    "P3.1 的 2489 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 27，model eligible 仍為 0。",
+    "P3.1 保留帳號 lexical catalog sidecar 供人工複核：1022 個帳號中有 86 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
+    "P3.1 的 27 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
   ]

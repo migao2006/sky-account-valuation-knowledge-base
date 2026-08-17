@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-attestation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["attestation_id", "dataset_id", "role", "authority_id", "fingerprint", "statement_sha256", "manifest_sha256", "observations_sha256", "payload_sha256", "signature_file"],
+  "properties": {
+    "attestation_id": {"type": "string", "pattern": "^authorized_market_attestation_[0-9]{4}$"},
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "role": {"enum": ["data_steward", "privacy_reviewer", "method_reviewer"]},
+    "authority_id": {"type": "string", "pattern": "^authority_[a-z0-9_]+$"},
+    "fingerprint": {"type": "string", "pattern": "^SHA256:[A-Za-z0-9+/]+$"},
+    "statement_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "payload_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "signature_file": {"type": "string", "pattern": "^data/review/market-authorization/signatures/[a-z0-9_./-]+\\.sig$"}
+  }
+}

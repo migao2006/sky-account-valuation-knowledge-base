@@ -1,4 +1,4 @@
-# 估價方法（v4.2 P3.0）
+# 估價方法（v4.3 P3.1）
 
 P2.9 保留 P1/P2 的「可比帳號選擇器」與資料門檻控制的可解釋模型線；兩者都不是把物品價格相加的報價表。它以帳型、季節結構、物品與套組、完成度、地圖、收藏、資源、綁定、任次、日期和證據品質選擇透明的同類案例。source-scoped identity 與 lexical review sidecar 不會自動成為 ownership、canonical promotion 或模型物品特徵；十八件已驗證 Nintendo／AURORA／Journey／Moomintroll／Kizuna identity 也因建模欄位與持有證據不足而維持模型排除。`winged_or_unspecified` 仍是 unknown，不因共享 fallback 值獲得帳型分數。
 

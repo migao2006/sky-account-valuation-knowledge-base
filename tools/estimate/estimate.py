@@ -16,8 +16,8 @@ from statistics import quantiles
 from typing import Any, Iterable
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from market_authorization import model_training_authorization_reasons
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.market_authorization import make_authorization_evaluator, model_training_authorization_reasons
 
 WEIGHTS = {
     "account_type": 15, "seasons": 22, "items_sets": 20,
@@ -550,10 +550,25 @@ def main() -> None:
     parser.add_argument("account", type=Path)
     parser.add_argument("comparables", type=Path, nargs="?", default=Path(__file__).resolve().parents[2] / "data" / "comparables" / "accounts.jsonl")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle-sha256")
+    parser.add_argument("--market-authorization-statement", type=Path)
+    parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
+    root = Path(__file__).resolve().parents[2]
+    evaluator = make_authorization_evaluator(
+        root, args.market_authorization_authority_bundle,
+        args.market_authorization_authority_bundle_sha256,
+        args.market_authorization_statement, args.market_authorization_statement_sha256,
+    )
+    if evaluator.errors:
+        parser.error("authorized market intake is invalid: " + "; ".join(evaluator.errors))
     comparables = _read_jsonl(args.comparables)
     if not comparables or any(not isinstance(row.get("base_account"), dict) for row in comparables):
         parser.error("comparables must be complete comparable account profiles (data/comparables/accounts.jsonl); history-only JSONL is not accepted")
+    # The signed intake currently binds market-price facts, not the complete
+    # account-feature/vector bytes used for similarity.  Keep the public
+    # estimator fail closed until a separate feature-lineage evaluator exists.
     result = estimate(json.loads(args.account.read_text(encoding="utf-8")), comparables)
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

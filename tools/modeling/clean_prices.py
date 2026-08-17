@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from market_authorization import model_training_authorization_reasons
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.market_authorization import make_authorization_evaluator, model_training_authorization_reasons
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -174,10 +174,13 @@ def clean(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tu
     return normal, urgent, sorted(ledger, key=lambda row: row["history_id"])
 
 
-def build(root: Path, input_path: Path | None = None, output_dir: Path | None = None) -> dict[str, int]:
+def build(
+    root: Path, input_path: Path | None = None, output_dir: Path | None = None,
+    authorization_evaluator: Any = None,
+) -> dict[str, int]:
     source = input_path or root / "data/comparables/accounts.jsonl"
     destination = output_dir or root / "data/modeling"
-    normal, urgent, exclusions = clean(read_jsonl(source))
+    normal, urgent, exclusions = clean(read_jsonl(source), authorization_evaluator)
     write_jsonl(destination / "price-cleaned-normal.jsonl", normal)
     write_jsonl(destination / "price-cleaned-urgent.jsonl", urgent)
     write_jsonl(destination / "model-exclusions.jsonl", exclusions)
@@ -189,9 +192,20 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--input", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle-sha256")
+    parser.add_argument("--market-authorization-statement", type=Path)
+    parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
-    print(json.dumps(build(root, args.input, args.output_dir), ensure_ascii=False))
+    evaluator = make_authorization_evaluator(
+        root, args.market_authorization_authority_bundle,
+        args.market_authorization_authority_bundle_sha256,
+        args.market_authorization_statement, args.market_authorization_statement_sha256,
+    )
+    if evaluator.errors:
+        parser.error("authorized market intake is invalid: " + "; ".join(evaluator.errors))
+    print(json.dumps(build(root, args.input, args.output_dir, evaluator), ensure_ascii=False))
 
 
 if __name__ == "__main__":

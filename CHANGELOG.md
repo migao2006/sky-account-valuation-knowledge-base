@@ -1,5 +1,12 @@
 # 變更紀錄
 
+## 4.3.0-p3.1 — 2026-08-17
+
+- 新增 Tournament of Triumph FAQ 1330 core-four：4 件 canonical identity 與歷史取得成本可重播驗證，仍不推論目前供應、玩家持有或轉售價。
+- 新增外部授權市場 dataset intake：repo 外聲明與 trust root、三角色 OpenSSH 簽章、逐 observation row／cluster／manifest digest 綁定；空 registry 維持離線 fail closed。
+- 正式 cleaner、估價 CLI、validator、report 與 release gate 共用同一授權 verifier；手填 market authorization 不能進入 clean price，且在完整 feature/vector lineage 尚未簽署前，合法 price-only observation 也不會解鎖訓練或估價。
+- 新增固定 publication dataset／split 與 parser knowledge coverage 報告；目前 dataset 為 0、狀態 `not_ready`、模型白名單仍為 0。
+
 ## 4.2.0-p3.0 — 2026-08-17
 
 - 新增 SkyFest FAQ 1330 core-five 的官方／固定 vendor identity evidence；維持目前供應、永久性、正式繁中名、視覺身份與模型 eligibility 為 unknown／excluded。

@@ -1,12 +1,12 @@
-# Sky 光遇知識庫與授權估價框架 v4.2 P3.0
+# Sky 光遇知識庫與授權估價框架 v4.3 P3.1
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v4.2 P3.0 新增 SkyFest FAQ 1330 core-five 的可重播官方摘要、固定 vendor identity 與歷史取得成本參考；成本表不分攤 bundle、不推論轉售價。市場人工審核新增外部信任根與三方 OpenSSH attestations 契約；市場列另需獨立、可重播的資料授權才能進訓練。所有正式工具只處理本機檔案，不主動連網。
+v4.3 P3.1 新增 Tournament of Triumph FAQ 1330 core-four 的可重播官方摘要、固定 vendor identity 與歷史取得成本參考；成本表不分攤 bundle、不推論轉售價。市場資料 intake 現要求 repo 外授權聲明、外部信任根與三種不同角色的 OpenSSH attestations，並以 observation／row／manifest digest 精確綁定；因尚未綁定完整 account feature/vector，production training 與估價仍 fail closed。所有正式工具只處理本機檔案，不主動連網。
 
-目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，沒有外部授權 evaluator，因此正式正常／急售訓練列皆為 0。105 個 canonical item 中 23 筆 identity 已驗證，但正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
+目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售訓練列皆為 0。109 個 canonical item 中 27 筆 identity 已驗證，但正式模型物品白名單仍為 0。因此四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
-P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.0 重建後的 relation、成本參考與 lexical sidecar 都只是來源／文字覆核關係，不會自動提升 ownership、轉售價或 model feature。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.1 的 relation、成本參考、parser coverage 與 lexical sidecar 都只是來源／文字覆核關係，不會自動提升 ownership、轉售價或 model feature。固定 publication dataset／split 報告目前為空且 `not_ready`。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
 本專案不會抓取公開第三方帳號交易貼文來補足訓練資料。官方條款禁止帳號出售／轉讓，新的市場資料必須具備明確授權、去識別、固定來源 bytes 與可驗證人審；詳見 [`docs/methodology/market-data-authorization-policy.md`](docs/methodology/market-data-authorization-policy.md)。在此之前，轉售估價維持 fail closed；官方歷史取得成本也不得被解讀為帳號轉售價。
 
@@ -54,4 +54,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.0 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.1 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或 verified sales；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset_id", "observations_path", "observations_sha256", "observation_digests"],
+  "properties": {
+    "schema_version": {"const": "authorized-market-manifest-v1"},
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "observations_path": {"type": "string", "pattern": "^data/review/market-authorization/datasets/[a-z0-9_/-]+/observations\\.jsonl$"},
+    "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "observation_digests": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["observation_id", "row_digest", "dedup_cluster_digest"], "properties": {"observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]+$"}, "row_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "dedup_cluster_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}}}
+  }
+}

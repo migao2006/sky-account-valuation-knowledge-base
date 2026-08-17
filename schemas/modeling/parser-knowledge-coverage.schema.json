@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/parser-knowledge-coverage.schema.json",
+  "title": "Non-model parser knowledge coverage audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "model_feature", "summary", "items"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.1"},
+    "model_feature": {"const": false},
+    "summary": {"type": "object", "additionalProperties": false, "required": ["canonical_item_count", "verified_canonical_item_count", "model_eligible_item_count", "verified_alias_item_count", "known_owned_count", "known_missing_count", "known_state_count", "review_only_positive_count", "review_only_negative_count", "review_only_conflict_count", "historical_cost_reference_count"], "properties": {"canonical_item_count": {"type": "integer", "minimum": 0}, "verified_canonical_item_count": {"type": "integer", "minimum": 0}, "model_eligible_item_count": {"type": "integer", "minimum": 0}, "verified_alias_item_count": {"type": "integer", "minimum": 0}, "known_owned_count": {"type": "integer", "minimum": 0}, "known_missing_count": {"type": "integer", "minimum": 0}, "known_state_count": {"type": "integer", "minimum": 0}, "review_only_positive_count": {"type": "integer", "minimum": 0}, "review_only_negative_count": {"type": "integer", "minimum": 0}, "review_only_conflict_count": {"type": "integer", "minimum": 0}, "historical_cost_reference_count": {"type": "integer", "minimum": 0}}},
+    "items": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["item_id", "canonical_verification_status", "canonical_model_feature_status", "verified_observation_token_available", "alias_count", "verified_alias_count", "alias_verification_gap_count", "known_owned_count", "known_missing_count", "unknown_state_count", "review_only_positive_count", "review_only_negative_count", "review_only_conflict_count", "historical_cost_reference_kind", "model_feature"], "properties": {"item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "canonical_verification_status": {"type": "string"}, "canonical_model_feature_status": {"type": "string"}, "verified_observation_token_available": {"type": "boolean"}, "alias_count": {"type": "integer", "minimum": 0}, "verified_alias_count": {"type": "integer", "minimum": 0}, "alias_verification_gap_count": {"type": "integer", "minimum": 0}, "known_owned_count": {"type": "integer", "minimum": 0}, "known_missing_count": {"type": "integer", "minimum": 0}, "unknown_state_count": {"type": "integer", "minimum": 0}, "review_only_positive_count": {"type": "integer", "minimum": 0}, "review_only_negative_count": {"type": "integer", "minimum": 0}, "review_only_conflict_count": {"type": "integer", "minimum": 0}, "historical_cost_reference_kind": {"type": ["string", "null"]}, "model_feature": {"const": false}}}}
+  }
+}
