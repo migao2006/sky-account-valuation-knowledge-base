@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0-p3.2",
+  "schema_version": "1.1-p3.3",
   "goal": "precise_account_valuation_and_complete_knowledge_base",
   "status": "incomplete",
   "complete": false,
@@ -9,7 +9,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1374
+        "source_references": 1373
       },
       "requirement": "all in-scope catalog observations resolved or explicitly excluded with evidence",
       "evidence_paths": [
@@ -28,10 +28,10 @@
     },
     {
       "contract_id": "catalog.model_eligible_positive",
-      "passed": false,
+      "passed": true,
       "actual": {
-        "verified": 30,
-        "model_eligible": 0
+        "verified": 33,
+        "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",
       "evidence_paths": [
@@ -44,24 +44,45 @@
       "passed": false,
       "actual": {
         "rows": 0,
-        "signed_audit_evaluator": "not_implemented"
+        "development": 0,
+        "heldout": 0,
+        "signed_rule_manifest": false
       },
-      "requirement": "at least 200 independently double-annotated parser claims with adjudication",
+      "requirement": "at least 200 independently double-annotated parser claims with adjudication, including >=100 development and >=100 held-out rows",
       "evidence_paths": [
-        "docs/methodology/completion-contract.md"
+        "reports/parser-gold-evaluation.json",
+        "data/review/parser-gold/claims.jsonl"
       ]
     },
     {
       "contract_id": "parser.metrics_passed",
       "passed": false,
       "actual": {
-        "verified_alias_tokens": 0,
-        "heldout_evaluator": "not_implemented"
+        "status": "not_ready",
+        "heldout": {
+          "collision_error_rate": null,
+          "collision_rows": 0,
+          "false_negative": 0,
+          "false_positive": 0,
+          "precision": null,
+          "recall": null,
+          "row_count": 0,
+          "true_positive": 0,
+          "unknown_to_missing_rows": 0
+        },
+        "strata": {
+          "account_type": 0,
+          "collaboration": 0,
+          "era": 0,
+          "season": 0,
+          "set_context": 0
+        },
+        "verified_alias_tokens": 0
       },
-      "requirement": "held-out precision >=98%, recall >=95%, and collision error rate 0",
+      "requirement": "held-out precision >=98%, recall >=95%, collision error rate 0, no unknown-to-missing errors, and locked strata coverage",
       "evidence_paths": [
-        "reports/parser-knowledge-coverage.json",
-        "docs/methodology/completion-contract.md"
+        "reports/parser-gold-evaluation.json",
+        "reports/parser-knowledge-coverage.json"
       ]
     },
     {
@@ -95,18 +116,22 @@
     {
       "contract_id": "model.replayable_publication_passed",
       "passed": false,
-      "actual": "not_ready",
-      "requirement": "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold",
+      "actual": {
+        "evaluation_status": "not_ready",
+        "publication_ready": false,
+        "trained_artifacts": 0,
+        "runtime_artifact_bindings": 0
+      },
+      "requirement": "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold and binds every published runtime artifact",
       "evidence_paths": [
         "reports/model-publication-evaluation.json",
-        "docs/methodology/completion-contract.md"
+        "modeling/artifacts"
       ]
     }
   ],
   "blocking_contract_ids": [
     "catalog.unresolved_zero",
     "catalog.unmapped_alias_zero",
-    "catalog.model_eligible_positive",
     "parser.human_gold_200",
     "parser.metrics_passed",
     "market.human_gold_200",

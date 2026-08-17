@@ -23,6 +23,7 @@ from tools.market_authorization import AuthorizedMarketEvaluator, make_authoriza
 ROOT = Path(__file__).resolve().parents[2]
 NORMAL_TYPES = {"asking", "normal_listing"}
 URGENT_TYPES = {"reduced", "instant", "urgent_sale", "quick_sale", "instant_price"}
+VERIFIED_SALE_TYPES = {"verified_sale"}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -41,6 +42,8 @@ def normalized_price_type(row: dict[str, Any]) -> str:
         return "normal_listing"
     if value in URGENT_TYPES:
         return "urgent_sale"
+    if value in VERIFIED_SALE_TYPES:
+        return "verified_sale"
     return "unknown"
 
 
@@ -129,10 +132,18 @@ def cleaned(row: dict[str, Any], line: str, rank: int, production_feature_lineag
     if production_feature_lineage:
         lineage=row["feature_lineage"]
         output.update({key: lineage[key] for key in ("training_example_id", "training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest")})
+        if line == "verified_sale":
+            output.update({
+                "completed_sale_verified": True, "sale_verified": True,
+                "completed_sale_date": row["completed_sale_date"],
+                "completion_evidence_digest": row["completion_evidence_digest"],
+                "independent_evidence_ids": row["independent_evidence_ids"],
+                "observation_row_digest": lineage["observation_row_digest"],
+            })
     return output
 
 
-def _clean_verified(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _clean_verified(rows: list[dict[str, Any]], authorization_evaluator: Any = None, *, include_verified_sales: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Core cleaner; callers must obtain the evaluator from the replay factory."""
     production_feature_lineage = (
         isinstance(authorization_evaluator, AuthorizedMarketEvaluator)
@@ -143,6 +154,8 @@ def _clean_verified(rows: list[dict[str, Any]], authorization_evaluator: Any = N
     ledger: list[dict[str, Any]] = []
     for row in rows:
         line, reasons = basic_reasons(row, authorization_evaluator)
+        if line == "verified_sale" and not include_verified_sales:
+            reasons.append("verified_sale_requires_separate_pool")
         if reasons:
             disposition = "needs_review" if {"brokerage_included_price", "multiple_price_terms"} & set(reasons) else "excluded"
             ledger.append(exclusion(row, line, reasons, disposition))
@@ -181,12 +194,14 @@ def _clean_verified(rows: list[dict[str, Any]], authorization_evaluator: Any = N
                 accepted.append(cleaned(row, line, rank, production_feature_lineage))
     normal = sorted((row for row in accepted if row["price_line"] == "normal_listing"), key=lambda row: row["history_id"])
     urgent = sorted((row for row in accepted if row["price_line"] == "urgent_sale"), key=lambda row: row["history_id"])
-    return normal, urgent, sorted(ledger, key=lambda row: row["history_id"])
+    sales = sorted((row for row in accepted if row["price_line"] == "verified_sale"), key=lambda row: row["history_id"])
+    return normal, urgent, sales, sorted(ledger, key=lambda row: row["history_id"])
 
 
 def clean(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Fail-closed public cleaner without externally verified authorization."""
-    return _clean_verified(rows)
+    normal, urgent, _sales, exclusions = _clean_verified(rows)
+    return normal, urgent, exclusions
 
 
 def clean_authorized(
@@ -200,7 +215,32 @@ def clean_authorized(
     )
     if evaluator.errors:
         raise ValueError("authorized market intake is invalid: " + "; ".join(evaluator.errors))
-    return _clean_verified(rows, evaluator)
+    projected = evaluator.bound_training_rows()
+    projected_keys = {
+        tuple(row["market_data_authorization"].get(name) for name in ("authorization_record_id", "dataset_id", "observation_id"))
+        for row in projected
+    }
+    supplied = [row for row in rows if tuple((row.get("market_data_authorization") or {}).get(name) for name in ("authorization_record_id", "dataset_id", "observation_id")) not in projected_keys]
+    normal, urgent, _sales, exclusions = _clean_verified([*supplied, *projected], evaluator)
+    return normal, urgent, exclusions
+
+
+def clean_authorized_with_verified_sales(
+    rows: list[dict[str, Any]], root: Path,
+    authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+    statement: str | Path | None = None, statement_sha256: str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return a dedicated verified-sale pool; it is never mixed with asking prices."""
+    evaluator = make_authorization_evaluator(root, authority_bundle, authority_bundle_sha256, statement, statement_sha256)
+    if evaluator.errors:
+        raise ValueError("authorized market intake is invalid: " + "; ".join(evaluator.errors))
+    projected = evaluator.bound_training_rows()
+    projected_keys = {
+        tuple(row["market_data_authorization"].get(name) for name in ("authorization_record_id", "dataset_id", "observation_id"))
+        for row in projected
+    }
+    supplied = [row for row in rows if tuple((row.get("market_data_authorization") or {}).get(name) for name in ("authorization_record_id", "dataset_id", "observation_id")) not in projected_keys]
+    return _clean_verified([*supplied, *projected], evaluator, include_verified_sales=True)
 
 
 def build(
@@ -210,13 +250,14 @@ def build(
 ) -> dict[str, int]:
     source = input_path or root / "data/comparables/accounts.jsonl"
     destination = output_dir or root / "data/modeling"
-    normal, urgent, exclusions = clean_authorized(
+    normal, urgent, verified_sales, exclusions = clean_authorized_with_verified_sales(
         read_jsonl(source), root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
     )
     write_jsonl(destination / "price-cleaned-normal.jsonl", normal)
     write_jsonl(destination / "price-cleaned-urgent.jsonl", urgent)
+    write_jsonl(destination / "price-cleaned-verified-sales.jsonl", verified_sales)
     write_jsonl(destination / "model-exclusions.jsonl", exclusions)
-    return {"input_rows": len(read_jsonl(source)), "normal_listing": len(normal), "urgent_sale": len(urgent), "excluded_or_review": len(exclusions)}
+    return {"input_rows": len(read_jsonl(source)), "normal_listing": len(normal), "urgent_sale": len(urgent), "verified_sale": len(verified_sales), "excluded_or_review": len(exclusions)}
 
 
 def main() -> None:

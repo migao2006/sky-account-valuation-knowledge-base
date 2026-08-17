@@ -5,10 +5,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
-from model_estimator import estimate_model, _predict_elastic_net
+from model_estimator import estimate_model, _predict_elastic_net, _runtime_model_sha256
 sys.path.insert(0, str(ROOT / "tools" / "validate"))
 from schema_validator import OfflineSchemaValidator
 from modeling.train_elastic_net import train as train_elastic_net, load_rows, classify_columns, _frame, _fit_with_inner_groups
@@ -70,7 +71,7 @@ class ModelEstimatorTest(unittest.TestCase):
             result = estimate_model(self._account(), root=root)
         self.assertFalse(result["eligible"])
         self.assertEqual(result["status"], "insufficient_training_data")
-        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
         validator = OfflineSchemaValidator(ROOT / "schemas")
         self.assertEqual(validator.validate(result, ROOT / "schemas" / "model" / "model-estimate-result.schema.json"), [])
 
@@ -79,7 +80,36 @@ class ModelEstimatorTest(unittest.TestCase):
             root = Path(directory); self._write_artifacts(root, xgb=False)
             result = estimate_model(self._account(), root=root)
         self.assertFalse(result["eligible"])
-        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
+
+    def test_only_exact_replayed_evaluator_binding_can_unlock_a_trained_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); self._write_artifacts(root, xgb=False)
+            path = root / "modeling" / "artifacts" / "elastic-net-normal_listing.json"
+            artifact = json.loads(path.read_text(encoding="utf-8"))
+            shared = {key: "A" * 64 for key in ("dataset_sha256", "dataset_manifest_sha256", "split_sha256")}
+            binding = {
+                "price_line": "normal_listing", "model_type": "elastic_net", **shared,
+                "model_sha256": _runtime_model_sha256(path, artifact),
+                "artifact_sha256": hashlib.sha256(path.read_bytes()).hexdigest().upper(),
+            }
+            report = {"status": "passed", "publication_ready": True, **shared, "artifact_bindings": [binding]}
+            report_path = root / "reports" / "model-publication-evaluation.json"; report_path.parent.mkdir()
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            with patch("tools.modeling.publication_evaluator.build", return_value=report):
+                accepted = estimate_model(self._account(), root=root)
+            self.assertTrue(accepted["eligible"])
+            stale = {**report, "artifact_bindings": [{**binding, "artifact_sha256": "B" * 64}]}
+            report_path.write_text(json.dumps(stale), encoding="utf-8")
+            with patch("tools.modeling.publication_evaluator.build", return_value=stale):
+                stale_result = estimate_model(self._account(), root=root)
+            self.assertFalse(stale_result["eligible"])
+            self.assertIn("publication_artifact_binding_missing_or_nonunique", stale_result["insufficiency_reasons"])
+            duplicated = {**report, "artifact_bindings": [binding, binding]}
+            report_path.write_text(json.dumps(duplicated), encoding="utf-8")
+            with patch("tools.modeling.publication_evaluator.build", return_value=duplicated):
+                duplicate_result = estimate_model(self._account(), root=root)
+            self.assertFalse(duplicate_result["eligible"])
 
     def test_no_trained_artifacts_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -97,7 +127,7 @@ class ModelEstimatorTest(unittest.TestCase):
             outlier_result = estimate_model(outlier, root=root)
         self.assertFalse(unknown_result["eligible"])
         self.assertFalse(outlier_result["eligible"])
-        self.assertIn("model_publication_disabled_in_p2_1", unknown_result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", unknown_result["insufficiency_reasons"])
 
     def test_market_and_evidence_gates_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -125,7 +155,7 @@ class ModelEstimatorTest(unittest.TestCase):
             artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
             result = estimate_model(self._account(), root=root)
         self.assertFalse(result["eligible"])
-        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
 
     def test_xgboost_sparse_feature_is_nan_not_unknown_rejection(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -133,7 +163,7 @@ class ModelEstimatorTest(unittest.TestCase):
             account = self._account(); account["resources"] = {"values": {}}
             result = estimate_model(account, root=root)
         self.assertFalse(result["eligible"])
-        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
 
     def test_trained_artifact_without_quality_evidence_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -180,7 +210,7 @@ class ModelEstimatorTest(unittest.TestCase):
                 self.assertEqual(reasons, [])
                 self.assertTrue(math.isclose(received, expected, rel_tol=0, abs_tol=1e-10))
         self.assertFalse(result["eligible"])
-        self.assertIn("model_publication_disabled_in_p2_1", result["insufficiency_reasons"])
+        self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
 
     def test_formal_p1_artifacts_are_present_but_insufficient(self):
         result = estimate_model(self._account(), root=ROOT)

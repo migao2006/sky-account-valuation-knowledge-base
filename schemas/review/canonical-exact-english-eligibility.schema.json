@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/canonical-exact-english-eligibility.schema.json",
+  "description": "Auditable, fail-closed decision for one exact-English canonical model observation token.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "item_id", "canonical_name_en", "approved_observation_token", "evidence_ids", "source_lineage_ids", "decision", "reasons"],
+  "properties": {
+    "schema_version": {"const": "canonical-exact-english-v1"}, "item_id": {"pattern": "^item_[a-z0-9_]+$"},
+    "canonical_name_en": {"type": "string"}, "approved_observation_token": {"type": ["string", "null"]},
+    "evidence_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "source_lineage_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "decision": {"enum": ["eligible", "excluded_pending_verification"]},
+    "reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "allOf": [
+    {"if": {"properties": {"decision": {"const": "eligible"}}}, "then": {"properties": {"approved_observation_token": {"type": "string", "minLength": 1}, "evidence_ids": {"minItems": 2}, "source_lineage_ids": {"minItems": 2}, "reasons": {"maxItems": 0}}}},
+    {"if": {"properties": {"decision": {"const": "excluded_pending_verification"}}}, "then": {"properties": {"approved_observation_token": {"const": null}, "reasons": {"minItems": 1}}}}
+  ]
+}

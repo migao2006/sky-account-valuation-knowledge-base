@@ -15,6 +15,18 @@
     "catalog_provenance_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "dedup_cluster_id": {"type": "string", "pattern": "^cluster_[a-z0-9_]+$"},
     "dedup_cluster_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
-    "training_example_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}
-  }
+    "training_example_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "observation_row_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "price_line": {"const": "verified_sale"},
+    "completed_sale_verified": {"const": true},
+    "sale_verified": {"const": true},
+    "completion_evidence_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "independent_evidence_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["price_line"]},
+      "then": {"required": ["observation_row_digest", "price_line", "completed_sale_verified", "sale_verified", "completion_evidence_digest", "independent_evidence_ids"]}
+    }
+  ]
 }

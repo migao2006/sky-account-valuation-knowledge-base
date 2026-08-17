@@ -14,19 +14,26 @@
       "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
     },
     {
+      "path": "data/modeling/price-cleaned-verified-sales.jsonl",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
       "path": "data/modeling/account-item-vectors.jsonl",
-      "sha256": "BD79BF08EDFBA4A9EEAAEF97529781DF969C63D5D6D8BB93F4AEB97CB513C5BA"
+      "sha256": "306129344D5FB08F7D010F84ACC049A16B5284E095895C8B5FBAB26F27CBEE2D"
     }
   ],
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "8AEEA98BE513DA5526DB0115A0B698EBCAC15B278428C27D69770C5C5E17FF5F",
+    "canonical_item_ids_sha256": "AE73A474300BA5FAA26A75BEDB3ED900DA9FF4B8EE35EEE373DDB86302273F1D",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "860DC87CCD7E6C6F4450D27631742D354859F22CADBF5D56EE33D1B9D85D2C48"
+    "pinned_catalog_sha256": "169B40B073299DA0E02A05393E1C24787C8A2160047624175CF58756C5062DD9"
   },
   "market_pools": [],
+  "rejected_clean_row_count": 0,
+  "rejection_counts": [],
+  "blockers": [],
   "dataset_rows": []
 }

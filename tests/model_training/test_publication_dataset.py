@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "modeling"))
-from publication_dataset import PublicationDatasetError, freeze, split  # noqa: E402
+from publication_dataset import PublicationDatasetError, freeze, freeze_synthetic_for_test, split  # noqa: E402
 
 PROVENANCE = {"pinned_catalog_sha256": "A" * 64}
 SNAPSHOTS = [{"path": "x", "sha256": "B" * 64}]
@@ -32,6 +32,18 @@ def signed_row(sample: dict, vector: dict) -> dict:
         "dedup_cluster_digest": signed_sha(sample["cluster_id"])}
 
 
+def training_example(signed: dict) -> dict:
+    return {
+        "training_example_id": signed["training_example_id"],
+        "training_example_digest": signed["training_example_digest"],
+        "feature_payload_sha256": signed["feature_payload_sha256"],
+        "catalog_provenance_sha256": signed["catalog_provenance_sha256"],
+        "dedup_cluster_digest": signed["dedup_cluster_digest"],
+        "account_id": signed["account_id"],
+        "dedup_cluster_id": signed["cluster_id"],
+    }
+
+
 class PublicationDatasetTests(unittest.TestCase):
     def test_empty_dataset_is_stable_and_not_ready(self):
         first = freeze([], [], PROVENANCE, SNAPSHOTS)
@@ -42,7 +54,7 @@ class PublicationDatasetTests(unittest.TestCase):
 
     def test_row_hash_dataset_hash_and_time_split_are_deterministic(self):
         rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
-        manifest = freeze(list(reversed(rows)), vectors(rows), PROVENANCE, SNAPSHOTS)
+        manifest = freeze_synthetic_for_test(list(reversed(rows)), vectors(rows), PROVENANCE, SNAPSHOTS)
         report = split(manifest)
         self.assertEqual(manifest["status"], "not_ready")
         self.assertEqual(manifest["dataset_row_count"], 400)
@@ -57,27 +69,27 @@ class PublicationDatasetTests(unittest.TestCase):
         sample = row(1)
         for changed, reason in [({"date_verified": False}, "date_not_verified"), ({"currency": "USD"}, "mixed_or_nonformal_market_pool"), ({"cleaned_price_id": ""}, "missing_cleaned_price_id")]:
             with self.subTest(reason=reason), self.assertRaisesRegex(PublicationDatasetError, reason):
-                freeze([{**sample, **changed}], vectors([sample]), PROVENANCE, SNAPSHOTS)
+                freeze_synthetic_for_test([{**sample, **changed}], vectors([sample]), PROVENANCE, SNAPSHOTS)
         with self.assertRaisesRegex(PublicationDatasetError, "duplicate_clean_price_or_history_id"):
-            freeze([sample, sample.copy()], vectors([sample]), PROVENANCE, SNAPSHOTS)
+            freeze_synthetic_for_test([sample, sample.copy()], vectors([sample]), PROVENANCE, SNAPSHOTS)
         with self.assertRaisesRegex(PublicationDatasetError, "stale_or_forged_catalog_provenance"):
-            freeze([sample], [{"account_id": sample["account_id"], "catalog_provenance": {}}], PROVENANCE, SNAPSHOTS)
+            freeze_synthetic_for_test([sample], [{"account_id": sample["account_id"], "catalog_provenance": {}}], PROVENANCE, SNAPSHOTS)
 
     def test_tampered_row_and_cluster_account_overlap_fail_closed(self):
         sample = row(1)
-        manifest = freeze([sample], vectors([sample]), PROVENANCE, SNAPSHOTS)
+        manifest = freeze_synthetic_for_test([sample], vectors([sample]), PROVENANCE, SNAPSHOTS)
         manifest["dataset_rows"][0]["selected_price_twd"] = 999
         with self.assertRaisesRegex(PublicationDatasetError, "dataset_manifest_hash_mismatch"):
             split(manifest)
         first, second = row(1, "2025-01-01", cluster="cluster_same"), row(2, "2025-01-02", cluster="cluster_same")
-        manifest = freeze([first, second], vectors([first, second]), PROVENANCE, SNAPSHOTS)
+        manifest = freeze_synthetic_for_test([first, second], vectors([first, second]), PROVENANCE, SNAPSHOTS)
         with self.assertRaisesRegex(PublicationDatasetError, "cluster_maps_to_multiple_accounts"):
             split(manifest)
 
     def test_spanning_cluster_is_excluded_not_split(self):
         rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
         rows.append({**row(401, "2025-01-02", cluster="cluster_1"), "account_id": "account_1"})
-        pool = split(freeze(rows, vectors(rows), PROVENANCE, SNAPSHOTS))["market_pools"][0]
+        pool = split(freeze_synthetic_for_test(rows, vectors(rows), PROVENANCE, SNAPSHOTS))["market_pools"][0]
         self.assertIn("cluster_1", pool["excluded_spanning_cluster_ids"])
         self.assertFalse(pool["cluster_overlap"])
         self.assertFalse(pool["requirements_met"])
@@ -86,11 +98,34 @@ class PublicationDatasetTests(unittest.TestCase):
         sample=row(1, cluster="cluster_signed_not_account_derived")
         vector=vectors([sample])[0]
         signed=signed_row(sample, vector)
-        manifest=freeze([signed], [vector], PROVENANCE, SNAPSHOTS)
+        manifest=freeze([signed], [vector], PROVENANCE, SNAPSHOTS, [training_example(signed)])
         self.assertEqual("cluster_signed_not_account_derived", manifest["dataset_rows"][0]["cluster_id"])
         forged={**vector, "feature_groups": {"tampered": True}}
         with self.assertRaisesRegex(PublicationDatasetError, "signed_feature_payload_vector_mismatch"):
-            freeze([signed], [forged], PROVENANCE, SNAPSHOTS)
+            freeze([signed], [forged], PROVENANCE, SNAPSHOTS, [training_example(signed)])
+
+    def test_unsigned_400_rows_are_excluded_and_cannot_ready(self):
+        rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
+        manifest = freeze(rows, vectors(rows), PROVENANCE, SNAPSHOTS)
+        self.assertEqual(manifest["dataset_row_count"], 0)
+        self.assertEqual(manifest["rejected_clean_row_count"], 400)
+        self.assertEqual(manifest["rejection_counts"], [{"reason": "unsigned_clean_row", "count": 400}])
+        self.assertEqual(manifest["blockers"], [{"code": "unsigned_clean_rows_excluded", "count": 400}])
+        self.assertEqual(split(manifest)["status"], "not_ready")
+
+    def test_partial_lineage_is_excluded_with_an_explicit_rejection(self):
+        sample = {**row(1), "training_example_id": "training_example_partial"}
+        manifest = freeze([sample], vectors([sample]), PROVENANCE, SNAPSHOTS)
+        self.assertEqual(manifest["dataset_row_count"], 0)
+        self.assertEqual(manifest["rejection_counts"], [{"reason": "incomplete_signed_feature_lineage", "count": 1}])
+
+    def test_signed_commitment_tampering_is_rejected(self):
+        sample = row(1, cluster="cluster_signed_not_account_derived")
+        vector = vectors([sample])[0]
+        signed = signed_row(sample, vector)
+        example = training_example(signed)
+        with self.assertRaisesRegex(PublicationDatasetError, "signed_training_example_commitment_mismatch"):
+            freeze([{**signed, "training_example_digest": "B" * 64}], [vector], PROVENANCE, SNAPSHOTS, [example])
 
 
 if __name__ == "__main__":

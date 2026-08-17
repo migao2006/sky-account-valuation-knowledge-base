@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "review/parser-gold-rule-development-manifest.schema.json",
+  "oneOf": [
+    {"type": "object", "additionalProperties": false, "required": ["schema_version", "status"], "properties": {"schema_version": {"const": "1.0-p3.3"}, "status": {"const": "not_ready"}}},
+    {"type": "object", "additionalProperties": false, "required": ["schema_version", "gold_ledger_sha256", "parser_source_sha256", "parser_config_sha256", "development_input_hashes", "required_strata", "minimum_distinct_values_per_required_stratum", "manifest_sha256"], "properties": {"schema_version": {"const": "1.0-p3.3"}, "gold_ledger_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "parser_source_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "parser_config_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "development_input_hashes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-F0-9]{64}$"}}, "required_strata": {"const": ["account_type", "era", "season", "collaboration", "set_context"]}, "minimum_distinct_values_per_required_stratum": {"const": 2}, "manifest_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}}}
+  ]
+}

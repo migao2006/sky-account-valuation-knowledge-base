@@ -6,9 +6,13 @@ are pinned before it writes.  FAQ 968 proves only this six-item slice, never a
 complete AURORA catalog or present availability.
 """
 from __future__ import annotations
-import argparse, hashlib, json
+import argparse, hashlib, json, sys
 from pathlib import Path
 from typing import Any
+
+REPOSITORY_ROOT=Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path: sys.path.insert(0,str(REPOSITORY_ROOT))
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status
 
 OFFICIAL_SOURCE="source_tgc_faq_968_aurora_remaining_iap"; SECONDARY_SOURCE="source_skygame_data_1_3_4"
 OFFICIAL_LINEAGE="lineage_tgc_support_faq_968"; SECONDARY_LINEAGE="lineage_skygame_data_1_3_4"
@@ -21,7 +25,7 @@ ITEMS=(
  ("item_aurora_wings",1560,"Wings of AURORA","cape","remaining_seasonal_iap","original_cost",24.99,None),
  ("item_aurora_cure_for_me_mask",573,"Cure For Me Mask","mask","cure_for_me_unlocks","original_cost",50,None),
  ("item_aurora_cure_for_me_outfit",572,"Cure For Me Outfit","outfit","cure_for_me_unlocks","original_cost",200,None),
- ("item_aurora_to_the_love_outfit",1557,"To The Love Outfit","outfit","remaining_seasonal_iap","original_cost",9.99,"2022-12-08"),
+ ("item_aurora_to_the_love_outfit",1557,"To the Love Outfit","outfit","remaining_seasonal_iap","original_cost",9.99,"2022-12-08"),
  ("item_aurora_giving_in_cape",1559,"Giving In Cape","cape","remaining_seasonal_iap","original_cost",14.99,"2022-12-08"),
 )
 IAP_IDS={"item_aurora_voice","item_aurora_wings","item_aurora_to_the_love_outfit","item_aurora_giving_in_cape"}
@@ -77,12 +81,10 @@ def build(root:Path)->tuple[dict[str,list[dict[str,Any]]],list[dict[str,Any]]]:
   if oi is None: raise AuroraEvidenceError(f"official item identity missing: {item_id}")
   official_name=source_entries[oi]["official_name_en"]; price_key="price_usd" if list_key=="remaining_seasonal_iap" else "price_candles"
   if source_entries[oi].get(price_key)!=price: raise AuroraEvidenceError(f"official price changed: {item_id}")
-  # Preserve the FAQ spelling for To the Love; the independent vendor defines title casing.
-  official_field="canonical_name_en" if official_name==name else "identity_description"
   evidence.extend([
-   ev("item",item_id,official_field,official_name,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,ob,f"/facts/{list_key}/{oi}/official_name_en","independent_identity","FAQ 968 exact item wording; vendor supplies any title-casing normalization."),
+   ev("item",item_id,"canonical_name_en",official_name,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,ob,f"/facts/{list_key}/{oi}/official_name_en","independent_identity","FAQ 968 exact item wording; vendor supplies any title-casing normalization."),
    ev("item",item_id,"original_cost",price,OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,ob,f"/facts/{list_key}/{oi}/{price_key}","independent_field","FAQ 968 stated historical price; no current price is inferred."),
-   ev("item",item_id,"canonical_name_en" if vr.get("name")==name else "identity_description",vr.get("name"),SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,sb,f"/items/{vi}/name","secondary_field","Exact vendor wording; the official FAQ controls canonical wording where title case differs."),
+   ev("item",item_id,"vendor_item_name",vr.get("name"),SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,sb,f"/items/{vi}/name","secondary_field","Exact vendor wording; the official FAQ controls canonical wording where title case differs."),
    ev("item",item_id,"item_category",vr.get("subtype") if category=="instrument" else vr.get("type"),SECONDARY_SOURCE,SECONDARY_LINEAGE,"secondary_reference",SECONDARY_PATH,sb,f"/items/{vi}/subtype" if category=="instrument" else f"/items/{vi}/type","secondary_field",f"Apply contract maps this vendor type to canonical category {category}.")])
   if start:
    evidence.append(ev("item",item_id,"availability_history",official["facts"]["availability_context"]["to_the_love_and_giving_in_available_at"],OFFICIAL_SOURCE,OFFICIAL_LINEAGE,"official_item_specific",OFFICIAL_PATH,ob,"/facts/availability_context/to_the_love_and_giving_in_available_at","independent_field","Historical opening context only; current availability stays unknown."))
@@ -92,7 +94,7 @@ def build(root:Path)->tuple[dict[str,list[dict[str,Any]]],list[dict[str,Any]]]:
  return {"items":list(rows.values()),"sets":list(sets.values()),"sources":read(root/"knowledge/sources/sources.jsonl")},evidence
 def item_row(item_id:str,name:str,category:str,price:float|int,start:str|None)->dict[str,Any]:
  iap=item_id in IAP_IDS; currency="USD" if iap else "candle"
- return {"item_id":item_id,"canonical_name_zh_tw":f"待確認（{name}）","canonical_name_en":name,"aliases":[],"item_category":category,"item_subcategory":"collaboration_iap" if iap else "collaboration_additional","source_type":"collaboration","source_id":OFFICIAL_SOURCE,"season_id":"season_aurora","event_id":None,"ancestor_id":None,"set_ids":[SET_ID] if iap else [],"free_or_premium":"premium" if iap else "free","pass_required":"unknown" if iap else "no","ultimate_reward":False,"collaboration":True,"permanent_account_item":"unknown","consumable":False,"original_currency":currency,"original_cost":price,"availability_status":"unknown","first_release_date":None,"availability_event_ids":["availability_aurora_faq968_"+item_id.removeprefix("item_aurora_")],"visual_reference_ids":["visual_"+item_id.removeprefix("item_")],"valuation_role":"collection_structure","source_ids":[OFFICIAL_SOURCE,SECONDARY_SOURCE],"last_verified_at":AS_OF,"verification_status":"verified","evidence_tier":"official_with_secondary","model_feature_status":"excluded_pending_verification","notes":"FAQ 968 establishes this named item's historical price and limited collaboration context; an independent pinned vendor snapshot supplies exact canonical title/type. Historical availability is recorded separately and is not promoted to a first-release claim. Current availability, return policy, permanent-account property, formal Traditional Chinese name, and visual identity remain unknown or unasserted. This cohort is not a complete AURORA paid-item catalog."}
+ return {"item_id":item_id,"canonical_name_zh_tw":f"待確認（{name}）","canonical_name_en":name,"aliases":[],"item_category":category,"item_subcategory":"collaboration_iap" if iap else "collaboration_additional","source_type":"collaboration","source_id":OFFICIAL_SOURCE,"season_id":"season_aurora","event_id":None,"ancestor_id":None,"set_ids":[SET_ID] if iap else [],"free_or_premium":"premium" if iap else "free","pass_required":"unknown" if iap else "no","ultimate_reward":False,"collaboration":True,"permanent_account_item":"unknown","consumable":False,"original_currency":currency,"original_cost":price,"availability_status":"unknown","first_release_date":None,"availability_event_ids":["availability_aurora_faq968_"+item_id.removeprefix("item_aurora_")],"visual_reference_ids":["visual_"+item_id.removeprefix("item_")],"valuation_role":"collection_structure","source_ids":[OFFICIAL_SOURCE,SECONDARY_SOURCE],"last_verified_at":AS_OF,"verification_status":"verified","evidence_tier":"official_with_secondary","model_feature_status":declared_model_feature_status(item_id),"notes":"FAQ 968 establishes this named item's historical price and limited collaboration context; an independent pinned vendor snapshot supplies exact canonical title/type. Historical availability is recorded separately and is not promoted to a first-release claim. Current availability, return policy, permanent-account property, formal Traditional Chinese name, and visual identity remain unknown or unasserted. This cohort is not a complete AURORA paid-item catalog."}
 def apply_targets(root:Path,targets:dict[str,list[dict[str,Any]]])->dict[str,list[dict[str,Any]]]:
  items={r["item_id"]:dict(r) for r in targets["items"]}
  for iid,_v,n,c,_l,_f,p,start in ITEMS: items[iid]=item_row(iid,n,c,p,start)
@@ -110,8 +112,11 @@ def support()->tuple[list[dict[str,Any]],list[dict[str,Any]]]:
 def verify(root:Path,require_applied:bool=True)->list[str]:
  targets,evidence=build(root); expected=apply_targets(root,targets); bad=[]
  if require_applied:
-  for rel,rows in (("knowledge/items/items.jsonl",expected["items"]),("knowledge/sets/item-sets.jsonl",expected["sets"]),("knowledge/sources/sources.jsonl",expected["sources"])):
-   if read(root/rel)!=rows: bad.append(f"committed target differs from replayable apply contract: {rel}")
+  current_items={row["item_id"]:row for row in read(root/"knowledge/items/items.jsonl")}; expected_items={row["item_id"]:row for row in expected["items"]}
+  for item_id,*_ in ITEMS:
+   if current_items.get(item_id)!=expected_items.get(item_id): bad.append("committed target differs from replayable apply contract: knowledge/items/items.jsonl"); break
+  current_sets={row["set_id"]:row for row in read(root/"knowledge/sets/item-sets.jsonl")}; expected_sets={row["set_id"]:row for row in expected["sets"]}
+  if current_sets.get(SET_ID)!=expected_sets.get(SET_ID): bad.append("committed target differs from replayable apply contract: knowledge/sets/item-sets.jsonl")
   av,vis=support(); havea={r["availability_id"]:r for r in read(root/"knowledge/acquisition/availability-events.jsonl")}; havev={r["visual_reference_id"]:r for r in read(root/"knowledge/visual-references/manifest.jsonl")}
   for row in av:
    if havea.get(row["availability_id"])!=row: bad.append(f"availability differs: {row['availability_id']}")
@@ -120,7 +125,7 @@ def verify(root:Path,require_applied:bool=True)->list[str]:
   ep=root/"data/review/aurora-faq968-canonical-evidence.jsonl"
   if not ep.is_file() or read(ep)!=evidence: bad.append("canonical field evidence differs from replayable source claims")
   byid={r["item_id"]:r for r in expected["items"]}
-  if any(byid[i]["availability_status"]!="unknown" or byid[i]["permanent_account_item"]!="unknown" or byid[i]["model_feature_status"]!="excluded_pending_verification" for i,*_ in ITEMS): bad.append("unsupported current availability, permanence, or model promotion")
+  if any(byid[i]["availability_status"]!="unknown" or byid[i]["permanent_account_item"]!="unknown" or byid[i]["model_feature_status"]!=declared_model_feature_status(i) for i,*_ in ITEMS): bad.append("unsupported current availability, permanence, or exact-English model eligibility")
   if set(next(x for x in expected["sets"] if x["set_id"]==SET_ID)["required_item_ids"])!=IAP_IDS: bad.append("FAQ 968 set membership mismatch")
   if any(i in next(x for x in expected["sets"] if x["set_id"]==SET_ID)["required_item_ids"] for i in ("item_aurora_cure_for_me_mask","item_aurora_cure_for_me_outfit")): bad.append("Cure items incorrectly included in FAQ 968 IAP set")
  return bad

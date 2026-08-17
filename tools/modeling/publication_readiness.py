@@ -106,7 +106,7 @@ def audit(
     invalid_market_rows = 0
     missing_vector_rows = 0
     for row in clean_rows:
-        if row.get("currency") != "TWD" or row.get("server") != "international" or row.get("price_line") not in {"normal_listing", "urgent_sale"}:
+        if row.get("currency") != "TWD" or row.get("server") != "international" or row.get("price_line") not in {"normal_listing", "urgent_sale", "verified_sale"}:
             invalid_market_rows += 1
             continue
         if row.get("account_id") not in eligible_vectors:
@@ -158,7 +158,15 @@ def audit(
         for row in catalog_rows
     )
     verified_sales = sum(
-        isinstance(row.get("sale_outcome"), dict) and row["sale_outcome"].get("verified") is True
+        (
+            row.get("price_line") == "verified_sale"
+            and row.get("completed_sale_verified") is True
+            and row.get("sale_verified") is True
+        )
+        or (
+            isinstance(row.get("sale_outcome"), dict)
+            and row["sale_outcome"].get("verified") is True
+        )
         for row in comparable_rows
     )
     global_reasons: list[str] = []
@@ -190,11 +198,16 @@ def audit(
 
 def build(root: Path) -> dict[str, Any]:
     root = root.resolve()
-    clean_paths = [root / "data/modeling/price-cleaned-normal.jsonl", root / "data/modeling/price-cleaned-urgent.jsonl"]
+    clean_paths = [
+        root / "data/modeling/price-cleaned-normal.jsonl",
+        root / "data/modeling/price-cleaned-urgent.jsonl",
+        root / "data/modeling/price-cleaned-verified-sales.jsonl",
+    ]
     clean_rows = [row for path in clean_paths for row in read_jsonl(path)]
     return audit(
         clean_rows, read_jsonl(root / "data/modeling/account-item-vectors.jsonl"),
-        read_jsonl(root / "knowledge/items/items.jsonl"), read_jsonl(root / "data/comparables/accounts.jsonl"),
+        read_jsonl(root / "knowledge/items/items.jsonl"),
+        read_jsonl(root / "data/modeling/price-cleaned-verified-sales.jsonl"),
         catalog_provenance(root),
     )
 

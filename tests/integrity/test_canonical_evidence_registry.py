@@ -76,7 +76,7 @@ class CanonicalEvidenceRegistryTests(unittest.TestCase):
             encoding="utf-8", newline="\n"
         )
         problems = self.problems(root)
-        self.assertTrue(any("item target must be verified and model excluded" in problem for problem in problems))
+        self.assertTrue(any("item target must be verified with a recognized model status" in problem for problem in problems))
         self.assertTrue(any("ledger targets differ from registry targets" in problem for problem in problems))
         # A registry never supplies a trusted row count: duplicated ledger rows
         # are rejected from their actual evidence IDs.

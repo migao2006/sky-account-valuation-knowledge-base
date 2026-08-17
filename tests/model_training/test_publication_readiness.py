@@ -29,9 +29,9 @@ class PublicationReadinessTests(unittest.TestCase):
         self.assertEqual(report["status"], "not_ready")
         self.assertFalse(report["artifact_publication_fields_consulted"])
         self.assertFalse(report["trained_models_treated_as_passed"])
-        self.assertEqual(report["model_eligible_item_count"], 0)
+        self.assertEqual(report["model_eligible_item_count"], 19)
         self.assertEqual(report["verified_completed_sale_count"], 0)
-        self.assertIn("no_model_eligible_catalog_items", report["blocking_reasons"])
+        self.assertNotIn("no_model_eligible_catalog_items", report["blocking_reasons"])
         self.assertIn("no_verified_completed_sales", report["blocking_reasons"])
         # The fixture deliberately fails closed whether current clean lines are
         # present or have been invalidated by a newer catalog provenance.

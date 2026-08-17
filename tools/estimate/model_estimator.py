@@ -96,6 +96,87 @@ def _outer_mae(artifact: dict[str, Any]) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0 else None
 
 
+def _canonical_sha256(value: Any) -> str:
+    """Hash a portable JSON model contract exactly as the evaluator does."""
+    rendered = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(rendered).hexdigest().upper()
+
+
+def _runtime_model_sha256(path: Path, artifact: dict[str, Any]) -> str | None:
+    """Return the immutable bytes/model-contract digest used by publication.
+
+    XGBoost has a separately persisted model payload.  Elastic Net inference is
+    entirely the portable JSON prediction contract, so that contract is its
+    model payload.  This is intentionally derived from local bytes/contracts,
+    never from an artifact's self-reported publication metadata.
+    """
+    if artifact.get("model_type") == "xgboost":
+        name = artifact.get("model_file")
+        if not isinstance(name, str):
+            return None
+        model_path = (path.parent / name).resolve()
+        if model_path.parent != path.parent.resolve() or not model_path.is_file():
+            return None
+        return _sha256(model_path).upper()
+    contract = artifact.get("prediction_contract")
+    return _canonical_sha256(contract) if isinstance(contract, dict) else None
+
+
+def _publication_binding_reasons(root: Path, path: Path, artifact: dict[str, Any]) -> list[str]:
+    """Require a freshly replayable, exact evaluator binding for a trained model.
+
+    The evaluator owns metric computation.  Runtime only consumes its
+    deterministic report and insists that the report is byte-for-byte the
+    current replay, has passed, and contains exactly one binding for this
+    artifact's observed bytes, model payload, dataset and split.
+    """
+    report_path = root / "reports" / "model-publication-evaluation.json"
+    try:
+        published = _read_json(report_path)
+    except ValueError:
+        return ["publication_evaluation_report_missing_or_invalid"]
+    try:
+        from tools.modeling.publication_evaluator import build as build_publication_evaluation
+        replayed = build_publication_evaluation(root.resolve())
+    except Exception as exc:
+        return [f"publication_evaluation_replay_unavailable:{type(exc).__name__}"]
+    if published != replayed:
+        return ["publication_evaluation_report_not_replayable"]
+    if published.get("status") != "passed" or published.get("publication_ready") is not True:
+        return ["publication_evaluation_not_passed"]
+    dataset_hashes = {
+        "dataset_sha256": published.get("dataset_sha256"),
+        "dataset_manifest_sha256": published.get("dataset_manifest_sha256"),
+        "split_sha256": published.get("split_sha256"),
+    }
+    if not all(isinstance(value, str) and len(value) == 64 for value in dataset_hashes.values()):
+        return ["publication_evaluation_hashes_invalid"]
+    model_sha = _runtime_model_sha256(path, artifact)
+    if model_sha is None:
+        return ["publication_model_payload_missing_or_invalid"]
+    binding = {
+        "price_line": artifact.get("price_line"),
+        "model_type": artifact.get("model_type"),
+        **dataset_hashes,
+        "model_sha256": model_sha,
+        "artifact_sha256": _sha256(path).upper(),
+    }
+    rows = published.get("artifact_bindings")
+    if not isinstance(rows, list):
+        return ["publication_artifact_bindings_missing"]
+    supported = {
+        ("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale"),
+        ("xgboost", "normal_listing"), ("xgboost", "urgent_sale"),
+    }
+    observed = [(row.get("model_type"), row.get("price_line")) for row in rows if isinstance(row, dict)]
+    if len(observed) != len(rows) or len(set(observed)) != len(observed) or not set(observed) <= supported:
+        return ["publication_artifact_binding_set_not_exact"]
+    matches = [row for row in rows if isinstance(row, dict) and all(row.get(key) == value for key, value in binding.items())]
+    if len(matches) != 1:
+        return ["publication_artifact_binding_missing_or_nonunique"]
+    return []
+
+
 def _training_quality_reasons(artifact: dict[str, Any]) -> list[str]:
     """Admission gate: a hand-written 'trained' envelope is not evidence."""
     training = artifact.get("training")
@@ -107,36 +188,13 @@ def _training_quality_reasons(artifact: dict[str, Any]) -> list[str]:
     folds = training.get("folds", training.get("outer_cv_folds"))
     baseline = training.get("baseline_mae", training.get("baseline_median_mae"))
     mae = _outer_mae(artifact)
-    # P2.1 has no deterministic evaluator that can replay a pinned,
-    # time-forward holdout and recompute every publication metric.  Therefore
-    # no trained envelope is publishable in this release, even if a caller
-    # self-asserts a passing publication gate.
-    reasons = ["model_publication_disabled_in_p2_1"]
+    reasons: list[str] = []
     if training.get("threshold_met") is not True: reasons.append("training_threshold_not_met")
     if training.get("baseline_beaten") is not True: reasons.append("training_baseline_not_beaten")
     if not isinstance(rows, int) or not isinstance(minimum, int) or rows < minimum: reasons.append("training_minimum_rows_not_met")
     if not isinstance(groups, int) or groups < 4: reasons.append("training_independent_groups_insufficient")
     if not isinstance(folds, int) or folds < 2: reasons.append("training_grouped_outer_folds_insufficient")
     if not isinstance(baseline, (int, float)) or isinstance(baseline, bool) or mae is None or mae >= float(baseline): reasons.append("training_cv_does_not_beat_baseline")
-    publication = artifact.get("publication_gate")
-    if not isinstance(publication, dict) or publication.get("status") != "passed":
-        reasons.append("publication_gate_not_passed")
-    else:
-        if publication.get("independent_training_clusters", 0) < 300: reasons.append("publication_training_clusters_insufficient")
-        if publication.get("time_forward_holdout_clusters", 0) < 100: reasons.append("publication_holdout_clusters_insufficient")
-        if publication.get("time_forward_holdout") is not True: reasons.append("publication_holdout_not_time_forward")
-        metrics = publication.get("metrics", {})
-        checks = (
-            isinstance(metrics, dict)
-            and isinstance(metrics.get("mdape"), (int, float)) and metrics["mdape"] <= 0.20
-            and isinstance(metrics.get("p90_ape"), (int, float)) and metrics["p90_ape"] <= 0.40
-            and isinstance(metrics.get("median_baseline_mae_improvement"), (int, float)) and metrics["median_baseline_mae_improvement"] >= 0.15
-            and isinstance(metrics.get("selector_mae_improvement"), (int, float)) and metrics["selector_mae_improvement"] >= 0.10
-            and isinstance(metrics.get("prediction_interval_80_coverage"), (int, float)) and 0.75 <= metrics["prediction_interval_80_coverage"] <= 0.85
-            and isinstance(metrics.get("median_interval_width_ratio"), (int, float)) and metrics["median_interval_width_ratio"] <= 0.50
-            and isinstance(metrics.get("supported_case_rate"), (int, float)) and metrics["supported_case_rate"] >= 0.80
-        )
-        if not checks: reasons.append("publication_metrics_not_met")
     return reasons
 
 
@@ -157,6 +215,7 @@ def _artifact_valid(root: Path, path: Path, expected_line: str) -> tuple[dict[st
     if _outer_mae(artifact) is None:
         failures.append("artifact_outer_cv_mae_invalid")
     failures.extend(_training_quality_reasons(artifact))
+    failures.extend(_publication_binding_reasons(root, path, artifact))
     if not isinstance(artifact.get("feature_schema"), dict):
         failures.append("artifact_feature_contract_missing")
     if not isinstance(artifact.get("prediction_contract"), dict):

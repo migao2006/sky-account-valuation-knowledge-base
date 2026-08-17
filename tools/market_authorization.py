@@ -15,7 +15,9 @@ REGISTRY_REL = Path("data/review/market-authorization/registry.jsonl")
 ATTESTATIONS_REL, SIGNATURES_REL = Path("data/review/market-authorization/attestations.jsonl"), Path("data/review/market-authorization/signatures")
 ROLES = ("data_steward", "privacy_reviewer", "method_reviewer")
 OBSERVATION_FIELDS = {"observation_id", "dedup_cluster_id", "post_date", "date_verified", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "price_line", "price_twd"}
+VERIFIED_SALE_OBSERVATION_FIELDS = OBSERVATION_FIELDS | {"completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence", "completion_evidence_digest", "independent_evidence_ids"}
 TRAINING_EXAMPLE_FIELDS = {"training_example_id", "observation_id", "account_id", "feature_payload", "feature_payload_sha256", "catalog_provenance", "catalog_provenance_sha256", "dedup_cluster_id", "dedup_cluster_digest", "training_example_digest"}
+VERIFIED_SALE_TRAINING_EXAMPLE_FIELDS = TRAINING_EXAMPLE_FIELDS | {"observation_row_digest", "price_line", "completed_sale_verified", "sale_verified", "completion_evidence_digest", "independent_evidence_ids"}
 PII_KEY = re.compile(r"(?:name|user|handle|social|uid|email|mail|phone|mobile|contact|login|payment|address|url|link)", re.I)
 EMAIL, PHONE = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b"), re.compile(r"(?:\+\d[\d .()-]{6,}\d|\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{3,4})")
 
@@ -25,6 +27,41 @@ def _valid_iso_date(value: Any) -> bool:
     if not isinstance(value,str): return False
     try: date.fromisoformat(value); return True
     except ValueError: return False
+
+def _sha256(value: Any) -> bool:
+    return isinstance(value, str) and bool(re.fullmatch(r"[A-Fa-f0-9]{64}", value))
+
+def _valid_observation(row: dict[str, Any], version: str) -> bool:
+    """Keep a verified sale a distinct signed event, never a listing label."""
+    sale = row.get("price_line") == "verified_sale"
+    expected_fields = VERIFIED_SALE_OBSERVATION_FIELDS if sale else OBSERVATION_FIELDS
+    if set(row) != expected_fields or (sale and version != "authorized-market-manifest-v3"):
+        return False
+    return bool(
+        isinstance(row.get("observation_id"), str) and row["observation_id"].startswith("observation_")
+        and isinstance(row.get("dedup_cluster_id"), str) and row["dedup_cluster_id"].startswith("cluster_")
+        and isinstance(row.get("price_twd"), int) and not isinstance(row["price_twd"], bool) and row["price_twd"] >= 1
+        and row.get("date_verified") is True and row.get("currency") == "TWD" and row.get("currency_verified") is True
+        and row.get("server") == "international" and row.get("server_verified") is True
+        and row.get("offer_kind") == "seller_listing" and row.get("entity_kind") == "single_account"
+        and row.get("price_line") in {"asking", "reduced", "urgent_sale", "verified_sale"}
+        and _valid_iso_date(row.get("post_date"))
+        and (not sale or (
+            row.get("completed_sale_verified") is True and row.get("sale_verified") is True
+            and row.get("completed_sale_date") == row.get("post_date") and _valid_iso_date(row.get("completed_sale_date"))
+            and isinstance(row.get("completion_evidence"), list) and len(row["completion_evidence"]) >= 2
+            and all(isinstance(value, dict) and set(value) == {"evidence_id", "source_lineage_id", "evidence_sha256"}
+                    and isinstance(value["evidence_id"], str) and value["evidence_id"].startswith("evidence_")
+                    and isinstance(value["source_lineage_id"], str) and value["source_lineage_id"].startswith("lineage_")
+                    and _sha256(value["evidence_sha256"]) for value in row["completion_evidence"])
+            and len({value["source_lineage_id"] for value in row["completion_evidence"]}) == len(row["completion_evidence"])
+            and row.get("completion_evidence_digest", "").upper() == sha256_bytes(canonical_bytes(row["completion_evidence"]))
+            and isinstance(row.get("independent_evidence_ids"), list) and len(row["independent_evidence_ids"]) >= 2
+            and len(row["independent_evidence_ids"]) == len(set(row["independent_evidence_ids"]))
+            and all(isinstance(value, str) and value.startswith("evidence_") for value in row["independent_evidence_ids"])
+            and row["independent_evidence_ids"] == [value["evidence_id"] for value in row["completion_evidence"]]
+        ))
+    )
 def _inside(p: Path, parent: Path) -> bool:
     try: p.resolve().relative_to(parent.resolve()); return True
     except ValueError: return False
@@ -67,7 +104,7 @@ def attestation_payload(dataset: dict[str,Any], manifest: dict[str,Any], stateme
 
 def training_example_commitment(row: dict[str, Any]) -> dict[str, Any]:
     """The signed, PII-free join between one sale and one model input."""
-    return {
+    commitment = {
         "training_example_id": row.get("training_example_id"),
         "observation_id": row.get("observation_id"),
         "account_id": row.get("account_id"),
@@ -76,6 +113,13 @@ def training_example_commitment(row: dict[str, Any]) -> dict[str, Any]:
         "dedup_cluster_id": row.get("dedup_cluster_id"),
         "dedup_cluster_digest": row.get("dedup_cluster_digest"),
     }
+    # v3 adds the completed-sale proof to the signed feature join itself.
+    if row.get("price_line") == "verified_sale":
+        commitment.update({key: row.get(key) for key in (
+            "observation_row_digest", "price_line", "completed_sale_verified", "sale_verified",
+            "completion_evidence_digest", "independent_evidence_ids",
+        )})
+    return commitment
 
 
 def _catalog_digest(value: Any) -> str:
@@ -125,7 +169,7 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
         try: m=json.loads(mp.read_text(encoding="utf-8"))
         except (OSError,json.JSONDecodeError): errors.append(f"{did}: manifest is invalid JSON"); continue
         version = m.get("schema_version") if isinstance(m, dict) else None
-        if not isinstance(m,dict) or version not in {"authorized-market-manifest-v1", "authorized-market-manifest-v2"} or m.get("dataset_id")!=did: errors.append(f"{did}: manifest identity/schema is invalid"); continue
+        if not isinstance(m,dict) or version not in {"authorized-market-manifest-v1", "authorized-market-manifest-v2", "authorized-market-manifest-v3"} or m.get("dataset_id")!=did: errors.append(f"{did}: manifest identity/schema is invalid"); continue
         if _pii(m): errors.append(f"{did}: PII-like data in manifest")
         msh=sha256_bytes(mp.read_bytes()); op=root/str(m.get("observations_path",""))
         if ds.get("manifest_sha256", "").upper() != msh: errors.append(f"{did}: registry manifest SHA-256 does not bind bytes")
@@ -137,9 +181,9 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
         expected=[{"observation_id": x.get("observation_id"), "row_digest": r, "dedup_cluster_digest": c} for x,r,c in zip(rows,rd,cd)]
         manifest_map=m.get("observation_digests")
         if osh!=str(m.get("observations_sha256","")).upper() or not rows or len(rd)!=len(set(rd)) or len(cd)!=len(set(cd)) or not isinstance(manifest_map,list) or len(manifest_map)!=len(rows) or len({x.get("observation_id") for x in rows})!=len(rows) or {canonical_bytes(x) for x in expected}!={canonical_bytes(x) for x in manifest_map}: errors.append(f"{did}: manifest/observation row or cluster digests do not bind bytes")
-        if any(set(x) != OBSERVATION_FIELDS or not isinstance(x.get("observation_id"),str) or not x["observation_id"].startswith("observation_") or not isinstance(x.get("dedup_cluster_id"),str) or not x["dedup_cluster_id"].startswith("cluster_") or not isinstance(x.get("price_twd"),int) or x["price_twd"] < 1 or x.get("date_verified") is not True or x.get("currency") != "TWD" or x.get("currency_verified") is not True or x.get("server") != "international" or x.get("server_verified") is not True or x.get("offer_kind") != "seller_listing" or x.get("entity_kind") != "single_account" or x.get("price_line") not in {"asking","reduced","urgent_sale"} or not _valid_iso_date(x.get("post_date")) for x in rows): errors.append(f"{did}: observation violates exact anonymous allowlist")
+        if any(not _valid_observation(x, str(version)) for x in rows): errors.append(f"{did}: observation violates exact anonymous allowlist")
         if any(_pii(x) for x in rows): errors.append(f"{did}: nested PII-like data in observations")
-        if version == "authorized-market-manifest-v2":
+        if version in {"authorized-market-manifest-v2", "authorized-market-manifest-v3"}:
             tp=root/str(m.get("training_examples_path", ""))
             if not _inside(tp, mp.parent) or not tp.is_file():
                 errors.append(f"{did}: training examples path missing or escapes dataset")
@@ -169,7 +213,8 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                         "dedup_cluster_digest": sha256_bytes(canonical_bytes(example.get("dedup_cluster_id"))),
                     })
                 manifest_examples=m.get("training_example_digests")
-                exact_fields = all(set(example) == TRAINING_EXAMPLE_FIELDS for example in examples)
+                expected_example_fields = VERIFIED_SALE_TRAINING_EXAMPLE_FIELDS if version == "authorized-market-manifest-v3" else TRAINING_EXAMPLE_FIELDS
+                exact_fields = all(set(example) == expected_example_fields for example in examples)
                 identifiers = [str(example.get("training_example_id")) for example in examples]
                 observations = [str(example.get("observation_id")) for example in examples]
                 accounts = [str(example.get("account_id")) for example in examples]
@@ -186,6 +231,15 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                 linked_ok=all(
                     example.get("observation_id") in observation_by_id
                     and example.get("dedup_cluster_id")==observation_by_id[str(example.get("observation_id"))].get("dedup_cluster_id")
+                    and (version != "authorized-market-manifest-v3" or (
+                        observation_by_id[str(example.get("observation_id"))].get("price_line") == "verified_sale"
+                        and example.get("observation_row_digest", "").upper() == sha256_bytes(canonical_bytes(observation_by_id[str(example.get("observation_id"))]))
+                        and example.get("price_line") == "verified_sale"
+                        and example.get("completed_sale_verified") is True
+                        and example.get("sale_verified") is True
+                        and example.get("completion_evidence_digest", "").upper() == observation_by_id[str(example.get("observation_id"))].get("completion_evidence_digest", "").upper()
+                        and example.get("independent_evidence_ids") == observation_by_id[str(example.get("observation_id"))].get("independent_evidence_ids")
+                    ))
                     for example in examples
                 )
                 if (
@@ -247,10 +301,16 @@ class AuthorizedMarketEvaluator:
         observation = binding["observation"] if "observation" in binding else binding
         price_type = str(row.get("price_type", row.get("normalized_price_type", ""))).lower()
         expected_line = observation["price_line"]
+        # A signed metadata assertion is not a replayable receipt or
+        # counterparty proof.  Keep verified-sale intake fail-closed until a
+        # privacy-preserving completion-evidence archive/evaluator exists.
+        if expected_line == "verified_sale":
+            return False
         line_matches = (
             (expected_line == "asking" and price_type in {"asking", "normal_listing"})
             or (expected_line == "reduced" and price_type == "reduced")
             or (expected_line == "urgent_sale" and price_type in {"urgent_sale", "quick_sale", "instant", "instant_price"})
+            or (expected_line == "verified_sale" and price_type == "verified_sale")
         )
         price_matches = bool(
             line_matches
@@ -283,7 +343,59 @@ class AuthorizedMarketEvaluator:
             and lineage.get("feature_payload_sha256", "").upper() == example["feature_payload_sha256"]
             and lineage.get("catalog_provenance_sha256", "").upper() == example["catalog_provenance_sha256"]
             and lineage.get("dedup_cluster_digest", "").upper() == example["dedup_cluster_digest"]
+            and (observation["price_line"] != "verified_sale" or (
+                lineage.get("observation_row_digest", "").upper() == example["observation_row_digest"]
+                and lineage.get("completion_evidence_digest", "").upper() == example["completion_evidence_digest"]
+            ))
         )
+
+    def bound_training_rows(self) -> list[dict[str, Any]]:
+        """Project verified v2 intake into cleaner rows without listing lineage.
+
+        The projection is available only on a factory-verified evaluator.  It
+        deliberately bypasses the legacy comparable-account schema: authorized
+        datasets contain opaque observations and signed feature commitments,
+        not fabricated listing/history records.
+        """
+        if not self.factory_verified or self.errors or not self.feature_lineage_bound:
+            return []
+        result: list[dict[str, Any]] = []
+        for key, binding in self.authorized_observations:
+            observation, example = binding.get("observation"), binding.get("training_example")
+            dataset, manifest = binding.get("dataset"), binding.get("manifest")
+            if not all(isinstance(value, dict) for value in (observation, example, dataset, manifest)):
+                continue
+            price_line = observation["price_line"]
+            row = {
+                "history_id": "history_authorized_" + str(dataset["dataset_id"]).removeprefix("authorized_market_") + "_" + str(observation["observation_id"]).removeprefix("observation_"),
+                "account_id": example["account_id"], "dedup_cluster_id": example["dedup_cluster_id"],
+                "selected_price_twd": observation["price_twd"], "price_type": price_line,
+                "post_date": observation["post_date"], "date_verified": True, "observed_at": observation["post_date"],
+                "currency": "TWD", "currency_verified": True, "server": "international", "server_verified": True,
+                "offer_kind": "seller_listing", "entity_kind": "single_account", "base_account_type": "unknown",
+                "feature_payload": example["feature_payload"], "catalog_provenance": example["catalog_provenance"],
+                "feature_lineage": {name: example[name] for name in (
+                    "training_example_id", "training_example_digest", "feature_payload_sha256",
+                    "catalog_provenance_sha256", "dedup_cluster_digest",
+                )},
+                "market_data_authorization": {
+                    "status": "authorized_model_training", "allowed_uses": ["model_training", "comparable_estimation"],
+                    "source_snapshot": {"artifact_path": dataset["manifest_path"], "sha256": dataset["manifest_sha256"], "captured_at": observation["post_date"], "replayable": True},
+                    "license_evidence": {"kind": "explicit_data_license", "evidence_id": dataset["authorization_record_id"], "verified": True},
+                    "replay_evidence": [{"evidence_id": observation["observation_id"], "source_locator": manifest["observations_path"], "content_sha256": key[3], "reviewed_at": observation["post_date"]}],
+                    "authorization_record_id": key[0], "dataset_id": key[1], "observation_id": key[2], "row_digest": key[3], "manifest_sha256": key[4],
+                },
+            }
+            if price_line == "verified_sale":
+                # Metadata-only sale claims remain unavailable to __call__
+                # until replayable completion evidence is implemented.
+                row.update({name: observation[name] for name in (
+                    "completed_sale_verified", "sale_verified", "completed_sale_date",
+                    "completion_evidence_digest", "independent_evidence_ids",
+                )})
+                row["feature_lineage"].update({name: example[name] for name in ("observation_row_digest", "completion_evidence_digest")})
+            result.append(row)
+        return result
 
 def make_authorization_evaluator(root: Path, authority_bundle: str|Path|None=None, authority_bundle_sha256: str|None=None, statement: str|Path|None=None, statement_sha256: str|None=None) -> AuthorizedMarketEvaluator:
     errors=verify_authorized_market_intake(root,authority_bundle,authority_bundle_sha256,statement,statement_sha256)
@@ -293,12 +405,12 @@ def make_authorization_evaluator(root: Path, authority_bundle: str|Path|None=Non
         for ds in _jsonl(root/REGISTRY_REL):
             mp=root/str(ds["manifest_path"]); manifest=json.loads(mp.read_text(encoding="utf-8")); rows=_jsonl(root/manifest["observations_path"])
             examples_by_observation={}
-            if manifest.get("schema_version")=="authorized-market-manifest-v2":
+            if manifest.get("schema_version") in {"authorized-market-manifest-v2", "authorized-market-manifest-v3"}:
                 examples=_jsonl(root/manifest["training_examples_path"])
                 examples_by_observation={str(example["observation_id"]): example for example in examples}
                 feature_lineage_bound=True
             mappings.extend(
-                ((str(ds["authorization_record_id"]), str(ds["dataset_id"]), str(row["observation_id"]), sha256_bytes(canonical_bytes(row)), str(ds["manifest_sha256"]).upper()), {"observation": row, "training_example": examples_by_observation.get(str(row["observation_id"]))})
+                ((str(ds["authorization_record_id"]), str(ds["dataset_id"]), str(row["observation_id"]), sha256_bytes(canonical_bytes(row)), str(ds["manifest_sha256"]).upper()), {"observation": row, "training_example": examples_by_observation.get(str(row["observation_id"])), "dataset": ds, "manifest": manifest})
                 for row in rows
             )
     return AuthorizedMarketEvaluator(tuple(mappings),tuple(errors),feature_lineage_bound,_FACTORY_CAPABILITY)

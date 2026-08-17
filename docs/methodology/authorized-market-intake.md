@@ -12,4 +12,24 @@ authority bundle 的 `schema_version` 為 `authorized-market-authority-bundle-v1
 
 Consumer 可用 `make_authorization_evaluator(root, bundle, bundle_sha, statement, statement_sha)` 建立 callable。它只有在整個 intake 全數驗證通過、五個 authorization lineage 欄位精確對應，且價格、日期、幣別、伺服器、交易方向與實體種類逐欄等於已簽署 observation 時才回傳 `True`。
 
-P3.1 的 signed observation 尚未綁定完整 account feature／Item Vector bytes，也不能證明同一 observation 沒被複製成多個 feature clusters。因此 production cleaner 會另回 `market_data_feature_lineage_evaluator_required`，正式 estimator 也不使用這個 price-only evaluator。只有後續契約把完整 feature/vector digest 與 signed dedup cluster 綁入外部授權證據後，才可讓這些列進入訓練或可比估價；目前 registry 即使非空也不會解鎖模型。
+v1 signed observation 只綁價格，仍會回 `market_data_feature_lineage_evaluator_required`。v2 另外簽署 account feature／Item Vector、catalog provenance 與跨資料集唯一 dedup cluster；factory evaluator 驗證外部 trust material 後，才會把這些 opaque observation 直接投影至 production cleaner。正式 registry 目前為空，所以實際模型列仍為 0；任何缺少 v2 commitments 的資料都不會解鎖訓練或估價。
+
+## Verified completed-sale intake (v3)
+
+`authorized-market-manifest-v3` is the only intake version that can carry a
+`verified_sale` line. It is a distinct completed transaction event, never a
+listing re-label. Its signed observation must contain exactly these additional
+facts: `completed_sale_verified: true`, `sale_verified: true`, a completed-sale
+date equal to the verified event date, a SHA-256 `completion_evidence_digest`,
+and at least two unique `evidence_*` IDs. Asking, reduced, and urgent rows are
+rejected if they try to attach any of those fields.
+
+The v3 training example repeats and signs the observation-row digest, sale
+line, completion digest, and independent evidence IDs alongside the P3.2
+feature/vector/catalog/cluster commitment. These fields are structural intake
+metadata only: an ID and hash do not preserve or replay the underlying receipt
+or independent counterparty proof. P3.3 therefore rejects every
+`verified_sale` at the production evaluator boundary. A future version must add
+a privacy-preserving completion-evidence archive and evaluator before the
+dedicated cleaner pool can contain a row. The empty pool remains separate from
+normal asking and urgent listings; no sale or model eligibility is claimed.

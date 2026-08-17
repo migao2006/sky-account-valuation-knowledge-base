@@ -14,8 +14,8 @@ python tools/estimate/estimate.py input-account.json data/comparables/accounts.j
 
 目標帳號的 `trade_conditions` 必須明確為 `offer_kind: seller_listing` 與 `entity_kind: single_account`。買方預算、服務、交換、套組及未知交易型態不會借用單帳賣方價格池。
 
-`model_estimator.py` 是離線模型入口，讀取同一個結構化帳號 JSON；只有外部 evaluator 驗證市場資料授權，且資料快照、獨立 cluster、time-forward holdout、baseline 與模型雜湊全部通過時才可發布。正式 P3.2 有 0 筆獲外部授權的正常刊登、0 筆急售，四個 artifact 皆停用，因此模型入口會回傳資料不足，而不是產生模型價格。
+`model_estimator.py` 是離線模型入口，讀取同一個結構化帳號 JSON。`trained` artifact 不信任其內嵌的 `publication_gate`；只有當目前的可重播 publication evaluation 報告為 `passed`，而且其單一 binding 精確覆蓋 artifact bytes、模型 payload、frozen dataset manifest 與 split 雜湊時才可發布。正式 P3.3 有 0 筆獲外部授權的正常刊登、0 筆急售與 0 筆 verified sale，四個 artifact 皆停用，因此模型入口會回傳資料不足，而不是產生模型價格。
 
-`estimate.py` CLI 不接受可注入的授權 callback，也不宣稱已啟用 signed comparable。P3.2 的外部材料重播目前只接到訓練資料 cleaner；估價器的授權接線仍是明列的未完成邊界。
+`estimate.py` CLI 不接受可注入的授權 callback，也不宣稱已啟用 signed comparable。P3.3 的外部材料重播已接到訓練資料 cleaner 與獨立 verified-sale pool；估價器的授權接線仍是明列的未完成邊界。
 
 `evidence.py` 只提供圖片證據資料契約與驗證。`ocr_text` 只可表示文字觀察，不能直接聲稱偵測到物品；物品圖示需獨立的 `icon_match` 或人工標註 row，並指定已存在的 `item_*` canonical ID。正式 evidence 禁止原始 OCR 內容、玩家資料、網址及本機圖片路徑。

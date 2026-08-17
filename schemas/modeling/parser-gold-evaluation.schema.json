@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/parser-gold-evaluation.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "model_feature", "status", "publication_ready", "gold_row_count", "gold_input_hashes_sha256", "rule_development_manifest_sha256", "heldout_excluded_from_rule_configuration", "strata_distinct_value_counts", "development", "heldout", "thresholds"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.3"}, "model_feature": {"const": false},
+    "status": {"enum": ["not_ready", "threshold_not_met", "evaluated"]}, "publication_ready": {"type": "boolean"}, "gold_row_count": {"type": "integer", "minimum": 0},
+    "gold_input_hashes_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "rule_development_manifest_sha256": {"type": ["string", "null"], "pattern": "^[A-F0-9]{64}$"}, "heldout_excluded_from_rule_configuration": {"const": true},
+    "strata_distinct_value_counts": {"type": "object", "additionalProperties": false, "required": ["account_type", "era", "season", "collaboration", "set_context"], "properties": {"account_type": {"type": "integer", "minimum": 0}, "era": {"type": "integer", "minimum": 0}, "season": {"type": "integer", "minimum": 0}, "collaboration": {"type": "integer", "minimum": 0}, "set_context": {"type": "integer", "minimum": 0}}},
+    "development": {"$ref": "#/$defs/metrics"}, "heldout": {"$ref": "#/$defs/metrics"},
+    "thresholds": {"type": "object", "additionalProperties": false, "required": ["minimum_gold_rows", "minimum_development_rows", "minimum_heldout_rows", "required_strata", "minimum_distinct_values_per_required_stratum", "heldout_precision_minimum", "heldout_recall_minimum", "collision_rows_maximum", "unknown_to_missing_rows_maximum"], "properties": {"minimum_gold_rows": {"const": 200}, "minimum_development_rows": {"const": 100}, "minimum_heldout_rows": {"const": 100}, "required_strata": {"const": ["account_type", "era", "season", "collaboration", "set_context"]}, "minimum_distinct_values_per_required_stratum": {"const": 2}, "heldout_precision_minimum": {"const": 0.98}, "heldout_recall_minimum": {"const": 0.95}, "collision_rows_maximum": {"const": 0}, "unknown_to_missing_rows_maximum": {"const": 0}}}
+  },
+  "$defs": {"metrics": {"type": "object", "additionalProperties": false, "required": ["row_count", "true_positive", "false_positive", "false_negative", "precision", "recall", "collision_rows", "collision_error_rate", "unknown_to_missing_rows"], "properties": {"row_count": {"type": "integer", "minimum": 0}, "true_positive": {"type": "integer", "minimum": 0}, "false_positive": {"type": "integer", "minimum": 0}, "false_negative": {"type": "integer", "minimum": 0}, "precision": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "recall": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "collision_rows": {"type": "integer", "minimum": 0}, "collision_error_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "unknown_to_missing_rows": {"type": "integer", "minimum": 0}}}}
+}

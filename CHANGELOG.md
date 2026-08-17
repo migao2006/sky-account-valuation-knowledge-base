@@ -1,5 +1,14 @@
 # 變更紀錄
 
+## 4.5.0-p3.3 — 2026-08-17
+
+- 新增 Days of Sunlight FAQ 1343 core-three 的可重播官方／vendor identity 與歷史成本證據。
+- 新增 19 項 exact-English model eligibility；中文玩家詞仍為 review-only。
+- 新增外部簽章 parser gold、locked development/held-out split 與 precision/recall/collision 評估。
+- publication evaluator 可自行訓練固定 train-only 模型並重播 holdout 指標；runtime/release 只接受精確 artifact binding。
+- signed market intake v3 新增獨立 verified-sale metadata 契約；因尚無可重播成交證據 archive，production pool 明確 fail closed。
+- 正式市場授權與真人 gold 仍為 0；估價保持 fail closed。
+
 ## 4.4.0-p3.2 — 2026-08-17
 
 - 新增 Days of Color FAQ 1323 core-three：3 件官方逐項 identity／歷史成本證據；目前 112 canonical、30 verified，全部仍排除於模型。

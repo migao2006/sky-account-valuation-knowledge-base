@@ -13,10 +13,11 @@ from release_files import HASH_EXCLUSIONS, release_files
 from canonical_evidence_registry import load_registry, validate_registry
 from market_audit import audit_market_ledgers
 from tools.market_authorization import verify_authorized_market_intake
-from tools.modeling.clean_prices import clean_authorized as clean_model_prices
+from tools.modeling.clean_prices import clean_authorized_with_verified_sales as clean_model_prices
 from tools.modeling.publication_dataset import build as build_publication_dataset
 from tools.modeling.publication_evaluator import build as build_publication_evaluation
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage
+from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation
 from tools.validate.build_completion_status import build as build_completion_status
 
 BUILT_AT = "2026-08-17T00:00:00+08:00"
@@ -63,6 +64,10 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--parser-gold-authority-bundle", type=Path)
+    parser.add_argument("--parser-gold-authority-bundle-sha256")
+    parser.add_argument("--parser-gold-replay-inputs", type=Path)
+    parser.add_argument("--parser-gold-replay-inputs-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
 
@@ -90,6 +95,7 @@ def main() -> None:
         "item_vectors": root / "data/modeling/account-item-vectors.jsonl",
         "clean_normal": root / "data/modeling/price-cleaned-normal.jsonl",
         "clean_urgent": root / "data/modeling/price-cleaned-urgent.jsonl",
+        "clean_verified_sales": root / "data/modeling/price-cleaned-verified-sales.jsonl",
         "model_exclusions": root / "data/modeling/model-exclusions.jsonl",
         "item_value_table": root / "data/modeling/item-value-table.jsonl",
         "vendor_crosswalk": root / "data/review/skygame-data-1.3.4-crosswalk.jsonl",
@@ -129,6 +135,9 @@ def main() -> None:
     )
     if market_audit_errors:
         raise RuntimeError(f"market audit contract is invalid: {market_audit_errors}")
+    parser_gold_errors = audit_parser_gold(root, read_jsonl(root / "data/review/parser-gold/claims.jsonl"), args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
+    if parser_gold_errors:
+        raise RuntimeError(f"parser-gold contract is invalid: {parser_gold_errors}")
     authorization_errors = verify_authorized_market_intake(
         root, args.market_authorization_authority_bundle,
         args.market_authorization_authority_bundle_sha256,
@@ -136,21 +145,23 @@ def main() -> None:
     )
     if authorization_errors:
         raise RuntimeError(f"authorized market intake is invalid: {authorization_errors}")
-    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(
+    expected_normal, expected_urgent, expected_verified_sales, expected_exclusions = clean_model_prices(
         rows["comparable_accounts"], root,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
     )
-    if rows["clean_normal"] != expected_normal or rows["clean_urgent"] != expected_urgent or rows["model_exclusions"] != expected_exclusions:
+    if rows["clean_normal"] != expected_normal or rows["clean_urgent"] != expected_urgent or rows["clean_verified_sales"] != expected_verified_sales or rows["model_exclusions"] != expected_exclusions:
         raise RuntimeError("formal clean prices differ from deterministic feature-lineage-gated rebuild")
     publication_dataset, publication_split = build_publication_dataset(root)
     publication_evaluation = build_publication_evaluation(root)
     parser_coverage = build_parser_knowledge_coverage(root)
+    parser_gold_evaluation = build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
     for relative, expected in (
         ("reports/model-publication-dataset-manifest.json", publication_dataset),
         ("reports/model-publication-split.json", publication_split),
         ("reports/model-publication-evaluation.json", publication_evaluation),
         ("reports/parser-knowledge-coverage.json", parser_coverage),
+        ("reports/parser-gold-evaluation.json", parser_gold_evaluation),
     ):
         actual = json.loads((root / relative).read_text(encoding="utf-8"))
         if actual != expected:
@@ -179,7 +190,7 @@ def main() -> None:
     migration = json.loads((root / "reports/migration/migration-summary.json").read_text(encoding="utf-8"))
     inventory = json.loads((root / "reports/migration/file-inventory.json").read_text(encoding="utf-8"))
 
-    verified_sales = sum(1 for row in rows["curated_histories"] if row.get("sale_outcome", {}).get("verified") is True)
+    verified_sales = len(rows["clean_verified_sales"])
     source_type_counts = count(rows["sources"], "source_type")
     official_types = {"official_site", "official_news", "official_support", "thatgamecompany"}
     canonical_entities = ("seasons", "events", "items", "sets", "aliases", "availability_events")
@@ -188,7 +199,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.4-p3.2",
+        "schema_version": "4.5-p3.3",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -258,6 +269,7 @@ def main() -> None:
             "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
             "clean_normal_rows": len(rows["clean_normal"]),
             "clean_urgent_rows": len(rows["clean_urgent"]),
+            "clean_verified_sale_rows": len(rows["clean_verified_sales"]),
             "excluded_or_review_rows": len(rows["model_exclusions"]),
             "item_value_rows": len(rows["item_value_table"]),
             "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
@@ -335,6 +347,7 @@ def main() -> None:
         "p3_0_authorized_evidence_and_cost_reference": {
             "authorized_clean_normal_rows": len(rows["clean_normal"]),
             "authorized_clean_urgent_rows": len(rows["clean_urgent"]),
+            "authorized_clean_verified_sale_rows": len(rows["clean_verified_sales"]),
             "historical_cost_reference_rows": len(rows["historical_cost_references"]),
             "historical_cost_model_features": sum(row.get("model_feature") is True for row in rows["historical_cost_references"]),
             "resale_value_inferences": sum(row.get("resale_value_effect") != "not_inferred" for row in rows["historical_cost_references"]),
@@ -354,7 +367,7 @@ def main() -> None:
             "P3.1 新增 Tournament of Triumph FAQ 1330 core-four 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
             "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
             "可驗證成交價與獲外部授權的市場訓練列均為零；正式估價器維持 fail closed，不輸出轉售價格。",
-            "P3.1 外部授權 intake 只綁定 price observation；完整 account feature／Item Vector 與 signed dedup cluster lineage 尚未建立，因此即使 price-only 簽章合法也不得進入 production training 或估價。",
+            "P3.3 v2 外部授權 intake 已可綁定 price、account feature／Item Vector、catalog provenance 與 signed dedup cluster；正式 registry 仍為空。verified-sale metadata 因沒有可重播成交證據 archive，仍固定 fail closed。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
             "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
@@ -425,13 +438,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.4-p3.2"
+    previous_validation["schema_version"] = "4.5-p3.3"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p32"
-    manifest["package_version"] = "4.4.0-p3.2"
+    manifest["package_id"] = "sky-valuation-v4-p33"
+    manifest["package_version"] = "4.5.0-p3.3"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -451,6 +464,7 @@ def main() -> None:
         "model_eligible_items": sum(row.get("model_feature_status") == "eligible" for row in rows["items"]),
         "clean_normal_rows": len(rows["clean_normal"]),
         "clean_urgent_rows": len(rows["clean_urgent"]),
+        "clean_verified_sale_rows": len(rows["clean_verified_sales"]),
         "model_exclusion_rows": len(rows["model_exclusions"]),
         "item_value_rows": len(rows["item_value_table"]),
         "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),

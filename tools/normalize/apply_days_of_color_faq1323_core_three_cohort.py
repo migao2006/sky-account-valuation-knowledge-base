@@ -12,6 +12,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from tools.modeling.canonical_english_eligibility import declared_model_feature_status
 from tools.normalize.apply_moomintroll_accessory_set_cohort import evidence, read, safe, sha, vendor, write
 
 OFFICIAL_SOURCE = "source_tgc_faq_1323_days_of_color_core_three"
@@ -59,7 +60,7 @@ def item_row(item_id: str, name: str, category: str, currency: str, cost: int | 
         "availability_event_ids": ["availability_days_of_color_faq1323_" + suffix], "visual_reference_ids": [],
         "valuation_role": "collection_structure", "source_ids": [OFFICIAL_SOURCE, SECONDARY_SOURCE],
         "last_verified_at": AS_OF, "verification_status": "verified", "evidence_tier": "official_with_secondary",
-        "model_feature_status": "excluded_pending_verification",
+        "model_feature_status": declared_model_feature_status(item_id),
         "notes": "FAQ 1323 establishes this named Days of Color 2024 item's historical cost and event window only; the pinned vendor snapshot independently supplies title, GUID, and vendor type. Current availability, return policy, permanent-account property, formal Traditional Chinese name, visual identity, first release date, and model eligibility remain unknown or unasserted. This is a bounded three-item FAQ slice, not a bundle or complete Days of Color catalog.",
     }
 
@@ -117,7 +118,9 @@ def availability_rows() -> list[dict[str, Any]]:
 def verify(root: Path, require_applied: bool = True) -> list[str]:
     targets, ledger = build(root); expected = apply_targets(targets); problems: list[str] = []
     if require_applied:
-        if read(root / "knowledge/items/items.jsonl") != expected["items"]:
+        current_items = {row["item_id"]: row for row in read(root / "knowledge/items/items.jsonl")}
+        expected_items = {row["item_id"]: row for row in expected["items"]}
+        if any(current_items.get(item_id) != expected_items.get(item_id) for item_id, *_ in ITEMS):
             problems.append("committed target differs from replayable apply contract: knowledge/items/items.jsonl")
         available = {row["availability_id"]: row for row in read(root / "knowledge/acquisition/availability-events.jsonl")}
         for row in availability_rows():
@@ -126,7 +129,7 @@ def verify(root: Path, require_applied: bool = True) -> list[str]:
         if not ledger_path.is_file() or read(ledger_path) != ledger: problems.append("canonical field evidence differs from replayable source claims")
         for item_id, *_ in ITEMS:
             item = next(row for row in expected["items"] if row["item_id"] == item_id)
-            if item["availability_status"] != "unknown" or item["permanent_account_item"] != "unknown" or item["first_release_date"] is not None or item["model_feature_status"] != "excluded_pending_verification" or item["set_ids"] or item["visual_reference_ids"]:
+            if item["availability_status"] != "unknown" or item["permanent_account_item"] != "unknown" or item["first_release_date"] is not None or item["model_feature_status"] != declared_model_feature_status(item_id) or item["set_ids"] or item["visual_reference_ids"]:
                 problems.append("unsupported availability, permanence, first-release, visual, model promotion, or bundle membership"); break
     return problems
 
@@ -139,7 +142,7 @@ def main() -> None:
         available = {row["availability_id"]: row for row in read(root / "knowledge/acquisition/availability-events.jsonl")}; available.update({row["availability_id"]: row for row in availability_rows()})
         write(root / "knowledge/acquisition/availability-events.jsonl", sorted(available.values(), key=lambda row: row["availability_id"]))
         write(root / "data/review/days-of-color-faq1323-core-three-canonical-evidence.jsonl", ledger)
-    problems = verify(root); print(json.dumps({"applied": args.apply, "valid": not problems, "problems": problems, "model_feature_status": "excluded_pending_verification"}, ensure_ascii=False, sort_keys=True)); raise SystemExit(bool(problems))
+    problems = verify(root); print(json.dumps({"applied": args.apply, "valid": not problems, "problems": problems, "model_feature_policy": "canonical-exact-english-v1"}, ensure_ascii=False, sort_keys=True)); raise SystemExit(bool(problems))
 
 
 if __name__ == "__main__":

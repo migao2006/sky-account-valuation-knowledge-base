@@ -1,0 +1,23 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1343_days_of_sunlight_core_three_2026_08_17",
+  "source_id":"source_tgc_faq_1343_days_of_sunlight_core_three",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1343-patch-notes---august-22-2024---0-26-5-280889-android-huawei-ios-steam-switch-282398-playstation/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1343's 2024 Days of Sunlight new-item list, restricted to three entries whose official wording can be bound to the pinned vendor snapshot. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2024-08-26",
+    "historical_window_end_date":"2024-09-08",
+    "new_items":[
+      {"item_id":"item_days_of_sunlight_manta_float","official_name_en":"Sunlight Manta Float","original_currency":"event_currency","original_cost":20},
+      {"item_id":"item_days_of_sunlight_helios_hoops","official_name_en":"Sunlight Helios Hoops earrings","original_currency":"USD","original_cost":2.99},
+      {"item_id":"item_days_of_sunlight_woven_wrap","official_name_en":"Sunlight Woven Wrap cape","original_currency":"USD","original_cost":14.99}
+    ]
+  },
+  "non_claims":[
+    "Sunlight Beach Shorts outfit is deliberately excluded from this three-item cohort, although FAQ 1343 lists it.",
+    "This historical FAQ does not establish current availability, a return policy, current storefront state, or permanent-account property for any item.",
+    "The FAQ does not provide formal Traditional Chinese names or image assets, and its text does not establish a visual match.",
+    "This bounded FAQ slice is not a complete Days of Sunlight set and no bundle or set membership is asserted."
+  ]
+}
