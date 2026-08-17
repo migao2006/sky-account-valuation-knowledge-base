@@ -4,10 +4,11 @@
   "title": "Signed PII-free market training example",
   "type": "object",
   "additionalProperties": false,
-  "required": ["training_example_id", "observation_id", "account_id", "feature_payload", "feature_payload_sha256", "catalog_provenance", "catalog_provenance_sha256", "dedup_cluster_id", "dedup_cluster_digest", "training_example_digest"],
+  "required": ["training_example_id", "observation_id", "source_snapshot_sha256", "account_id", "feature_payload", "feature_payload_sha256", "catalog_provenance", "catalog_provenance_sha256", "dedup_cluster_id", "dedup_cluster_digest", "training_example_digest"],
   "properties": {
     "training_example_id": {"type": "string", "pattern": "^training_example_[a-z0-9_]+$"},
     "observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]+$"},
+    "source_snapshot_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "account_id": {"type": "string", "pattern": "^account_[a-z0-9_]+$"},
     "feature_payload": {"type": "object"},
     "feature_payload_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},

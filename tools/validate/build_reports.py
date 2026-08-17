@@ -51,10 +51,17 @@ def write_utf8_lf(path: Path, content: str) -> None:
         handle.write(content)
 
 
-def derived_model_status(artifacts: list[dict[str, Any]]) -> str:
+def derived_model_status(artifacts: list[dict[str, Any]], publication_evaluation: dict[str, Any] | None = None) -> str:
     """Describe the published model state without trusting self-attested publication fields."""
     if artifacts and all(artifact.get("status") == "insufficient_training_data" for artifact in artifacts):
         return "insufficient_training_data"
+    trained = [artifact for artifact in artifacts if artifact.get("status") == "trained"]
+    canonical = {("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale"), ("xgboost", "normal_listing"), ("xgboost", "urgent_sale")}
+    tuples = [(artifact.get("model_type"), artifact.get("price_line")) for artifact in artifacts]
+    bindings = publication_evaluation.get("artifact_bindings") if isinstance(publication_evaluation, dict) else None
+    exact_normal_binding = isinstance(bindings, list) and len(bindings) == 1 and isinstance(bindings[0], dict) and (bindings[0].get("model_type"), bindings[0].get("price_line")) == ("elastic_net", "normal_listing")
+    if len(trained) == 1 and len(artifacts) == 4 and len(set(tuples)) == 4 and set(tuples) == canonical and len(trained) + sum(artifact.get("status") == "insufficient_training_data" for artifact in artifacts) == len(artifacts) and (trained[0].get("model_type"), trained[0].get("price_line")) == ("elastic_net", "normal_listing") and isinstance(publication_evaluation, dict) and publication_evaluation.get("status") == "passed" and publication_evaluation.get("publication_ready") is True and exact_normal_binding:
+        return "published_runtime_elastic_net_normal_listing"
     return "publication_evaluator_required"
 
 
@@ -210,7 +217,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.6-p3.4",
+        "schema_version": "4.7-p3.5",
         "as_of_date": "2026-08-17",
         "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
         "full_item_catalog_complete": catalog_completion["complete"],
@@ -284,7 +291,7 @@ def main() -> None:
             "excluded_or_review_rows": len(rows["model_exclusions"]),
             "item_value_rows": len(rows["item_value_table"]),
             "eligible_item_value_rows": sum(row.get("status") == "eligible" for row in rows["item_value_table"]),
-            "model_status": derived_model_status(model_artifacts),
+            "model_status": derived_model_status(model_artifacts, publication_evaluation),
         },
         "p2_evidence": {
             "vendor_snapshot_items": 3266,
@@ -385,10 +392,10 @@ def main() -> None:
         },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-            "P3.4 新增 Cinnamoroll Pop-Up Cafe FAQ 1308 六項受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+            "P3.5 新增 Days of Fortune FAQ 1264 core-five 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
             "真實圖片資產與核准 detection 目前為零；10 筆 visual reference 只是來源文字描述，不宣稱具備圖示辨識準確率。",
             "可驗證成交價與獲外部授權的市場訓練列均為零；正式估價器維持 fail closed，不輸出轉售價格。",
-            "P3.4 外部授權 intake 已可綁定 price、account feature／Item Vector、catalog provenance 與 signed dedup cluster；正式 registry 仍為空。verified-sale metadata 因沒有可重播成交證據 archive，仍固定 fail closed。",
+            "P3.5 將供應者自證的 account／dedup cluster 視為未確認獨立性；在外部簽署 identity→cluster mapping 完成前，即使 price、feature 與 catalog provenance 的 bytes 綁定通過，也不會進入訓練。verified-sale 仍因沒有可重播成交證據 archive 而 fail closed。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
             "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
@@ -463,13 +470,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.6-p3.4"
+    previous_validation["schema_version"] = "4.7-p3.5"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p34"
-    manifest["package_version"] = "4.6.0-p3.4"
+    manifest["package_id"] = "sky-valuation-v4-p35"
+    manifest["package_version"] = "4.7.0-p3.5"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),

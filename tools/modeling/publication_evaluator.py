@@ -24,6 +24,11 @@ try:
 except ImportError:
     from publication_dataset import PublicationDatasetError, _derive_split, build as build_publication_dataset, split_synthetic_for_test
 
+try:
+    from .publication_runtime import PublicationRuntimeError, build_expected_artifact, canonical_sha256, predict_log
+except ImportError:
+    from publication_runtime import PublicationRuntimeError, build_expected_artifact, canonical_sha256, predict_log
+
 ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
@@ -198,10 +203,90 @@ def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[d
     return metric, model
 
 
+def _runtime_replay_metrics(root: Path, manifest: dict[str, Any], rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Refit the exact portable Elastic Net from train rows and score holdout.
+
+    The artifact supplied on disk is checked separately against this result;
+    no artifact-provided metric, split, or prediction is consumed here.
+    """
+    artifact = build_expected_artifact(root, manifest, pool)
+    train_ids, holdout_ids = set(pool["training_cluster_ids"]), set(pool["holdout_cluster_ids"])
+    train, holdout = [r for r in rows if r["cluster_id"] in train_ids], [r for r in rows if r["cluster_id"] in holdout_ids]
+    domain = artifact.get("feature_schema", {}).get("runtime_domain", {})
+    holdout_total_case_count = len(holdout)
+    holdout_cluster_ids_all = {row["cluster_id"] for row in holdout}
+    original_subgroups: dict[str, set[str]] = defaultdict(set)
+    for row in holdout:
+        original_subgroups[row.get("evaluation_subgroup") or "unknown"].add(row["cluster_id"])
+    supported: list[dict[str, Any]] = []
+    predictions: list[float] = []
+    for row in holdout:
+        try:
+            prediction = max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain)))
+        except (PublicationRuntimeError, OverflowError, ValueError):
+            continue
+        supported.append(row); predictions.append(prediction)
+    if not supported:
+        raise PublicationRuntimeError("runtime_supported_holdout_case_count_zero")
+    holdout = supported
+    train_predictions = [max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain))) for row in train]
+    interval_contract = artifact.get("artifact", {}).get("runtime_interval_contract", {})
+    if not isinstance(interval_contract, dict) or interval_contract.get("kind") != "train_residual_p10_p90_twd" or interval_contract.get("quantiles") != [.10, .90] or not all(isinstance(interval_contract.get(key), (int, float)) for key in ("residual_lower_twd", "residual_upper_twd")):
+        raise PublicationRuntimeError("runtime_interval_contract_invalid")
+    low, high = float(interval_contract["residual_lower_twd"]), float(interval_contract["residual_upper_twd"])
+    apes = [_ape(float(row["selected_price_twd"]), value) for row, value in zip(holdout, predictions)]
+    errors = [abs(float(row["selected_price_twd"]) - value) for row, value in zip(holdout, predictions)]
+    median = statistics.median(float(row["selected_price_twd"]) for row in train)
+    baseline_errors = [abs(float(row["selected_price_twd"]) - median) for row in holdout]
+    selector_errors = []
+    for row in holdout:
+        row_date = date.fromisoformat(row["post_date"])
+        closest = min(train, key=lambda item: (abs((row_date - date.fromisoformat(item["post_date"])).days), item["cleaned_price_id"]))
+        selector_errors.append(abs(float(row["selected_price_twd"]) - float(closest["selected_price_twd"])))
+    # Every independent listing cluster receives one weight.  Row diagnostics
+    # remain available for runtime admission coverage, but duplicate rows from
+    # an easy cluster cannot dilute difficult independent clusters.
+    by_cluster: dict[str, list[int]] = defaultdict(list)
+    for index, row in enumerate(holdout): by_cluster[row["cluster_id"]].append(index)
+    cluster_apes = [statistics.mean(apes[index] for index in indices) for _, indices in sorted(by_cluster.items())]
+    cluster_errors = [statistics.mean(errors[index] for index in indices) for _, indices in sorted(by_cluster.items())]
+    cluster_baseline_errors = [statistics.mean(baseline_errors[index] for index in indices) for _, indices in sorted(by_cluster.items())]
+    cluster_selector_errors = [statistics.mean(selector_errors[index] for index in indices) for _, indices in sorted(by_cluster.items())]
+    subgroups: dict[str, set[str]] = defaultdict(set)
+    train_subgroups: dict[str, set[str]] = defaultdict(set)
+    for row in train: train_subgroups[row.get("evaluation_subgroup") or "unknown"].add(row["cluster_id"])
+    for row in holdout: subgroups[row.get("evaluation_subgroup") or "unknown"].add(row["cluster_id"])
+    subgroup_metrics = []
+    for key in sorted(original_subgroups):
+        clusters = subgroups.get(key, set())
+        total = len(original_subgroups[key])
+        subgroup_apes = [statistics.mean(apes[i] for i in by_cluster[cluster]) for cluster in sorted(clusters)]
+        subgroup_metrics.append({"name": key, "holdout_case_count": total, "runtime_supported_case_count": len(clusters),
+                                 "runtime_supported_case_share": len(clusters) / total,
+                                 "mdape": statistics.median(subgroup_apes) if subgroup_apes else None})
+    underpowered = [row["name"] for row in subgroup_metrics if row["holdout_case_count"] < MINIMUM_SUBGROUP_HOLDOUT_CASES or row["runtime_supported_case_count"] < MINIMUM_SUBGROUP_HOLDOUT_CASES]
+    candidate_mae, baseline_mae, selector_mae = statistics.mean(cluster_errors), statistics.mean(cluster_baseline_errors), statistics.mean(cluster_selector_errors)
+    interval_coverage_by_cluster = [statistics.mean(predictions[index] + low <= float(holdout[index]["selected_price_twd"]) <= predictions[index] + high for index in indices) for _, indices in sorted(by_cluster.items())]
+    interval_width_by_cluster = [statistics.mean((high - low) / predictions[index] for index in indices) for _, indices in sorted(by_cluster.items())]
+    return ({"scorer": "evaluator_owned_train_only_runtime_elastic_net", "training_row_count": len(train), "holdout_row_count": len(holdout), "holdout_total_case_count": holdout_total_case_count,
+             "runtime_supported_case_share": len(by_cluster) / len(holdout_cluster_ids_all), "runtime_supported_row_case_share": len(holdout) / holdout_total_case_count,
+             "model": {"model_type": "elastic_net", "prediction_contract_sha256": canonical_sha256(artifact["prediction_contract"])},
+             "holdout_mdape": statistics.median(cluster_apes), "holdout_p90_ape": _percentile(cluster_apes, .90), "holdout_mae_twd": candidate_mae,
+             "median_baseline_mae_twd": baseline_mae, "median_baseline_mae_improvement": None if baseline_mae == 0 else 1 - candidate_mae / baseline_mae,
+             "comparable_selector_mae_twd": selector_mae, "comparable_selector_mae_improvement": None if selector_mae == 0 else 1 - candidate_mae / selector_mae,
+             "interval": {"kind": "runtime_train_residual_p10_p90", "residual_lower_twd": low, "residual_upper_twd": high,
+                          "coverage": statistics.mean(interval_coverage_by_cluster),
+                          "median_width_ratio": statistics.median(interval_width_by_cluster)},
+             "subgroups": subgroup_metrics, "underpowered_subgroups": underpowered,
+             "coverage_qualified_share": sum(len(train_subgroups.get(row.get("evaluation_subgroup") or "unknown", set())) >= MINIMUM_SUBGROUP_HOLDOUT_CASES for row in (holdout[indices[0]] for _, indices in sorted(by_cluster.items()))) / len(by_cluster)}, artifact)
+
+
 def _gate_reasons(metric: dict[str, Any]) -> list[str]:
     if metric["scorer"] == "feature_linear_unavailable":
         return ["signed_feature_linear_requires_varying_shared_numeric_features"]
     reasons = []
+    if metric.get("runtime_supported_case_share", 1.0) < 0.80:
+        reasons.append("runtime_supported_holdout_share_below_80_percent")
     if metric["holdout_mdape"] > 0.20:
         reasons.append("holdout_mdape_above_20_percent")
     if metric["holdout_p90_ape"] > 0.40:
@@ -217,8 +302,12 @@ def _gate_reasons(metric: dict[str, Any]) -> list[str]:
         reasons.append("prediction_interval_width_above_50_percent")
     reasons.extend(f"subgroup_under_30:{name}" for name in metric["underpowered_subgroups"])
     reasons.extend(
+        f"subgroup_runtime_supported_share_below_80_percent:{row['name']}"
+        for row in metric["subgroups"] if row.get("runtime_supported_case_share", 1.0) < 0.80
+    )
+    reasons.extend(
         f"subgroup_mdape_above_25_percent:{row['name']}"
-        for row in metric["subgroups"] if row["mdape"] > 0.25
+        for row in metric["subgroups"] if isinstance(row["mdape"], (int, float)) and row["mdape"] > 0.25
     )
     if metric["coverage_qualified_share"] < 0.80:
         reasons.append("coverage_qualified_share_below_80_percent")
@@ -243,7 +332,7 @@ def evaluator_artifact_binding(price_line: str, model: dict[str, Any], dataset_s
 
 
 def _evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, artifact: Any = None,
-              predictions: Any = None, allow_test_synthetic: bool = False) -> dict[str, Any]:
+              predictions: Any = None, allow_test_synthetic: bool = False, root: Path | None = None) -> dict[str, Any]:
     """Recompute a report from a frozen manifest and reject external claims.
 
     ``artifact`` and ``predictions`` exist solely to make the trust boundary
@@ -288,18 +377,46 @@ def _evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None =
         rows_by_pool[_pool_key(row)].append(row)
     pool_metrics = []
     pool_summary = []
+    runtime_production = manifest.get("lineage_mode") == "production_signed"
+    runtime_artifacts: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for pool in eligible:
-        metric, model = _replay_metrics(rows_by_pool[(pool["currency"], pool["server"], pool["price_line"])], pool)
+        rows = rows_by_pool[(pool["currency"], pool["server"], pool["price_line"])]
+        if runtime_production and pool["price_line"] == "normal_listing":
+            try:
+                metric, runtime_artifact = _runtime_replay_metrics(ROOT if root is None else root, manifest, rows, pool)
+                runtime_artifacts.append((pool, runtime_artifact))
+            except (PublicationRuntimeError, ValueError, ImportError, KeyError, TypeError) as exc:
+                metric, runtime_artifact = ({"scorer": "runtime_elastic_net_unavailable", "reason": str(exc), "training_row_count": 0, "holdout_row_count": 0}, None)
+        elif runtime_production:
+            metric, runtime_artifact = ({"scorer": "runtime_unsupported_price_line", "reason": "runtime_contract_not_available_for_price_line", "training_row_count": 0, "holdout_row_count": 0}, None)
+        else:
+            metric, runtime_artifact = _replay_metrics(rows, pool)
         pool_metrics.append({"currency": pool["currency"], "server": pool["server"], "price_line": pool["price_line"], **metric})
         pool_summary.append({"currency": pool["currency"], "server": pool["server"], "price_line": pool["price_line"],
                              "training_cluster_count": len(pool["training_cluster_ids"]),
                              "holdout_cluster_count": len(pool["holdout_cluster_ids"]), "cut_date": pool["cut_date"]})
-    pool_reasons = {f"{metric['currency']}:{metric['server']}:{metric['price_line']}": _gate_reasons(metric) for metric in pool_metrics}
+    pool_reasons = {f"{metric['currency']}:{metric['server']}:{metric['price_line']}": _gate_reasons(metric) if metric["scorer"] not in {"runtime_elastic_net_unavailable", "runtime_unsupported_price_line"} else ([] if metric["scorer"] == "runtime_unsupported_price_line" else [metric["reason"]]) for metric in pool_metrics}
     failed = [f"{name}:{reason}" for name, reasons in pool_reasons.items() for reason in reasons]
     metrics = {"replay_kind": "evaluator_owned_train_only_signed_account_feature_linear", "market_pools": pool_metrics}
     if failed:
         return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
                 "blocking_reasons": sorted(set(failed))}
+    if runtime_production and len(runtime_artifacts) == 1 and not failed:
+        pool, expected_artifact = runtime_artifacts[0]
+        artifact_path = (ROOT if root is None else root) / "modeling/artifacts/elastic-net-normal_listing.json"
+        try:
+            actual_artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            actual_artifact = None
+        if actual_artifact != expected_artifact:
+            return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
+                    "blocking_reasons": ["runtime_artifact_missing_or_not_exact_train_only_replay"]}
+        binding = {"price_line": "normal_listing", "model_type": "elastic_net", "dataset_sha256": common["dataset_sha256"],
+                   "dataset_manifest_sha256": common["dataset_manifest_sha256"], "split_sha256": common["split_sha256"],
+                   "model_sha256": canonical_sha256(expected_artifact["prediction_contract"]),
+                   "artifact_sha256": hashlib.sha256(artifact_path.read_bytes()).hexdigest().upper()}
+        return {**common, "status": "passed", "publication_ready": True, "artifact_bindings": [binding],
+                "eligible_market_pools": pool_summary, "metrics": metrics, "blocking_reasons": []}
     # This proves a replayable account-feature path, but it is not an Elastic
     # Net/XGBoost runtime artifact.  Keep publication locked until that exact
     # runtime contract is evaluated; never bless a date-only substitute.
@@ -320,7 +437,7 @@ def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = 
     expected_manifest, _split = build_publication_dataset(root.resolve())
     if manifest != expected_manifest:
         raise PublicationEvaluationError("dataset_manifest_differs_from_deterministic_root_replay")
-    return _evaluate(expected_manifest, submitted_split, artifact=artifact, predictions=predictions)
+    return _evaluate(expected_manifest, submitted_split, artifact=artifact, predictions=predictions, root=root.resolve())
 
 
 def evaluate_synthetic_for_test(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, artifact: Any = None,
@@ -333,7 +450,7 @@ def evaluate_synthetic_for_test(manifest: dict[str, Any], submitted_split: dict[
 
 def build(root: Path) -> dict[str, Any]:
     manifest, _split = build_publication_dataset(root.resolve())
-    return _evaluate(manifest)
+    return _evaluate(manifest, root=root.resolve())
 
 
 def main() -> None:

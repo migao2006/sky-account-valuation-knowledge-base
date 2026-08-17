@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.7.0-p3.5 — 2026-08-17
+
+- 新增 Days of Fortune FAQ 1264 core-five 的五件 canonical identity、歷史取得成本與活動期間證據。
+- 新增 release 外部的授權市場 provider onboarding 契約；來源 bytes、catalog provenance 與去識別欄位可預檢，但供應者自證的 account／cluster digest 不被當成獨立性證明，因此正式訓練仍拒絕這些列。
+- 新增 parser review queue、決策 receipt、分歧裁決與 candidate-ledger 契約；因公開 unsalted input hash 無法證明 held-out 真正隱藏，盲檢 packet 發行在外部 keyed commitment 協定完成前保持 fail closed。
+- 新增 production-signed normal-listing Elastic Net runtime 路徑；訓練只讀凍結 train clusters，evaluator 重播 holdout、OOD、subgroup 與區間契約，並以 exact artifact binding 解鎖。
+- 現有授權 dataset 與人工 gold 仍為空，因此正式 artifact 繼續為 `insufficient_training_data`，估價維持 fail closed。
+
 ## 4.6.0-p3.4 — 2026-08-17
 
 - 新增 Cinnamoroll Pop-Up Cafe FAQ 1308 六項可重播官方／vendor identity 與歷史成本證據。

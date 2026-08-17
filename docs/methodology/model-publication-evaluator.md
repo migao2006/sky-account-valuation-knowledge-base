@@ -27,6 +27,13 @@ subgroup below 30 cases.
 The feature-linear evaluator is deliberately **not** a runtime artifact: even
 when its gates pass, it returns `evaluation_required` with
 `runtime_compatible_feature_artifact_required`. Runtime publication remains
-reserved for separately replayed Elastic Net/XGBoost artifacts. A self-reported
+reserved for separately replayed Elastic Net/XGBoost artifacts. P3.5 adds the
+first such path only for `elastic_net` + `normal_listing`: the evaluator
+reconstructs its portable JSON contract from exactly the frozen train clusters,
+scores only the frozen holdout, and accepts a local artifact only if its parsed
+bytes exactly equal that reconstruction. The evaluator, not the artifact,
+creates the dataset/split/model/artifact hash binding. Test-only synthetic
+fixtures cannot create a production binding. Urgent-sale and XGBoost remain
+insufficient until they receive their own runtime contracts. A self-reported
 artifact status or metric cannot advance the report. The current production
 data has no qualifying pool and therefore stays `not_ready`.

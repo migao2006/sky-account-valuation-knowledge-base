@@ -37,7 +37,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1369
+        "source_references": 1367
       },
       "requirement": "no catalog review scope or source-scoped reference remains unresolved",
       "evidence_paths": [
@@ -71,7 +71,7 @@
       "contract_id": "catalog.all_canonical_verified",
       "passed": false,
       "actual": {
-        "canonical_items": 118,
+        "canonical_items": 123,
         "non_verified_count": 79,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -164,7 +164,7 @@
       "contract_id": "catalog.required_field_evidence",
       "passed": false,
       "actual": {
-        "items_missing_required_fields": 118,
+        "items_missing_required_fields": 123,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_status",
@@ -1063,6 +1063,41 @@
             "item_category",
             "permanent_account_item",
             "source_type"
+          ],
+          "item_days_of_fortune_dragon_bangles": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_fortune_dragon_vestment": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_fortune_dragon_stole": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_fortune_dragon_mask": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_fortune_drum": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
           ]
         },
         "registry_replay_error_count": 0
@@ -1186,7 +1221,7 @@
       "contract_id": "catalog.visual_state_verified",
       "passed": false,
       "actual": {
-        "items_without_actual_visual_evidence": 118,
+        "items_without_actual_visual_evidence": 123,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -1235,12 +1270,17 @@
           "item_days_of_color_color_bubble_machine",
           "item_days_of_color_color_glam_cut",
           "item_days_of_color_dark_rainbow_mask",
+          "item_days_of_fortune_dragon_bangles",
+          "item_days_of_fortune_dragon_stole",
+          "item_days_of_fortune_dragon_vestment",
           "item_days_of_sunlight_helios_hoops",
           "item_days_of_sunlight_manta_float",
           "item_days_of_sunlight_woven_wrap",
           "item_days_rainbow_double_flower",
           "item_days_rainbow_earrings",
           "item_days_rainbow_headphones",
+          "item_fortune_dragon_mask",
+          "item_fortune_drum",
           "item_journey_hair",
           "item_journey_mask",
           "item_journey_pack_cape",
@@ -1320,7 +1360,7 @@
       "contract_id": "catalog.model_eligible_positive",
       "passed": true,
       "actual": {
-        "verified": 39,
+        "verified": 44,
         "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",

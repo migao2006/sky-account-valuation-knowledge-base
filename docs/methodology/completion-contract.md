@@ -63,6 +63,6 @@ P0 至 P3.2 的 image evidence 只是資料契約，不是 OCR 或圖示辨識�
 
 ## 目前狀態
 
-截至 P3.4，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,498 筆離線查詢索引。39 筆 canonical item 具有受限、可重播的 identity 證據鏈，其中 19 筆只允許官方精確英文 observation token；但 1,369 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場／parser 人工 gold、near-miss approved evidence、verified sale、真實圖片資產與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
+截至 P3.5，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,503 筆離線查詢索引。44 筆 canonical item 具有受限、可重播的 identity 證據鏈，其中 19 筆只允許官方精確英文 observation token；但 1,367 筆 collectible observation 仍 unresolved，且 3,266 筆 scope disposition 都尚未有獨立的 approved scope decision。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場／parser 人工 gold、near-miss approved evidence、verified sale、真實圖片資產與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P3.4 的 publication evaluator 會重播簽署的帳號 feature payload，日期只用於時間前推切分；合成 300/100 fixture 可驗證指標計算，但沒有 runtime-compatible 正式 artifact 時仍回 `evaluation_required`。Parser review onboarding 會在 release 外建立獨立 A/B commitments，只有分歧才允許裁決；market gold evaluator 也不再用單純筆數冒充準確率。正式資料仍未達樣本與真人標註門檻，因此 `publication_ready=false`；合成測試只能證明管線可前進，不能充當正式完成證據。
+P3.5 的 publication evaluator 已具備 normal-listing portable Elastic Net 的 train-only 重建、cluster-weighted holdout、OOD／subgroup／interval 門檻與 runtime parity；但正式市場資料尚無外部簽署 identity→cluster 獨立性證明，所以不會進入訓練池。Parser review 也因公開 unsalted input hash 可回推 split，在外部 keyed commitment 與私有 split mapping 完成前不發行盲檢 packet。正式資料仍未達樣本與真人標註門檻，因此 `publication_ready=false`；合成測試只能證明計算與 fail-closed 邊界，不能充當正式完成證據。

@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import hmac
 import subprocess
 import tempfile
 from pathlib import Path
@@ -20,6 +21,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_STRATA = ("account_type", "era", "season", "collaboration", "set_context")
+STRATUM_VALUE_PATTERN = re.compile(r"bucket_[0-9]{1,2}")
 QUEUE_SIZE = 200
 SPLIT_SIZE = QUEUE_SIZE // 2
 COMMITMENT_NAMESPACE = "sky-parser-review-commitment-v1"
@@ -60,6 +62,22 @@ def _outside_root(path: Path, root: Path, purpose: str) -> Path:
     raise ValueError(f"{purpose} must be outside the release root")
 
 
+def _safe_workflow_output(path: Path, root: Path, purpose: str) -> Path:
+    """P3.5 handoff artifacts are external-only and cannot impersonate gold."""
+    resolved = _outside_root(path, root, purpose)
+    if resolved.name.lower() in {"claims.jsonl", "claims.json", "formal-gold.json", "parser-gold.json"}:
+        raise ValueError(f"{purpose} may not use a reserved formal-gold filename")
+    return resolved
+
+
+def _safe_queue_manifest_output(path: Path, root: Path) -> Path:
+    """The only allowed in-root queue artifact is the anonymous manifest."""
+    resolved = path.expanduser().resolve(); allowed = (root.resolve() / "data/review/parser-gold/review-queue-manifest.json").resolve()
+    if resolved == allowed:
+        return resolved
+    return _safe_workflow_output(resolved, root, "queue manifest output")
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -74,8 +92,8 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def _strata(value: Any) -> dict[str, str]:
     if not isinstance(value, dict) or set(value) != set(REQUIRED_STRATA):
         raise ValueError("review source rows require exactly the five approved strata")
-    if any(not isinstance(value[key], str) or not value[key] for key in REQUIRED_STRATA):
-        raise ValueError("review strata values must be nonempty strings")
+    if any(not isinstance(value[key], str) or not STRATUM_VALUE_PATTERN.fullmatch(value[key]) for key in REQUIRED_STRATA):
+        raise ValueError("review strata values must be approved low-cardinality opaque buckets")
     return {key: value[key] for key in REQUIRED_STRATA}
 
 
@@ -114,6 +132,7 @@ def build_queue(root: Path, source: Path, source_sha256: str, manifest_out: Path
     """Freeze exactly 100 development and 100 held-out anonymous queue rows."""
     source = _outside_root(source, root, "review source")
     packet_dir = _outside_root(packet_dir, root, "restricted review packet directory")
+    manifest_out = _safe_queue_manifest_output(manifest_out, root)
     if digest(source.read_bytes()) != source_sha256.upper():
         raise ValueError("review source SHA-256 does not match injected digest")
     candidates: dict[str, tuple[dict[str, Any], dict[str, Any], dict[str, str]]] = {}
@@ -165,7 +184,13 @@ def _decision_payload(row: dict[str, Any]) -> dict[str, Any]:
     if set(row) != allowed:
         raise ValueError("decision contains unsupported fields")
     payload = {key: row[key] for key in allowed - {"decision_commitment_sha256"}}
-    if not isinstance(payload["expected_canonical_item_ids"], list) or not payload["expected_canonical_item_ids"] or len(payload["expected_canonical_item_ids"]) != len(set(payload["expected_canonical_item_ids"])):
+    if not isinstance(payload["decision_id"], str) or not re.fullmatch(r"(?:receipt|annotator_[ab])_[a-z0-9_]{1,64}", payload["decision_id"]):
+        raise ValueError("decision ID is invalid")
+    if not isinstance(payload["queue_id"], str) or not re.fullmatch(r"parser_review_[a-f0-9]{20}", payload["queue_id"]) or not isinstance(payload["input_sha256"], str) or not re.fullmatch(r"[A-F0-9]{64}", payload["input_sha256"]):
+        raise ValueError("decision queue or input hash is invalid")
+    if payload["reviewer"] not in {"annotator_a", "annotator_b"}:
+        raise ValueError("decision reviewer is invalid")
+    if not isinstance(payload["expected_canonical_item_ids"], list) or not payload["expected_canonical_item_ids"] or len(payload["expected_canonical_item_ids"]) != len(set(payload["expected_canonical_item_ids"])) or any(not isinstance(item, str) or not re.fullmatch(r"item_[a-z0-9_]+", item) for item in payload["expected_canonical_item_ids"]):
         raise ValueError("decision requires unique canonical item IDs")
     if payload["expected_polarity"] not in {"owned", "confirmed_missing", "unknown"}:
         raise ValueError("decision has unsupported polarity")
@@ -178,13 +203,13 @@ def _fingerprint(public_key: str) -> str | None:
     return fields[1] if result.returncode == 0 and len(fields) >= 2 else None
 
 
-def _verify_decision_ledger(path: Path, reviewer: str, root: Path) -> list[dict[str, Any]]:
+def _verify_decision_ledger(path: Path, reviewer: str, root: Path, queue_manifest_sha256: str) -> list[dict[str, Any]]:
     path = _outside_root(path, root, f"reviewer {reviewer} decisions")
     rows = _read_jsonl(path); sidecar = path.with_suffix(path.suffix + ".commitment.json")
     try: commitment = json.loads(sidecar.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc: raise ValueError(f"{reviewer} signed decision commitment is missing: {exc}") from exc
-    allowed = {"schema_version", "reviewer", "decision_ledger_sha256", "public_key", "fingerprint", "signature_file"}
-    if not isinstance(commitment, dict) or set(commitment) != allowed or commitment.get("schema_version") != "1.0-p3.4" or commitment.get("reviewer") != reviewer or commitment.get("decision_ledger_sha256") != digest(b"".join(canonical_bytes(row) for row in rows)):
+    allowed = {"schema_version", "reviewer", "queue_manifest_sha256", "decision_ledger_sha256", "public_key", "fingerprint", "signature_file"}
+    if not isinstance(commitment, dict) or set(commitment) != allowed or commitment.get("schema_version") != "1.0-p3.5" or commitment.get("reviewer") != reviewer or commitment.get("queue_manifest_sha256") != queue_manifest_sha256 or commitment.get("decision_ledger_sha256") != digest(b"".join(canonical_bytes(row) for row in rows)):
         raise ValueError(f"{reviewer} signed decision commitment does not bind its ledger")
     public_key = commitment.get("public_key"); fingerprint = _fingerprint(public_key) if isinstance(public_key, str) else None
     if not fingerprint or commitment.get("fingerprint") != fingerprint: raise ValueError(f"{reviewer} decision signer key is invalid")
@@ -198,6 +223,31 @@ def _verify_decision_ledger(path: Path, reviewer: str, root: Path) -> list[dict[
     return rows
 
 
+def _verify_adjudication_ledger(path: Path, root: Path, queue_manifest_sha256: str) -> tuple[list[dict[str, Any]], str]:
+    """Verify a third-party OpenSSH signature over the final adjudications."""
+    path = _outside_root(path, root, "adjudications")
+    rows = _read_jsonl(path); sidecar = path.with_suffix(path.suffix + ".commitment.json")
+    try:
+        commitment = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"adjudicator signed receipt is missing: {exc}") from exc
+    allowed = {"schema_version", "reviewer", "queue_manifest_sha256", "adjudication_ledger_sha256", "public_key", "fingerprint", "signature_file"}
+    if not isinstance(commitment, dict) or set(commitment) != allowed or commitment.get("schema_version") != "1.0-p3.5" or commitment.get("reviewer") != "adjudicator" or commitment.get("queue_manifest_sha256") != queue_manifest_sha256 or commitment.get("adjudication_ledger_sha256") != digest(b"".join(canonical_bytes(row) for row in rows)):
+        raise ValueError("adjudicator signed receipt does not bind its ledger")
+    public_key = commitment.get("public_key"); fingerprint = _fingerprint(public_key) if isinstance(public_key, str) else None
+    if not fingerprint or commitment.get("fingerprint") != fingerprint:
+        raise ValueError("adjudicator signer key is invalid")
+    signature_name = commitment.get("signature_file")
+    if not isinstance(signature_name, str) or Path(signature_name).name != signature_name:
+        raise ValueError("adjudicator signature path is invalid")
+    with tempfile.TemporaryDirectory(prefix="parser-review-") as temporary:
+        allowed_signers = Path(temporary) / "allowed_signers"; allowed_signers.write_text(f"adjudicator {public_key.strip()}\n", encoding="utf-8")
+        result = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", str(allowed_signers), "-I", "adjudicator", "-n", COMMITMENT_NAMESPACE, "-s", str(sidecar.parent / signature_name)], input=canonical_bytes({key: value for key, value in commitment.items() if key != "signature_file"}), capture_output=True, check=False)
+    if result.returncode:
+        raise ValueError("adjudicator signed receipt verification failed")
+    return rows, fingerprint
+
+
 def verify_decision_commitments(manifest: dict[str, Any], decisions_a: Path, decisions_b: Path, adjudications: Path | None, root: Path) -> dict[str, Any]:
     """Verify reviewer independence; returns candidates only, never formal gold."""
     errors = validate_manifest(manifest)
@@ -207,7 +257,7 @@ def verify_decision_commitments(manifest: dict[str, Any], decisions_a: Path, dec
     expected = {row["queue_id"]: row for row in queue}
     def load(path: Path, reviewer: str) -> dict[str, dict[str, Any]]:
         result = {}
-        for row in _verify_decision_ledger(path, reviewer, root):
+        for row in _verify_decision_ledger(path, reviewer, root, manifest["manifest_sha256"]):
             payload = _decision_payload(row)
             if payload["reviewer"] != reviewer or row["decision_commitment_sha256"] != digest(canonical_bytes(payload)):
                 raise ValueError(f"{reviewer} decision commitment is invalid")
@@ -227,27 +277,213 @@ def verify_decision_commitments(manifest: dict[str, Any], decisions_a: Path, dec
     disagreements = {qid for qid in expected if comparable(a[qid]) != comparable(b[qid])}
     adj: dict[str, dict[str, Any]] = {}
     if adjudications is not None:
-        for row in _read_jsonl(_outside_root(adjudications, root, "adjudications")):
-            allowed = {"adjudication_id", "queue_id", "annotator_a_commitment_sha256", "annotator_b_commitment_sha256", "adjudicator_commitment_sha256"}
-            if set(row) != allowed or not isinstance(row.get("queue_id"), str) or row["queue_id"] in adj:
+        rows, adjudicator_fingerprint = _verify_adjudication_ledger(adjudications, root, manifest["manifest_sha256"])
+        if adjudicator_fingerprint in {signer(decisions_a), signer(decisions_b)}:
+            raise ValueError("adjudicator requires a third independent signing key")
+        for row in rows:
+            allowed = {"adjudication_id", "queue_id", "input_sha256", "annotator_a_commitment_sha256", "annotator_b_commitment_sha256", "final_canonical_item_ids", "final_polarity", "adjudicator_receipt_sha256"}
+            if set(row) != allowed or not isinstance(row.get("adjudication_id"), str) or not re.fullmatch(r"adjudication_[a-z0-9_]{1,64}", row["adjudication_id"]) or not isinstance(row.get("queue_id"), str) or row["queue_id"] in adj:
                 raise ValueError("adjudication has unsupported fields or duplicate queue ID")
             qid = row["queue_id"]
-            if qid not in expected or row["annotator_a_commitment_sha256"] != a[qid]["decision_commitment_sha256"] or row["annotator_b_commitment_sha256"] != b[qid]["decision_commitment_sha256"]:
+            payload = {key: value for key, value in row.items() if key != "adjudicator_receipt_sha256"}
+            if qid not in expected or row["input_sha256"] != expected[qid]["input_sha256"] or row["annotator_a_commitment_sha256"] != a[qid]["decision_commitment_sha256"] or row["annotator_b_commitment_sha256"] != b[qid]["decision_commitment_sha256"]:
                 raise ValueError("adjudication must link the two immutable A/B commitments")
-            if not isinstance(row["adjudicator_commitment_sha256"], str) or len(row["adjudicator_commitment_sha256"]) != 64:
-                raise ValueError("adjudication requires an external adjudicator commitment digest")
+            if row["adjudicator_receipt_sha256"] != digest(canonical_bytes(payload)) or not isinstance(row["final_canonical_item_ids"], list) or not row["final_canonical_item_ids"] or len(row["final_canonical_item_ids"]) != len(set(row["final_canonical_item_ids"])) or any(not isinstance(item, str) or not re.fullmatch(r"item_[a-z0-9_]+", item) for item in row["final_canonical_item_ids"]) or row["final_polarity"] not in {"owned", "confirmed_missing", "unknown"}:
+                raise ValueError("adjudication requires a signed final result receipt")
             adj[qid] = row
     if set(adj) != disagreements:
         raise ValueError("adjudications must exist only and exactly for A/B disagreements")
     return {"status": "candidate_labels_only", "queue_manifest_sha256": manifest["manifest_sha256"], "agreement_count": len(expected) - len(disagreements), "disagreement_count": len(disagreements), "formal_gold_written": False}
 
 
+def _assignment_id(reviewer: str, queue_id: str, blind_secret: str) -> str:
+    """Stable external-only opaque handle; never derive it from a public ID alone."""
+    if not blind_secret or len(blind_secret) < 16:
+        raise ValueError("blind assignment secret must contain at least 16 characters")
+    token = hmac.new(blind_secret.encode("utf-8"), f"{reviewer}:{queue_id}".encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"assignment_{reviewer}_{token[:24]}"
+
+
+def _load_verified_restricted_packets(manifest: dict[str, Any], packet_dir: Path, root: Path) -> dict[str, dict[str, Any]]:
+    """Replay every restricted row against the frozen queue, not just file hashes."""
+    packet_dir = _outside_root(packet_dir, root, "restricted review packet directory")
+    raw: dict[str, dict[str, Any]] = {}
+    frozen_rows = {queue["queue_id"]: queue for queue in manifest["queue"]}
+    for split in ("development", "heldout"):
+        path = packet_dir / f"parser-review-{split}-restricted.jsonl"; content = path.read_bytes()
+        if digest(content) != manifest["restricted_packet_sha256"][split]:
+            raise ValueError(f"restricted {split} packet digest does not match frozen manifest")
+        for row in _read_jsonl(path):
+            if set(row) != {"queue_id", "input_sha256", "strata", "split", "profile", "listing"}:
+                raise ValueError("restricted packet has unsupported fields")
+            if input_sha256(row["profile"], row["listing"]) != row["input_sha256"]:
+                raise ValueError("restricted packet input hash does not replay profile/listing")
+            frozen = frozen_rows.get(row["queue_id"])
+            if not frozen or row["input_sha256"] != frozen["input_sha256"] or row["split"] != split or row["split"] != frozen["split"] or row["strata"] != frozen["strata"]:
+                raise ValueError("restricted packet does not exactly match frozen queue split/strata/input")
+            if row["queue_id"] in raw:
+                raise ValueError("restricted packets contain duplicate queue IDs")
+            raw[row["queue_id"]] = row
+    if set(raw) != set(frozen_rows):
+        raise ValueError("restricted packets do not exactly cover frozen queue")
+    return raw
+
+
+def build_blind_packages(manifest: dict[str, Any], packet_dir: Path, output_dir: Path, blind_secret: str, root: Path) -> dict[str, Any]:
+    """Issue separate A/B packets outside the release root.
+
+    Packets retain restricted replay data, while their returned/reportable ledger
+    contains only opaque assignment IDs and cryptographic bindings.  Split and
+    queue identifiers are intentionally absent from reviewer packets.
+    """
+    # The public queue currently exposes unsalted input_sha256 plus split.  A
+    # reviewer can recompute that hash from this packet's profile/listing and
+    # join it back to the held-out mapping.  Do not issue a falsely "blind"
+    # packet until an external keyed commitment/mapping protocol replaces it.
+    raise ValueError("blind package issuance is disabled: public unsalted input hashes make held-out assignments linkable; require external keyed commitments and split mapping")
+
+
+def _quarantined_unissuable_blind_packet_implementation(manifest: dict[str, Any], packet_dir: Path, output_dir: Path, blind_secret: str, root: Path) -> dict[str, Any]:
+    """Removed issuer retained as an explicit fail-closed compatibility stub."""
+    raise ValueError("unsafe blind packet issuer was removed; external keyed commitments and split mapping are required")
+
+
+def _validate_issued_assignment(assignment: dict[str, Any], ledger: dict[str, Any]) -> None:
+    required = {"schema_version", "status", "queue_manifest_sha256", "assignment_count", "assignments", "formal_gold_written", "ledger_sha256"}
+    if not isinstance(ledger, dict) or set(ledger) != required or ledger.get("schema_version") != "1.0-p3.5" or ledger.get("status") != "external_blind_packets_issued" or ledger.get("formal_gold_written") is not False or ledger.get("assignment_count") != 400:
+        raise ValueError("issued assignment ledger is malformed")
+    if ledger.get("ledger_sha256") != digest(canonical_bytes({key: value for key, value in ledger.items() if key != "ledger_sha256"})):
+        raise ValueError("issued assignment ledger digest is invalid")
+    assignments = ledger.get("assignments")
+    if not isinstance(assignments, list) or len(assignments) != 400 or len({row.get("assignment_id") for row in assignments if isinstance(row, dict)}) != 400:
+        raise ValueError("issued assignment ledger assignment count or IDs are invalid")
+    for row in assignments:
+        if not isinstance(row, dict) or set(row) != {"assignment_id", "reviewer", "input_sha256"} or not isinstance(row.get("assignment_id"), str) or not re.fullmatch(r"assignment_annotator_[ab]_[a-f0-9]{24}", row["assignment_id"]) or row.get("reviewer") not in {"annotator_a", "annotator_b"} or not isinstance(row.get("input_sha256"), str) or not re.fullmatch(r"[A-F0-9]{64}", row["input_sha256"]):
+            raise ValueError("issued assignment ledger contains invalid assignment fields")
+    if set(assignment) != {"assignment_id", "reviewer", "input_sha256"} or assignment not in ledger["assignments"]:
+        raise ValueError("receipt assignment is not present in issued assignment ledger")
+
+
+def canonical_decision_receipt_payload(assignment: dict[str, Any], decision: dict[str, Any], queue_id: str, issued_assignment_ledger: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    """Convert an opaque assignment into the verifier-compatible signed row.
+
+    The queue ID is resolved only by the controlled receipt consumer, after the
+    reviewer has submitted an opaque assignment; it is never in blind packets.
+    """
+    _validate_issued_assignment(assignment, issued_assignment_ledger)
+    manifest_errors = validate_manifest(manifest)
+    if manifest_errors or issued_assignment_ledger["queue_manifest_sha256"] != manifest.get("manifest_sha256"):
+        raise ValueError("receipt does not bind a valid frozen queue manifest")
+    if queue_id not in {row["queue_id"] for row in manifest["queue"]}:
+        raise ValueError("receipt queue ID is not in frozen manifest")
+    allowed = {"expected_canonical_item_ids", "expected_polarity"}
+    if set(decision) != allowed:
+        raise ValueError("receipt decision has unsupported fields")
+    items, polarity = decision["expected_canonical_item_ids"], decision["expected_polarity"]
+    if not isinstance(items, list) or not items or len(items) != len(set(items)) or any(not isinstance(item, str) or not re.fullmatch(r"item_[a-z0-9_]+", item) for item in items):
+        raise ValueError("receipt requires unique canonical item IDs")
+    if polarity not in {"owned", "confirmed_missing", "unknown"}:
+        raise ValueError("receipt polarity is invalid")
+    if not isinstance(queue_id, str) or not re.fullmatch(r"parser_review_[a-f0-9]{20}", queue_id):
+        raise ValueError("receipt queue ID is invalid")
+    payload = {"decision_id": "receipt_" + digest(assignment["assignment_id"].encode("utf-8"))[:20].lower(), "queue_id": queue_id, "input_sha256": assignment["input_sha256"], "reviewer": assignment["reviewer"], "expected_canonical_item_ids": items, "expected_polarity": polarity}
+    return payload | {"decision_commitment_sha256": digest(canonical_bytes(payload))}
+
+
+def build_conflict_packet(manifest: dict[str, Any], decisions_a: Path, decisions_b: Path, output: Path, root: Path) -> dict[str, Any]:
+    """Create a minimal adjudication packet for precisely the A/B conflicts."""
+    # We deliberately do not call the verifier above: it rejects a missing
+    # adjudication by design.  Load and compare signed ledgers using its same
+    # strict parsers, then export no raw replay data.
+    errors = validate_manifest(manifest)
+    if errors:
+        raise ValueError("invalid queue manifest: " + "; ".join(errors))
+    a = {row["queue_id"]: row for row in _verify_decision_ledger(decisions_a, "annotator_a", root, manifest["manifest_sha256"])}
+    b = {row["queue_id"]: row for row in _verify_decision_ledger(decisions_b, "annotator_b", root, manifest["manifest_sha256"])}
+    def signer(path: Path) -> str:
+        return json.loads(path.with_suffix(path.suffix + ".commitment.json").read_text(encoding="utf-8"))["fingerprint"]
+    if signer(decisions_a) == signer(decisions_b):
+        raise ValueError("annotator A and B require independent signing keys")
+    expected = {row["queue_id"]: row for row in manifest.get("queue", [])}
+    if set(a) != set(expected) or set(b) != set(expected):
+        raise ValueError("both reviewer ledgers must cover the frozen queue before adjudication")
+    for reviewer, ledger in (("annotator_a", a), ("annotator_b", b)):
+        for qid, row in ledger.items():
+            payload = _decision_payload(row)
+            if payload["reviewer"] != reviewer or row["decision_commitment_sha256"] != digest(canonical_bytes(payload)) or payload["input_sha256"] != expected[qid]["input_sha256"]:
+                raise ValueError("conflict packet decisions do not exactly bind frozen queue inputs")
+    conflicts = []
+    for qid in sorted(expected):
+        left, right = _decision_payload(a[qid]), _decision_payload(b[qid])
+        if a[qid].get("decision_commitment_sha256") != digest(canonical_bytes(left)) or b[qid].get("decision_commitment_sha256") != digest(canonical_bytes(right)):
+            raise ValueError("conflict packet requires immutable decision commitments")
+        if (left["expected_canonical_item_ids"], left["expected_polarity"]) != (right["expected_canonical_item_ids"], right["expected_polarity"]):
+            conflicts.append({"conflict_id": "conflict_" + digest(qid.encode("utf-8"))[:20].lower(), "queue_id": qid, "input_sha256": expected[qid]["input_sha256"], "annotator_a_commitment_sha256": a[qid]["decision_commitment_sha256"], "annotator_b_commitment_sha256": b[qid]["decision_commitment_sha256"]})
+    output = _safe_workflow_output(output, root, "adjudication packet")
+    packet = {"schema_version": "1.0-p3.5", "status": "external_conflict_only_adjudication", "queue_manifest_sha256": manifest.get("manifest_sha256"), "conflict_count": len(conflicts), "conflicts": conflicts, "formal_gold_written": False}
+    packet["packet_sha256"] = digest(canonical_bytes(packet))
+    output.write_bytes(canonical_bytes(packet))
+    return packet
+
+
+def preflight_report(manifest: dict[str, Any], packet_dir: Path, root: Path) -> dict[str, Any]:
+    """Safe report: verifies readiness without exposing restricted content."""
+    errors = validate_manifest(manifest)
+    if not errors:
+        try:
+            _load_verified_restricted_packets(manifest, packet_dir, root)
+        except (OSError, ValueError) as exc:
+            errors.append(f"restricted packet verification failed: {exc}")
+    errors.append("blind issuance disabled: public unsalted input hashes make held-out assignments linkable; external keyed commitments and split mapping are required")
+    return {"schema_version": "1.0-p3.5", "status": "ready_for_external_review" if not errors else "not_ready", "queue_manifest_sha256": manifest.get("manifest_sha256"), "queue_size": manifest.get("queue_size"), "errors": errors, "formal_gold_written": False}
+
+
+def import_candidate_ledger(manifest: dict[str, Any], decisions_a: Path, decisions_b: Path, adjudications: Path | None, output: Path, root: Path) -> dict[str, Any]:
+    """Import verified external decisions into a non-gold, hash-only candidate ledger."""
+    output = _safe_workflow_output(output, root, "candidate import output")
+    summary = verify_decision_commitments(manifest, decisions_a, decisions_b, adjudications, root)
+    a = {row["queue_id"]: row for row in _verify_decision_ledger(decisions_a, "annotator_a", root, manifest["manifest_sha256"])}
+    b = {row["queue_id"]: row for row in _verify_decision_ledger(decisions_b, "annotator_b", root, manifest["manifest_sha256"])}
+    candidates = []
+    for queue in manifest["queue"]:
+        qid = queue["queue_id"]
+        left, right = _decision_payload(a[qid]), _decision_payload(b[qid])
+        if (left["expected_canonical_item_ids"], left["expected_polarity"]) == (right["expected_canonical_item_ids"], right["expected_polarity"]):
+            candidates.append({"candidate_id": "candidate_" + digest(qid.encode("utf-8"))[:20].lower(), "input_sha256": queue["input_sha256"], "expected_canonical_item_ids": left["expected_canonical_item_ids"], "expected_polarity": left["expected_polarity"], "source": "independent_ab_agreement"})
+    ledger = {"schema_version": "1.0-p3.5", "status": "candidate_labels_only", "queue_manifest_sha256": manifest["manifest_sha256"], "candidate_count": len(candidates), "conflict_count": summary["disagreement_count"], "candidates": candidates, "formal_gold_written": False}
+    ledger["ledger_sha256"] = digest(canonical_bytes(ledger))
+    output.write_bytes(canonical_bytes(ledger))
+    return ledger
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Freeze parser review packets outside the release root.")
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build-queue"); build.add_argument("--source", type=Path, required=True); build.add_argument("--source-sha256", required=True); build.add_argument("--manifest-out", type=Path, required=True); build.add_argument("--packet-dir", type=Path, required=True); build.add_argument("--root", type=Path, default=ROOT)
+    packages = sub.add_parser("build-blind-packages"); packages.add_argument("--manifest", type=Path, required=True); packages.add_argument("--packet-dir", type=Path, required=True); packages.add_argument("--output-dir", type=Path, required=True); packages.add_argument("--blind-secret", required=True); packages.add_argument("--root", type=Path, default=ROOT)
+    receipt = sub.add_parser("decision-receipt-payload"); receipt.add_argument("--assignment", type=Path, required=True); receipt.add_argument("--assignment-ledger", type=Path, required=True); receipt.add_argument("--decision", type=Path, required=True); receipt.add_argument("--manifest", type=Path, required=True); receipt.add_argument("--output", type=Path, required=True); receipt.add_argument("--root", type=Path, default=ROOT)
+    conflict = sub.add_parser("build-conflict-packet"); conflict.add_argument("--manifest", type=Path, required=True); conflict.add_argument("--decisions-a", type=Path, required=True); conflict.add_argument("--decisions-b", type=Path, required=True); conflict.add_argument("--output", type=Path, required=True); conflict.add_argument("--root", type=Path, default=ROOT)
+    preflight = sub.add_parser("preflight"); preflight.add_argument("--manifest", type=Path, required=True); preflight.add_argument("--packet-dir", type=Path, required=True); preflight.add_argument("--output", type=Path, required=True); preflight.add_argument("--root", type=Path, default=ROOT)
+    importer = sub.add_parser("import-candidate-ledger"); importer.add_argument("--manifest", type=Path, required=True); importer.add_argument("--decisions-a", type=Path, required=True); importer.add_argument("--decisions-b", type=Path, required=True); importer.add_argument("--adjudications", type=Path); importer.add_argument("--output", type=Path, required=True); importer.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args()
     if args.command == "build-queue": build_queue(args.root.resolve(), args.source, args.source_sha256, args.manifest_out.resolve(), args.packet_dir)
+    elif args.command == "build-blind-packages":
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8")); build_blind_packages(manifest, args.packet_dir, args.output_dir, args.blind_secret, args.root.resolve())
+    elif args.command == "decision-receipt-payload":
+        output = _safe_workflow_output(args.output, args.root.resolve(), "decision receipt payload")
+        assignment = json.loads(args.assignment.read_text(encoding="utf-8")); manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        issued_ledger = json.loads(args.assignment_ledger.read_text(encoding="utf-8")); _validate_issued_assignment(assignment, issued_ledger)
+        if issued_ledger["queue_manifest_sha256"] != manifest.get("manifest_sha256"):
+            raise ValueError("issued assignment ledger does not bind this queue manifest")
+        matches = [row["queue_id"] for row in manifest.get("queue", []) if row["input_sha256"] == assignment.get("input_sha256")]
+        if len(matches) != 1: raise ValueError("assignment does not resolve to exactly one frozen queue row")
+        output.write_bytes(canonical_bytes(canonical_decision_receipt_payload(assignment, json.loads(args.decision.read_text(encoding="utf-8")), matches[0], issued_ledger, manifest)))
+    elif args.command == "build-conflict-packet":
+        build_conflict_packet(json.loads(args.manifest.read_text(encoding="utf-8")), args.decisions_a, args.decisions_b, args.output, args.root.resolve())
+    elif args.command == "preflight":
+        _safe_workflow_output(args.output, args.root.resolve(), "preflight output").write_bytes(canonical_bytes(preflight_report(json.loads(args.manifest.read_text(encoding="utf-8")), args.packet_dir, args.root.resolve())))
+    elif args.command == "import-candidate-ledger":
+        import_candidate_ledger(json.loads(args.manifest.read_text(encoding="utf-8")), args.decisions_a, args.decisions_b, args.adjudications, args.output, args.root.resolve())
 
 
 if __name__ == "__main__": main()

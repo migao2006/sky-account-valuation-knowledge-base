@@ -1,0 +1,24 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1264_days_of_fortune_core_five_2026_08_17",
+  "source_id":"source_tgc_faq_1264_days_of_fortune_core_five",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1264-patch-notes---january-11-2024---0-24-0-240551-ios-playstation-switch-241911-android-huawei/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1264's Days of Fortune 2024 window and five named new-item offers. No HTML, images, current storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2024-01-29",
+    "historical_window_end_date":"2024-02-11",
+    "new_items":[
+      {"item_id":"item_days_of_fortune_dragon_bangles","official_name_en":"Days of Fortune Dragon Bangles earrings","original_currency":"USD","original_cost":1.99},
+      {"item_id":"item_days_of_fortune_dragon_vestment","official_name_en":"Days of Fortune Dragon Vestment outfit","original_currency":"USD","original_cost":9.99},
+      {"item_id":"item_days_of_fortune_dragon_stole","official_name_en":"Days of Fortune Dragon Stole cape","original_currency":"USD","original_cost":14.99},
+      {"item_id":"item_fortune_dragon_mask","official_name_en":"Fortune Dragon Mask","original_currency":"event_currency","original_cost":14},
+      {"item_id":"item_fortune_drum","official_name_en":"Fortune Drum","original_currency":"event_currency","original_cost":34}
+    ]
+  },
+  "non_claims":[
+    "This historical FAQ does not establish current availability, return policy, permanent-account property, or a current storefront state.",
+    "The FAQ does not provide formal Traditional Chinese names, image assets, or a visual match.",
+    "This bounded core-five cohort is not a complete Days of Fortune catalog and asserts no bundle or set membership."
+  ]
+}

@@ -8,8 +8,11 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.modeling.publication_dataset import freeze_synthetic_for_test  # noqa: E402
-from tools.modeling.publication_evaluator import _sha256, build, evaluate, evaluate_synthetic_for_test  # noqa: E402
+from tools.modeling.publication_dataset import freeze_synthetic_for_test, split_synthetic_for_test  # noqa: E402
+from tools.modeling.publication_evaluator import _gate_reasons, _runtime_replay_metrics, _sha256, build, evaluate, evaluate_synthetic_for_test  # noqa: E402
+from tools.modeling.publication_runtime import PublicationRuntimeError, build_expected_artifact  # noqa: E402
+from modeling.train_elastic_net import train_publication_runtime  # noqa: E402
+from tools.validate.schema_validator import OfflineSchemaValidator  # noqa: E402
 
 
 class PublicationEvaluatorTests(unittest.TestCase):
@@ -37,6 +40,12 @@ class PublicationEvaluatorTests(unittest.TestCase):
         self.assertIs(report["artifact_publication_fields_consulted"], False)
         self.assertIsNone(report["metrics"])
         self.assertIn("no_market_pool_meets_300_train_100_time_forward_holdout", report["blocking_reasons"])
+
+    def test_formal_empty_publication_trainer_emits_schema_valid_insufficient_envelope(self):
+        artifact = train_publication_runtime(ROOT)
+        self.assertEqual(artifact["status"], "insufficient_training_data")
+        validator = OfflineSchemaValidator(ROOT / "schemas")
+        self.assertEqual(validator.validate(artifact, ROOT / "schemas/modeling/elastic-net-artifact.schema.json"), [])
 
     def test_sufficient_frozen_fixture_replays_train_only_metrics_but_cannot_publish(self):
         report = evaluate_synthetic_for_test(self.frozen_fixture())
@@ -121,6 +130,128 @@ class PublicationEvaluatorTests(unittest.TestCase):
         with patch("tools.modeling.publication_evaluator.build_publication_dataset", return_value=(expected, {})):
             with self.assertRaisesRegex(Exception, "dataset_manifest_differs_from_deterministic_root_replay"):
                 evaluate(manifest, root=ROOT)
+
+    def test_test_only_synthetic_manifest_cannot_generate_a_runtime_artifact(self):
+        manifest = self.frozen_fixture(trend=True)
+        split = manifest["market_pools"][0]
+        with self.assertRaisesRegex(PublicationRuntimeError, "production_signed"):
+            build_expected_artifact(ROOT, manifest, split)
+
+    def test_runtime_contract_is_normal_listing_only(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = dict(manifest["market_pools"][0]); pool["price_line"] = "urgent_sale"
+        with self.assertRaisesRegex(PublicationRuntimeError, "normal_listing_only"):
+            build_expected_artifact(ROOT, manifest, pool)
+
+    def test_runtime_artifact_fit_is_invariant_to_holdout_targets(self):
+        # This intentionally uses the test-only shape only after changing its
+        # lineage marker; it exercises the pure fitter, not publication.  A
+        # holdout target may alter metrics but must never alter model bytes.
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        first = build_expected_artifact(ROOT, manifest, pool)
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in set(pool["holdout_cluster_ids"]):
+                row["selected_price_twd"] *= 50
+        second = build_expected_artifact(ROOT, manifest, pool)
+        self.assertEqual(first["prediction_contract"], second["prediction_contract"])
+
+    def test_runtime_categorical_only_fixture_is_safe(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        for number, vector in enumerate(manifest["dataset_rows"]):
+            vector["feature_payload"]["feature_groups"] = {"base": {"tier": "a" if number % 2 else "b"}}
+            vector["row_sha256"] = _sha256({key: value for key, value in vector.items() if key != "row_sha256"})
+        manifest["dataset_sha256"] = _sha256(manifest["dataset_rows"])
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        try:
+            artifact = build_expected_artifact(ROOT, manifest, pool)
+        except (PublicationRuntimeError, ValueError):
+            return  # explicit fail-closed is an allowed categorical-only outcome
+        self.assertEqual(artifact["feature_schema"]["continuous_columns"], [])
+        self.assertTrue(artifact["feature_schema"]["categorical_columns"])
+
+    def test_runtime_interval_contract_equals_evaluator_interval(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in set(pool["holdout_cluster_ids"]):
+                row["feature_payload"]["feature_groups"]["synthetic"]["signal"] %= 300
+        rows = manifest["dataset_rows"]
+        metric, artifact = _runtime_replay_metrics(ROOT, manifest, rows, pool)
+        contract = artifact["artifact"]["runtime_interval_contract"]
+        self.assertEqual(metric["interval"]["residual_lower_twd"], contract["residual_lower_twd"])
+        self.assertEqual(metric["interval"]["residual_upper_twd"], contract["residual_upper_twd"])
+
+    def test_runtime_ood_holdout_coverage_blocks_publication(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        holdout_ids = set(pool["holdout_cluster_ids"])
+        for number, row in enumerate(row for row in manifest["dataset_rows"] if row["cluster_id"] in holdout_ids):
+            if number < 30:
+                row["feature_payload"]["feature_groups"]["synthetic"]["signal"] = number
+        metric, _ = _runtime_replay_metrics(ROOT, manifest, manifest["dataset_rows"], pool)
+        self.assertEqual(metric["runtime_supported_case_share"], .30)
+        self.assertIn("runtime_supported_holdout_share_below_80_percent", _gate_reasons(metric))
+
+    def test_runtime_unknown_category_normalizes_to_unknown_token(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        for row in manifest["dataset_rows"]:
+            row["feature_payload"]["feature_groups"]["synthetic"]["state"] = "unknown"
+        artifact = build_expected_artifact(ROOT, manifest, pool)
+        self.assertEqual(artifact["feature_schema"]["runtime_domain"]["categorical"]["synthetic.state"], ["__unknown__"])
+
+    def test_runtime_train_residuals_preserve_item_set_projection(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        for row in manifest["dataset_rows"]:
+            row["feature_payload"]["feature_groups"]["item_sets"] = [{"set_id": "set_example", "model_feature": True, "completion_ratio": .5}]
+        artifact = build_expected_artifact(ROOT, manifest, pool)
+        self.assertIn("item_sets.set_example.completion_ratio", artifact["prediction_contract"]["continuous"]["columns"])
+
+    def test_runtime_ood_subgroup_cannot_disappear_from_gate(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        holdout_ids = set(pool["holdout_cluster_ids"])
+        index = 0
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in holdout_ids:
+                row["evaluation_subgroup"] = "rare"
+                if index < 30:
+                    row["feature_payload"]["feature_groups"]["synthetic"]["signal"] = index
+                index += 1
+        metric, _ = _runtime_replay_metrics(ROOT, manifest, manifest["dataset_rows"], pool)
+        rare = next(row for row in metric["subgroups"] if row["name"] == "rare")
+        self.assertEqual(rare["holdout_case_count"], 100)
+        self.assertEqual(rare["runtime_supported_case_count"], 30)
+        self.assertIn("subgroup_runtime_supported_share_below_80_percent:rare", _gate_reasons(metric))
+
+    def test_duplicate_easy_rows_cannot_dominate_cluster_weighted_holdout(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        holdout_ids = set(pool["holdout_cluster_ids"])
+        easy = sorted(holdout_ids)[0]
+        base = next(row for row in manifest["dataset_rows"] if row["cluster_id"] == easy)
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in holdout_ids:
+                row["feature_payload"]["feature_groups"]["synthetic"]["signal"] = 0
+                if row["cluster_id"] != easy: row["selected_price_twd"] = 100000
+        for _ in range(1000):
+            manifest["dataset_rows"].append(dict(base))
+        metric, _ = _runtime_replay_metrics(ROOT, manifest, manifest["dataset_rows"], pool)
+        self.assertGreater(metric["holdout_mdape"], .90)
+        self.assertEqual(metric["holdout_total_case_count"], 1100)  # admission remains row-level diagnostic
+        self.assertEqual(metric["runtime_supported_case_share"], 1.0)  # publication gate is cluster-weighted
+        self.assertEqual(metric["coverage_qualified_share"], 1.0)
 
 
 if __name__ == "__main__":

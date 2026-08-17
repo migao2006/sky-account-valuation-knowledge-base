@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-staging.schema.json",
+  "title": "External sanitized market staging (never committed)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset_id", "authorization_record_id", "expires_at", "records"],
+  "properties": {
+    "schema_version": {"const": "authorized-market-staging-v1"},
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "authorization_record_id": {"type": "string", "pattern": "^authorization_record_[a-z0-9_]+$"},
+    "expires_at": {"type": "string", "format": "date"},
+    "records": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/record"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["evidence_id", "source_lineage_id", "evidence_sha256"], "properties": {"evidence_id": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}, "source_lineage_id": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"}, "evidence_sha256": {"$ref": "#/$defs/digest"}}},
+    "record": {"type": "object", "additionalProperties": false, "required": ["source_snapshot_path", "source_snapshot_sha256", "dedup_cluster_digest", "account_commitment_digest", "post_date", "currency", "server", "offer_kind", "entity_kind", "price_line", "price_twd", "feature_payload", "catalog_provenance", "catalog_provenance_sha256"], "properties": {"source_snapshot_path": {"type": "string", "minLength": 1}, "source_snapshot_sha256": {"$ref": "#/$defs/digest"}, "dedup_cluster_digest": {"$ref": "#/$defs/digest"}, "account_commitment_digest": {"$ref": "#/$defs/digest"}, "post_date": {"type": "string", "format": "date"}, "currency": {"const": "TWD"}, "server": {"const": "international"}, "offer_kind": {"const": "seller_listing"}, "entity_kind": {"const": "single_account"}, "price_line": {"enum": ["asking", "reduced", "urgent_sale", "verified_sale"]}, "price_twd": {"type": "integer", "minimum": 1}, "feature_payload": {"type": "object", "additionalProperties": false, "required": ["feature_groups"], "properties": {"feature_groups": {"type": "object", "additionalProperties": false, "required": ["base_account"], "properties": {"base_account": {"type": "object", "additionalProperties": false, "required": ["account_type"], "properties": {"account_type": {"enum": ["unknown", "winged_or_unspecified", "winged", "no_wing"]}, "owned_count": {"type": "integer", "minimum": 0, "maximum": 100000}}}}}}}, "catalog_provenance": {"type": "object"}, "catalog_provenance_sha256": {"$ref": "#/$defs/digest"}, "completed_sale_verified": {"const": true}, "sale_verified": {"const": true}, "completed_sale_date": {"type": "string", "format": "date"}, "completion_evidence": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/evidence"}}, "completion_evidence_digest": {"$ref": "#/$defs/digest"}, "independent_evidence_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_]+$"}}}}
+  }
+}

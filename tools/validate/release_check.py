@@ -67,7 +67,7 @@ def model_artifacts_release_valid(
     artifacts: list[dict[str, object]], publication_evaluation: dict[str, object] | None = None,
     artifact_paths: dict[tuple[str, str], Path] | None = None, publication_replayed: bool = False,
 ) -> bool:
-    """Allow only an all-insufficient release or exact passed evaluator bindings.
+    """Allow all-insufficient, or P3.5's one exact normal Elastic binding.
 
     Publication metadata embedded in an artifact is intentionally ignored.  A
     trained release must be covered one-to-one by the evaluator's current
@@ -76,10 +76,22 @@ def model_artifacts_release_valid(
     """
     if not artifacts:
         return False
+    canonical = {
+        ("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale"),
+        ("xgboost", "normal_listing"), ("xgboost", "urgent_sale"),
+    }
+    observed_all = [(artifact.get("model_type"), artifact.get("price_line")) for artifact in artifacts]
+    # The release caller supplies the canonical four envelopes.  Keep the
+    # small helper usable for unit-level one-artifact binding probes, but never
+    # permit a four-artifact release with duplicate/mislabelled slots.
+    if len(artifacts) >= 4 and (len(observed_all) != len(set(observed_all)) or set(observed_all) != canonical):
+        return False
     states = {artifact.get("status") for artifact in artifacts}
     if states == {"insufficient_training_data"}:
         return True
-    if states != {"trained"} or not publication_replayed or not isinstance(publication_evaluation, dict) or artifact_paths is None:
+    trained = [artifact for artifact in artifacts if artifact.get("status") == "trained"]
+    insufficient = [artifact for artifact in artifacts if artifact.get("status") == "insufficient_training_data"]
+    if len(trained) != 1 or len(insufficient) + len(trained) != len(artifacts) or (trained[0].get("model_type"), trained[0].get("price_line")) != ("elastic_net", "normal_listing") or not publication_replayed or not isinstance(publication_evaluation, dict) or artifact_paths is None:
         return False
     if publication_evaluation.get("status") != "passed" or publication_evaluation.get("publication_ready") is not True:
         return False
@@ -94,7 +106,7 @@ def model_artifacts_release_valid(
     if not isinstance(bindings, list):
         return False
     expected: list[dict[str, object]] = []
-    for artifact in artifacts:
+    for artifact in trained:
         model_type, price_line = artifact.get("model_type"), artifact.get("price_line")
         if not isinstance(model_type, str) or not isinstance(price_line, str):
             return False
@@ -464,7 +476,7 @@ def main() -> None:
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.6-p3.4", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.7-p3.5", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-registry-candidate.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["dataset_id", "authorization_record_id", "manifest_path", "manifest_sha256", "statement_sha256", "expires_at", "status"],
+  "properties": {"dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"}, "authorization_record_id": {"type": "string", "pattern": "^authorization_record_[a-z0-9_]+$"}, "manifest_path": {"type": "string"}, "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "statement_sha256": {"type": "null"}, "expires_at": {"type": "string", "format": "date"}, "status": {"const": "candidate_requires_external_statement_and_three_role_signatures"}}
+}

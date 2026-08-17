@@ -14,9 +14,9 @@ STATEMENT_ENV, STATEMENT_SHA_ENV = "SKY_AUTHORIZED_MARKET_STATEMENT", "SKY_AUTHO
 REGISTRY_REL = Path("data/review/market-authorization/registry.jsonl")
 ATTESTATIONS_REL, SIGNATURES_REL = Path("data/review/market-authorization/attestations.jsonl"), Path("data/review/market-authorization/signatures")
 ROLES = ("data_steward", "privacy_reviewer", "method_reviewer")
-OBSERVATION_FIELDS = {"observation_id", "dedup_cluster_id", "post_date", "date_verified", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "price_line", "price_twd"}
+OBSERVATION_FIELDS = {"observation_id", "source_snapshot_sha256", "dedup_cluster_id", "post_date", "date_verified", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "price_line", "price_twd"}
 VERIFIED_SALE_OBSERVATION_FIELDS = OBSERVATION_FIELDS | {"completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence", "completion_evidence_digest", "independent_evidence_ids"}
-TRAINING_EXAMPLE_FIELDS = {"training_example_id", "observation_id", "account_id", "feature_payload", "feature_payload_sha256", "catalog_provenance", "catalog_provenance_sha256", "dedup_cluster_id", "dedup_cluster_digest", "training_example_digest"}
+TRAINING_EXAMPLE_FIELDS = {"training_example_id", "observation_id", "source_snapshot_sha256", "account_id", "feature_payload", "feature_payload_sha256", "catalog_provenance", "catalog_provenance_sha256", "dedup_cluster_id", "dedup_cluster_digest", "training_example_digest"}
 VERIFIED_SALE_TRAINING_EXAMPLE_FIELDS = TRAINING_EXAMPLE_FIELDS | {"observation_row_digest", "price_line", "completed_sale_verified", "sale_verified", "completion_evidence_digest", "independent_evidence_ids"}
 PII_KEY = re.compile(r"(?:name|user|handle|social|uid|email|mail|phone|mobile|contact|login|payment|address|url|link)", re.I)
 EMAIL, PHONE = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b"), re.compile(r"(?:\+\d[\d .()-]{6,}\d|\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{3,4})")
@@ -39,6 +39,7 @@ def _valid_observation(row: dict[str, Any], version: str) -> bool:
         return False
     return bool(
         isinstance(row.get("observation_id"), str) and row["observation_id"].startswith("observation_")
+        and _sha256(row.get("source_snapshot_sha256"))
         and isinstance(row.get("dedup_cluster_id"), str) and row["dedup_cluster_id"].startswith("cluster_")
         and isinstance(row.get("price_twd"), int) and not isinstance(row["price_twd"], bool) and row["price_twd"] >= 1
         and row.get("date_verified") is True and row.get("currency") == "TWD" and row.get("currency_verified") is True
@@ -62,6 +63,13 @@ def _valid_observation(row: dict[str, Any], version: str) -> bool:
             and row["independent_evidence_ids"] == [value["evidence_id"] for value in row["completion_evidence"]]
         ))
     )
+
+def _valid_feature_payload(value: Any) -> bool:
+    try:
+        from tools.market_intake.onboarding import feature_payload_errors
+        return not feature_payload_errors(value)
+    except Exception:
+        return False
 def _inside(p: Path, parent: Path) -> bool:
     try: p.resolve().relative_to(parent.resolve()); return True
     except ValueError: return False
@@ -107,6 +115,7 @@ def training_example_commitment(row: dict[str, Any]) -> dict[str, Any]:
     commitment = {
         "training_example_id": row.get("training_example_id"),
         "observation_id": row.get("observation_id"),
+        "source_snapshot_sha256": row.get("source_snapshot_sha256"),
         "account_id": row.get("account_id"),
         "feature_payload_sha256": row.get("feature_payload_sha256"),
         "catalog_provenance_sha256": row.get("catalog_provenance_sha256"),
@@ -222,6 +231,8 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                 reused_across_datasets = set(clusters) & committed_training_clusters
                 committed_training_clusters.update(clusters)
                 hashes_ok=all(
+                    _valid_feature_payload(example.get("feature_payload"))
+                    and
                     example.get("feature_payload_sha256", "").upper()==_catalog_digest(example.get("feature_payload"))
                     and example.get("catalog_provenance_sha256", "").upper()==_catalog_digest(example.get("catalog_provenance"))
                     and example.get("dedup_cluster_digest", "").upper()==sha256_bytes(canonical_bytes(example.get("dedup_cluster_id")))
@@ -231,6 +242,7 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                 linked_ok=all(
                     example.get("observation_id") in observation_by_id
                     and example.get("dedup_cluster_id")==observation_by_id[str(example.get("observation_id"))].get("dedup_cluster_id")
+                    and str(example.get("source_snapshot_sha256", "")).upper() == str(observation_by_id[str(example.get("observation_id"))].get("source_snapshot_sha256", "")).upper()
                     and (version != "authorized-market-manifest-v3" or (
                         observation_by_id[str(example.get("observation_id"))].get("price_line") == "verified_sale"
                         and example.get("observation_row_digest", "").upper() == sha256_bytes(canonical_bytes(observation_by_id[str(example.get("observation_id"))]))
@@ -285,6 +297,7 @@ class AuthorizedMarketEvaluator:
     authorized_observations: tuple[tuple[tuple[str,str,str,str,str], dict[str,Any]], ...]
     errors: tuple[str,...]=()
     feature_lineage_bound: bool=False
+    cluster_independence_bound: bool=False
     _factory_capability: object|None=None
     @property
     def factory_verified(self) -> bool:
@@ -357,7 +370,7 @@ class AuthorizedMarketEvaluator:
         datasets contain opaque observations and signed feature commitments,
         not fabricated listing/history records.
         """
-        if not self.factory_verified or self.errors or not self.feature_lineage_bound:
+        if not self.factory_verified or self.errors or not self.feature_lineage_bound or not self.cluster_independence_bound:
             return []
         result: list[dict[str, Any]] = []
         for key, binding in self.authorized_observations:
@@ -413,7 +426,7 @@ def make_authorization_evaluator(root: Path, authority_bundle: str|Path|None=Non
                 ((str(ds["authorization_record_id"]), str(ds["dataset_id"]), str(row["observation_id"]), sha256_bytes(canonical_bytes(row)), str(ds["manifest_sha256"]).upper()), {"observation": row, "training_example": examples_by_observation.get(str(row["observation_id"])), "dataset": ds, "manifest": manifest})
                 for row in rows
             )
-    return AuthorizedMarketEvaluator(tuple(mappings),tuple(errors),feature_lineage_bound,_FACTORY_CAPABILITY)
+    return AuthorizedMarketEvaluator(tuple(mappings),tuple(errors),feature_lineage_bound,False,_FACTORY_CAPABILITY)
 
 def model_training_authorization_reasons(row: dict[str,Any], external_evaluator: Callable[[dict[str,Any]],bool]|None=None) -> list[str]:
     x=row.get("market_data_authorization")
@@ -434,6 +447,8 @@ def model_training_authorization_reasons(row: dict[str,Any], external_evaluator:
             r.append("market_data_external_authorization_evaluator_required")
         elif external_evaluator.feature_lineage_bound is not True:
             r.append("market_data_feature_lineage_evaluator_required")
+        elif external_evaluator.cluster_independence_bound is not True:
+            r.append("market_data_cluster_independence_evaluator_required")
         elif external_evaluator(row) is not True:
             r.append("market_data_external_authorization_evaluator_required")
     return r
