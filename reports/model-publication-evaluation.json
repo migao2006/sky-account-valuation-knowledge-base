@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0-p3.2",
+  "status": "not_ready",
+  "publication_ready": false,
+  "artifact_publication_fields_consulted": false,
+  "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
+  "dataset_manifest_sha256": "6CF89C4CBEA471E9DE3C0E29DB4DC4869F0A8BE38415E278A6B319A517EE7AC7",
+  "split_sha256": "3130E73FD2C2675A71266E4ADD2B49080C164DF88AB9769D800B7B7E238613AB",
+  "requirements": {
+    "training_clusters": 300,
+    "holdout_clusters": 100
+  },
+  "eligible_market_pools": [],
+  "metrics": null,
+  "blocking_reasons": [
+    "no_market_pool_meets_300_train_100_time_forward_holdout"
+  ]
+}

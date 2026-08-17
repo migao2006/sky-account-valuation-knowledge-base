@@ -6,8 +6,8 @@
   "additionalProperties": false,
   "required": ["schema_version", "status", "artifact_publication_fields_consulted", "trained_models_treated_as_passed", "requirements", "formal_clean_price_rows", "valid_vector_accounts", "model_eligible_item_count", "verified_completed_sale_count", "market_pools", "blocking_reasons"],
   "properties": {
-    "schema_version": {"const": "1.0-p3"},
-    "status": {"const": "not_ready"},
+    "schema_version": {"const": "1.1-p3.2"},
+    "status": {"enum": ["not_ready", "ready_for_evaluation", "passed", "failed"]},
     "artifact_publication_fields_consulted": {"const": false},
     "trained_models_treated_as_passed": {"const": false},
     "requirements": {"type": "object", "additionalProperties": false, "required": ["independent_training_clusters", "time_forward_holdout_clusters"], "properties": {"independent_training_clusters": {"const": 300}, "time_forward_holdout_clusters": {"const": 100}}},

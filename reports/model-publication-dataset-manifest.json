@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0-p3.1",
+  "schema_version": "1.1-p3.2",
   "status": "not_ready",
   "dataset_path": "reports/model-publication-dataset-manifest.json#dataset_rows",
   "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
@@ -15,17 +15,17 @@
     },
     {
       "path": "data/modeling/account-item-vectors.jsonl",
-      "sha256": "7865F90E9655038461980CE9A35A86E17B22F5CB73D8011C75FC6220EC48C020"
+      "sha256": "BD79BF08EDFBA4A9EEAAEF97529781DF969C63D5D6D8BB93F4AEB97CB513C5BA"
     }
   ],
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "0533D0CA2E9C4380234FAC01F839027F9C7471FD535853E2EF29F0D00BD6F40C",
+    "canonical_item_ids_sha256": "8AEEA98BE513DA5526DB0115A0B698EBCAC15B278428C27D69770C5C5E17FF5F",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "DD304DD8A98285332340F8EB62CE4F779DBB283BA9850077E63346C87420DF3F"
+    "pinned_catalog_sha256": "860DC87CCD7E6C6F4450D27631742D354859F22CADBF5D56EE33D1B9D85D2C48"
   },
   "market_pools": [],
   "dataset_rows": []

@@ -1,0 +1,23 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1323_days_of_color_core_three_2026_08_17",
+  "source_id":"source_tgc_faq_1323_days_of_color_core_three",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1323-patch-notes---may-23-2024---0-25-5-264243-android-huawei-ios-pc-playstation-switch/?s=patch-notes",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1323's three named new Days of Color 2024 non-campaign items, their stated historical costs, and its event window. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2024-06-24",
+    "historical_window_end_date":"2024-07-07",
+    "new_items":[
+      {"item_id":"item_days_of_color_dark_rainbow_mask","official_name_en":"Dark Rainbow Mask","original_currency":"event_currency","original_cost":32},
+      {"item_id":"item_days_of_color_color_glam_cut","official_name_en":"Color Glam Cut","original_currency":"event_currency","original_cost":18},
+      {"item_id":"item_days_of_color_color_bubble_machine","official_name_en":"Color Bubble Machine","original_currency":"USD","original_cost":14.99}
+    ]
+  },
+  "non_claims":[
+    "This cohort deliberately excludes campaign items, returning items, and every other Days of Color item described by FAQ 1323.",
+    "This historical FAQ does not establish current availability, a return policy, current storefront state, or permanent-account property for any item.",
+    "The FAQ does not provide formal Traditional Chinese names or image assets, and its text does not establish a visual match.",
+    "This bounded FAQ slice is not a complete Days of Color set and no bundle or set membership is asserted."
+  ]
+}

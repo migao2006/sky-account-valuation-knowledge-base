@@ -64,7 +64,7 @@ class ProgressionContractTests(unittest.TestCase):
             "account_id": "account_forged", "cluster_id": "cluster_forged",
             "selected_price_twd": 1000.0, "price_line": "normal_listing",
         }
-        problems = formal_price_rebuild_errors([], [injected], [], [])
+        problems = formal_price_rebuild_errors([], [injected], [], [], ROOT)
         self.assertIn("price-cleaned-normal differs from deterministic authorized rebuild", problems)
 
 

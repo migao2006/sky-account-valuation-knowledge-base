@@ -176,8 +176,9 @@ def audit(
         global_reasons.append("no_verified_completed_sales")
     for pool in pool_reports:
         global_reasons.extend(f"{pool['market_pool']}:{reason}" for reason in pool["blocking_reasons"])
+    status = "ready_for_evaluation" if not global_reasons else "not_ready"
     return {
-        "schema_version": "1.0-p3", "status": "not_ready",
+        "schema_version": "1.1-p3.2", "status": status,
         "artifact_publication_fields_consulted": False,
         "trained_models_treated_as_passed": False,
         "requirements": {"independent_training_clusters": TRAINING_CLUSTERS_REQUIRED, "time_forward_holdout_clusters": HOLDOUT_CLUSTERS_REQUIRED},

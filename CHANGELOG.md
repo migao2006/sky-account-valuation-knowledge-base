@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.4.0-p3.2 — 2026-08-17
+
+- 新增 Days of Color FAQ 1323 core-three：3 件官方逐項 identity／歷史成本證據；目前 112 canonical、30 verified，全部仍排除於模型。
+- 授權市場 manifest v2 可用外部三方簽章把價格 observation、去識別 feature payload、正式 Item Vector、catalog provenance 與 signed dedup cluster 原子綁定；交換、竄改與重複 commitment 皆 fail closed。
+- publication dataset／readiness schema 改為由證據推導 `not_ready` 或 `ready_for_evaluation`，不再永久硬編未完成；新增不信 artifact 自填欄位的 publication evaluation boundary。
+- 新增正式 `completion-status.json`，逐條報告完整知識庫、parser gold、市場 gold、300/100 時間切分、verified sales 與模型評估的達成狀態。
+- 新增 FAQ 968 六個官方英文精確 item title 的 parser 回歸；未核准中文玩家詞即使未來 item eligible 仍保持 unknown。
+
 ## 4.3.0-p3.1 — 2026-08-17
 
 - 新增 Tournament of Triumph FAQ 1330 core-four：4 件 canonical identity 與歷史取得成本可重播驗證，仍不推論目前供應、玩家持有或轉售價。

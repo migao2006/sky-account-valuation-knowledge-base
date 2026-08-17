@@ -2,8 +2,9 @@
 """Freeze a replayable, fail-closed candidate publication dataset and split.
 
 This module is evidence plumbing only.  It intentionally never reads model
-artifacts and its status is permanently ``not_ready``; a later, separately
-approved publication gate must decide whether a model may be released.
+artifacts.  Its derived status may advance to ``ready_for_evaluation`` when a
+market pool satisfies the frozen 300/100 split contract, but a separate
+replayable evaluator must still decide whether a model may be released.
 """
 from __future__ import annotations
 
@@ -40,6 +41,11 @@ def _sha256(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest().upper()
 
 
+def _signed_payload_sha256(value: Any) -> str:
+    """Match the newline-terminated canonical bytes used by signed intake."""
+    return hashlib.sha256((_canonical(value) + "\n").encode("utf-8")).hexdigest().upper()
+
+
 def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
@@ -68,13 +74,20 @@ def _row_payload(row: dict[str, Any]) -> dict[str, Any]:
     price = row.get("selected_price_twd")
     if not isinstance(price, (int, float)) or isinstance(price, bool) or not math.isfinite(float(price)) or price <= 0:
         raise PublicationDatasetError("invalid_selected_price_twd")
-    return {
+    payload = {
         "cleaned_price_id": row["cleaned_price_id"], "history_id": row["history_id"],
         "account_id": row["account_id"], "cluster_id": row["cluster_id"],
         "currency": "TWD", "server": "international", "price_line": row["price_line"],
         "selected_price_twd": float(price), "post_date": _date(row.get("post_date")),
         "date_verified": True,
     }
+    lineage_fields = ("training_example_id", "training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest")
+    present = [field for field in lineage_fields if field in row]
+    if present:
+        if len(present) != len(lineage_fields) or any(not isinstance(row.get(field), str) or not row[field] for field in lineage_fields):
+            raise PublicationDatasetError("incomplete_signed_feature_lineage")
+        payload.update({field: row[field] for field in lineage_fields})
+    return payload
 
 
 def _snapshot(root: Path) -> list[dict[str, str]]:
@@ -107,6 +120,14 @@ def freeze(clean_rows: list[dict[str, Any]], vector_rows: list[dict[str, Any]], 
             raise PublicationDatasetError(f"duplicate_vector_account_id:{payload['account_id']}")
         if matching_vectors[0].get("catalog_provenance") != provenance:
             raise PublicationDatasetError(f"stale_or_forged_catalog_provenance:{payload['account_id']}")
+        if "training_example_id" in payload:
+            vector=matching_vectors[0]
+            if payload["feature_payload_sha256"].upper() != _signed_payload_sha256(vector):
+                raise PublicationDatasetError(f"signed_feature_payload_vector_mismatch:{payload['account_id']}")
+            if payload["catalog_provenance_sha256"].upper() != _signed_payload_sha256(vector["catalog_provenance"]):
+                raise PublicationDatasetError(f"signed_catalog_provenance_mismatch:{payload['account_id']}")
+            if payload["dedup_cluster_digest"].upper() != _signed_payload_sha256(payload["cluster_id"]):
+                raise PublicationDatasetError(f"signed_dedup_cluster_mismatch:{payload['account_id']}")
         ids.add(payload["cleaned_price_id"])
         histories.add(payload["history_id"])
         frozen.append({**payload, "row_sha256": _sha256(payload)})
@@ -165,8 +186,9 @@ def split(manifest: dict[str, Any]) -> dict[str, Any]:
         result = _best_split(rows)
         result.update({"currency": key[0], "server": key[1], "price_line": key[2], "row_count": len(rows)})
         pools.append(result)
+    status = "ready_for_evaluation" if any(pool["requirements_met"] for pool in pools) else "not_ready"
     return {
-        "schema_version": "1.0-p3.1", "status": "not_ready", "dataset_path": manifest["dataset_path"],
+        "schema_version": "1.1-p3.2", "status": status, "dataset_path": manifest["dataset_path"],
         "dataset_sha256": manifest["dataset_sha256"], "requirements": {"training_clusters": TRAINING_CLUSTERS_REQUIRED, "holdout_clusters": HOLDOUT_CLUSTERS_REQUIRED},
         "market_pools": pools,
     }
@@ -176,7 +198,10 @@ def build(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     root = root.resolve()
     clean_rows = read_jsonl(root / "data/modeling/price-cleaned-normal.jsonl") + read_jsonl(root / "data/modeling/price-cleaned-urgent.jsonl")
     manifest = freeze(clean_rows, read_jsonl(root / "data/modeling/account-item-vectors.jsonl"), catalog_provenance(root), _snapshot(root))
-    return manifest, split(manifest)
+    report = split(manifest)
+    manifest["schema_version"] = "1.1-p3.2"
+    manifest["status"] = report["status"]
+    return manifest, report
 
 
 def main() -> None:

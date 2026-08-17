@@ -5,9 +5,20 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-from tools.modeling.parse_item_vectors import build_vector, build_vectors
+from tools.modeling.parse_item_vectors import build_vector, build_vectors, load_catalog
 from tools.modeling.catalog_provenance import catalog_provenance
 from tools.validate.schema_validator import OfflineSchemaValidator
+
+
+FAQ968_ITEMS = {
+    "item_aurora_cure_for_me_mask": "Cure For Me Mask",
+    "item_aurora_cure_for_me_outfit": "Cure For Me Outfit",
+    "item_aurora_giving_in_cape": "Giving In Cape",
+    "item_aurora_to_the_love_outfit": "To The Love Outfit",
+    "item_aurora_voice": "Voice of AURORA",
+    "item_aurora_wings": "Wings of AURORA",
+}
+FAQ968_WINGS_PLAYER_TERMS = ("極光翅膀", "歐若拉翅膀", "金翅膀")
 
 
 class ItemVectorTests(unittest.TestCase):
@@ -19,11 +30,53 @@ class ItemVectorTests(unittest.TestCase):
         self.aliases = {"測試斗篷": {"item_verified_cape"}, "測斗": {"item_verified_cape"}, "測試面具": {"item_review_mask"}, "測面": {"item_review_mask"}}
         self.profile = {"account_id": "account_fixture", "source_listing_ids": ["listing_fixture"], "season_profiles": [], "collection": {"owned_item_ids": [], "graduation_rewards": [], "collaboration_items": [], "bundle_item_ids": [], "event_limited_item_ids": [], "graduation_reward_season_ids": []}, "resources": {"values": {}, "evidence_state": "unknown"}, "map_completion": {"evidence_state": "unknown"}, "base_account": {"account_type": "unknown"}, "bindings": {"risk_state": "unknown"}, "ownership_history": "unknown"}
 
-    def _vector(self, text, owned=(), missing=()):
+    def _vector(self, text, owned=(), missing=(), items=None, aliases=None, root=ROOT):
         profile = json.loads(json.dumps(self.profile))
         profile["collection"]["owned_item_ids"] = list(owned)
         profile["season_profiles"] = [{"owned_item_ids": [], "missing_item_ids": list(missing)}]
-        return build_vector(profile, {"listing_text": text, "offer_kind": "seller_listing", "entity_kind": "single_account"}, self.items, self.aliases, ROOT)
+        return build_vector(
+            profile,
+            {"listing_text": text, "offer_kind": "seller_listing", "entity_kind": "single_account"},
+            items or self.items,
+            aliases or self.aliases,
+            root,
+        )
+
+    def _faq968_catalog(self):
+        items, aliases = load_catalog(ROOT)
+        selected = {item_id: items[item_id] for item_id in FAQ968_ITEMS}
+        selected_ids = set(selected)
+        selected_aliases = {
+            token: item_ids.intersection(selected_ids)
+            for token, item_ids in aliases.items()
+            if item_ids.intersection(selected_ids)
+        }
+        for item_id, canonical_name in FAQ968_ITEMS.items():
+            self.assertEqual(selected[item_id]["canonical_name_en"], canonical_name)
+            self.assertEqual(selected[item_id]["verification_status"], "verified")
+            self.assertEqual(selected[item_id]["model_feature_status"], "excluded_pending_verification")
+        return selected, selected_aliases
+
+    def _copied_catalog_with_wings_eligible(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sky-item-vector-faq968-", dir=ROOT.parent)
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        for relative in ("knowledge/items/items.jsonl", "knowledge/aliases/item-aliases.jsonl", "knowledge/sets/item-sets.jsonl"):
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, destination)
+
+        item_path = root / "knowledge/items/items.jsonl"
+        rows = [json.loads(line) for line in item_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        for row in rows:
+            if row["item_id"] == "item_aurora_wings":
+                row["model_feature_status"] = "eligible"
+        item_path.write_text(
+            "".join(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return root, *load_catalog(root)
 
     def _set_root(self, required_item_ids, optional_item_ids=()):
         temporary = tempfile.TemporaryDirectory(prefix="sky-item-vector-set-", dir=ROOT.parent)
@@ -81,6 +134,37 @@ class ItemVectorTests(unittest.TestCase):
         self.assertEqual(states["item_review_mask"]["state"], "owned")
         self.assertFalse(states["item_review_mask"]["model_feature"])
         self.assertTrue(states["item_review_mask"]["sensitivity_feature"])
+
+    def test_faq968_exact_english_names_are_seller_single_review_only_observations(self):
+        items, aliases = self._faq968_catalog()
+        for item_id, canonical_name in FAQ968_ITEMS.items():
+            vector = self._vector(canonical_name, items=items, aliases=aliases)
+            state = next(row for row in vector["item_states"] if row["item_id"] == item_id)
+            self.assertEqual(state["state"], "owned", canonical_name)
+            self.assertFalse(state["model_feature"], canonical_name)
+            self.assertEqual(state["matched_sources"], ["listing_text"])
+            self.assertEqual(state["matched_aliases"], ["".join(char.lower() for char in canonical_name if char.isalnum())])
+
+    def test_faq968_wings_only_eligible_keeps_player_terms_unknown(self):
+        root, items, aliases = self._copied_catalog_with_wings_eligible()
+        exact = self._vector(
+            FAQ968_ITEMS["item_aurora_wings"],
+            items=items,
+            aliases=aliases,
+            root=root,
+        )
+        exact_state = next(row for row in exact["item_states"] if row["item_id"] == "item_aurora_wings")
+        self.assertEqual(exact_state["state"], "owned")
+        self.assertTrue(exact_state["model_feature"])
+        self.assertEqual(exact_state["matched_aliases"], ["wingsofaurora"])
+
+        for player_term in FAQ968_WINGS_PLAYER_TERMS:
+            vector = self._vector(player_term, items=items, aliases=aliases, root=root)
+            state = next(row for row in vector["item_states"] if row["item_id"] == "item_aurora_wings")
+            self.assertEqual(state["state"], "unknown", player_term)
+            self.assertTrue(state["model_feature"], player_term)
+            self.assertEqual(state["evidence_state"], "unknown", player_term)
+            self.assertEqual(state["matched_aliases"], [player_term], player_term)
 
     def test_unreviewed_alias_cannot_create_a_known_model_observation(self):
         items = json.loads(json.dumps(self.items))

@@ -1,9 +1,11 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+import tools.modeling.clean_prices as clean_prices_module
 from tools.modeling.clean_prices import build, clean as raw_clean
 
 
@@ -18,8 +20,9 @@ def authorized_market_data():
 
 
 def clean(rows):
-    """Unit-test price semantics with an explicitly injected authority."""
-    return raw_clean(rows, authorization_evaluator=lambda row: row.get("market_data_authorization") == authorized_market_data())
+    """Unit-test price semantics below the independently tested authority gate."""
+    with patch.object(clean_prices_module, "model_training_authorization_reasons", return_value=[]):
+        return raw_clean(rows)
 
 
 def row(number, **changes):
@@ -69,7 +72,7 @@ class PriceCleaningTest(unittest.TestCase):
             "source_snapshot": {"artifact_path": "legacy", "sha256": "a" * 64, "captured_at": "2026-08-01", "replayable": False},
             "license_evidence": {"kind": "legacy_anonymous_research", "evidence_id": "legacy", "verified": False}, "replay_evidence": [],
         })
-        normal, urgent, ledger = clean([unauthorized, legacy])
+        normal, urgent, ledger = raw_clean([unauthorized, legacy])
         self.assertEqual((normal, urgent), ([], []))
         by_history = {entry["history_id"]: entry["reason_codes"] for entry in ledger}
         self.assertIn("market_data_replay_evidence_missing", by_history["history_test_0001"])
@@ -130,7 +133,7 @@ class PriceCleaningTest(unittest.TestCase):
             "evidence_state": "text_claim", "review_status": "needs_review",
             "reason_codes": ["multiple_price_terms", "installment_price_variants"],
         }
-        normal, urgent, ledger = clean([installment_listing])
+        normal, urgent, ledger = raw_clean([installment_listing])
         self.assertEqual(normal, [])
         self.assertEqual(urgent, [])
         self.assertEqual(ledger[0]["history_id"], "history_0068")

@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "cleaned_price_id", "history_id", "account_id", "cluster_id", "cluster_rank", "selected_price_twd", "log_price_twd", "price_line", "normalized_price_type", "base_account_type", "post_date", "date_verified", "observed_at", "currency", "server", "evidence_quality", "review_status"],
+  "allOf": [{"if": {"required": ["training_example_id"]}, "then": {"required": ["training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest"]}}],
   "properties": {
     "schema_version": {"const": "3.1-p1"},
     "cleaned_price_id": {"type": "string", "pattern": "^cleaned_price_[a-z0-9_]+$"},
@@ -23,6 +24,11 @@
     "currency": {"const": "TWD"},
     "server": {"const": "international"},
     "evidence_quality": {"enum": ["high", "medium", "low", "unknown"]},
-    "review_status": {"enum": ["accepted", "needs_review"]}
+    "review_status": {"enum": ["accepted", "needs_review"]},
+    "training_example_id": {"type": "string", "pattern": "^training_example_[a-z0-9_]+$"},
+    "training_example_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "feature_payload_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "catalog_provenance_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "dedup_cluster_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}
   }
 }

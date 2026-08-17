@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -18,6 +20,16 @@ def row(n: int, day: str = "2025-01-01", line: str = "normal_listing", cluster: 
 
 def vectors(rows: list[dict]) -> list[dict]:
     return [{"account_id": account, "catalog_provenance": PROVENANCE} for account in sorted({item["account_id"] for item in rows})]
+
+
+def signed_sha(value: object) -> str:
+    return hashlib.sha256((json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest().upper()
+
+
+def signed_row(sample: dict, vector: dict) -> dict:
+    return {**sample, "training_example_id": "training_example_fixture_0001", "training_example_digest": "A" * 64,
+        "feature_payload_sha256": signed_sha(vector), "catalog_provenance_sha256": signed_sha(vector["catalog_provenance"]),
+        "dedup_cluster_digest": signed_sha(sample["cluster_id"])}
 
 
 class PublicationDatasetTests(unittest.TestCase):
@@ -39,7 +51,7 @@ class PublicationDatasetTests(unittest.TestCase):
         self.assertEqual(pool["cut_date"], "2025-01-02")
         self.assertEqual((len(pool["training_cluster_ids"]), len(pool["holdout_cluster_ids"])), (300, 100))
         self.assertTrue(pool["requirements_met"])
-        self.assertEqual(report["status"], "not_ready")
+        self.assertEqual(report["status"], "ready_for_evaluation")
 
     def test_rejects_tamper_duplicate_mixed_pool_unverified_date_and_stale_vector(self):
         sample = row(1)
@@ -69,6 +81,16 @@ class PublicationDatasetTests(unittest.TestCase):
         self.assertIn("cluster_1", pool["excluded_spanning_cluster_ids"])
         self.assertFalse(pool["cluster_overlap"])
         self.assertFalse(pool["requirements_met"])
+
+    def test_signed_feature_payload_must_be_exact_matching_vector(self):
+        sample=row(1, cluster="cluster_signed_not_account_derived")
+        vector=vectors([sample])[0]
+        signed=signed_row(sample, vector)
+        manifest=freeze([signed], [vector], PROVENANCE, SNAPSHOTS)
+        self.assertEqual("cluster_signed_not_account_derived", manifest["dataset_rows"][0]["cluster_id"])
+        forged={**vector, "feature_groups": {"tampered": True}}
+        with self.assertRaisesRegex(PublicationDatasetError, "signed_feature_payload_vector_mismatch"):
+            freeze([signed], [forged], PROVENANCE, SNAPSHOTS)
 
 
 if __name__ == "__main__":

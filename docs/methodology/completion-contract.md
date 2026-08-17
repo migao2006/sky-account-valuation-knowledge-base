@@ -59,10 +59,10 @@
 
 ## 圖片證據門檻
 
-P0 至 P3.1 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
+P0 至 P3.2 的 image evidence 只是資料契約，不是 OCR 或圖示辨識引擎。若未來宣稱自動辨識，必須使用真實、分層、held-out 標註集，並達到 micro precision 99%、micro recall 95%、supported-item macro recall 90%；未知圖示不得強制映射。
 
 ## 目前狀態
 
-截至 P3.1，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,489 筆離線查詢索引。27 筆 canonical item 具有受限、可重播的 identity 證據鏈，但 1,377 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場人工 gold、near-miss approved evidence 與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
+截至 P3.2，3,266 筆 vendor 宇宙已封閉對帳，其中 1,758 筆 collectible observation 具有唯一 source-scoped identity；另有 2,492 筆離線查詢索引。30 筆 canonical item 具有受限、可重播的 identity 證據鏈，但 1,374 筆 collectible observation 仍 unresolved、1,508 筆 scope disposition 仍待人工審查。1,022 筆帳號 lexical sidecar 只有 review-only 命中，不是持有證據。市場人工 gold、near-miss approved evidence 與獲外部授權的正式訓練價格皆為 0；Catalog、Item Vector、verified sale 與 image evidence 都未達完成門檻。所有模型維持 fail closed 是正確行為，不是錯誤。
 
-P3.1 新增 publication-readiness、固定 candidate dataset 與 time-forward split 的可重播容量報告，但仍沒有足量、具驗證日期的 holdout rows 與可重算模型發布評估器；因此 runtime 與離線 evaluator 都拒絕未通過獨立發布證據的 `trained` artifact 對外估價。模型發布必須在後續版本先建立可重播 evaluator，不能由 artifact 自填指標解鎖。
+P3.2 新增 publication evaluation boundary 與 completion-status state machine；dataset/readiness 可依證據進入 `ready_for_evaluation`，不再永久鎖死 `not_ready`。但仍沒有足量、具驗證日期的 holdout rows 或可重算完整模型指標，因此 `publication_ready=false`，runtime 拒絕未通過獨立發布證據的 `trained` artifact。模型發布不能由 artifact 自填指標解鎖。

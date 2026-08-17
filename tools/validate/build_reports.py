@@ -12,10 +12,12 @@ from typing import Any
 from release_files import HASH_EXCLUSIONS, release_files
 from canonical_evidence_registry import load_registry, validate_registry
 from market_audit import audit_market_ledgers
-from tools.market_authorization import make_authorization_evaluator, verify_authorized_market_intake
-from tools.modeling.clean_prices import clean as clean_model_prices
+from tools.market_authorization import verify_authorized_market_intake
+from tools.modeling.clean_prices import clean_authorized as clean_model_prices
 from tools.modeling.publication_dataset import build as build_publication_dataset
+from tools.modeling.publication_evaluator import build as build_publication_evaluation
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage
+from tools.validate.build_completion_status import build as build_completion_status
 
 BUILT_AT = "2026-08-17T00:00:00+08:00"
 
@@ -134,19 +136,20 @@ def main() -> None:
     )
     if authorization_errors:
         raise RuntimeError(f"authorized market intake is invalid: {authorization_errors}")
-    authorization_evaluator = make_authorization_evaluator(
-        root, args.market_authorization_authority_bundle,
-        args.market_authorization_authority_bundle_sha256,
+    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(
+        rows["comparable_accounts"], root,
+        args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
     )
-    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(rows["comparable_accounts"], authorization_evaluator)
     if rows["clean_normal"] != expected_normal or rows["clean_urgent"] != expected_urgent or rows["model_exclusions"] != expected_exclusions:
         raise RuntimeError("formal clean prices differ from deterministic feature-lineage-gated rebuild")
     publication_dataset, publication_split = build_publication_dataset(root)
+    publication_evaluation = build_publication_evaluation(root)
     parser_coverage = build_parser_knowledge_coverage(root)
     for relative, expected in (
         ("reports/model-publication-dataset-manifest.json", publication_dataset),
         ("reports/model-publication-split.json", publication_split),
+        ("reports/model-publication-evaluation.json", publication_evaluation),
         ("reports/parser-knowledge-coverage.json", parser_coverage),
     ):
         actual = json.loads((root / relative).read_text(encoding="utf-8"))
@@ -185,7 +188,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.3-p3.1",
+        "schema_version": "4.4-p3.2",
         "as_of_date": "2026-08-17",
         "catalog_claim": "partial_verified_catalog",
         "full_item_catalog_complete": False,
@@ -368,6 +371,8 @@ def main() -> None:
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
     write_utf8_lf(coverage_path, json.dumps(coverage, ensure_ascii=False, indent=2) + "\n")
+    completion_status = build_completion_status(root)
+    write_utf8_lf(root / "reports/completion-status.json", json.dumps(completion_status, ensure_ascii=False, indent=2) + "\n")
 
     migration_md = f"""# P0 遷移報告
 
@@ -420,13 +425,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.3-p3.1"
+    previous_validation["schema_version"] = "4.4-p3.2"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p31"
-    manifest["package_version"] = "4.3.0-p3.1"
+    manifest["package_id"] = "sky-valuation-v4-p32"
+    manifest["package_version"] = "4.4.0-p3.2"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -493,6 +498,8 @@ def main() -> None:
         "modeling/artifacts/xgboost-normal_listing.json", "modeling/artifacts/xgboost-urgent_sale.json",
         "reports/coverage/catalog-coverage.json", "reports/model-publication-readiness.json",
         "reports/model-publication-dataset-manifest.json", "reports/model-publication-split.json",
+        "reports/model-publication-evaluation.json",
+        "reports/completion-status.json",
         "reports/parser-knowledge-coverage.json",
         "reports/validation/p0-validation.json",
     ]

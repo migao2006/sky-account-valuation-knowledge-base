@@ -48,6 +48,7 @@ class PublicationReadinessTests(unittest.TestCase):
         self.assertEqual(pool["training_cluster_gap"], 0)
         self.assertEqual(pool["holdout_cluster_gap"], 0)
         self.assertEqual(pool["verified_date_count"], 2)
+        self.assertEqual(report["status"], "ready_for_evaluation")
 
     def test_cluster_with_dates_on_both_sides_is_never_split(self):
         rows = [clean(n, 1 if n <= 300 else 2) for n in range(1, 400)]

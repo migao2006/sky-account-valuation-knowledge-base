@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modeling/publication-evaluation.schema.json",
+  "title": "Replayable model publication evaluation state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "publication_ready", "artifact_publication_fields_consulted", "dataset_sha256", "dataset_manifest_sha256", "split_sha256", "requirements", "eligible_market_pools", "metrics", "blocking_reasons"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.2"},
+    "status": {"enum": ["not_ready", "evaluation_required", "passed", "failed"]},
+    "publication_ready": {"type": "boolean"},
+    "artifact_publication_fields_consulted": {"const": false},
+    "dataset_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "dataset_manifest_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "split_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "requirements": {"type": "object", "additionalProperties": false, "required": ["training_clusters", "holdout_clusters"], "properties": {"training_clusters": {"const": 300}, "holdout_clusters": {"const": 100}}},
+    "eligible_market_pools": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["currency", "server", "price_line", "training_cluster_count", "holdout_cluster_count", "cut_date"], "properties": {"currency": {"const": "TWD"}, "server": {"const": "international"}, "price_line": {"enum": ["normal_listing", "urgent_sale"]}, "training_cluster_count": {"type": "integer", "minimum": 300}, "holdout_cluster_count": {"type": "integer", "minimum": 100}, "cut_date": {"type": "string", "format": "date"}}}},
+    "metrics": {"type": ["object", "null"]},
+    "blocking_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "allOf": [
+    {"if": {"properties": {"publication_ready": {"const": true}}}, "then": {"properties": {"status": {"const": "passed"}, "metrics": {"type": "object"}, "blocking_reasons": {"maxItems": 0}}}},
+    {"if": {"properties": {"status": {"enum": ["not_ready", "evaluation_required", "failed"]}}}, "then": {"properties": {"publication_ready": {"const": false}, "blocking_reasons": {"minItems": 1}}}}
+  ]
+}

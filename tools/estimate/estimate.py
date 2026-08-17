@@ -17,7 +17,7 @@ from typing import Any, Iterable
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tools.market_authorization import make_authorization_evaluator, model_training_authorization_reasons
+from tools.market_authorization import model_training_authorization_reasons
 
 WEIGHTS = {
     "account_type": 15, "seasons": 22, "items_sets": 20,
@@ -387,12 +387,12 @@ def score(account: dict[str, Any], comparable: dict[str, Any]) -> dict[str, Any]
     return {"score": round(sum(weighted.values()), 4), "dimensions": weighted, "known_dimensions": known}
 
 
-def hard_pool(account: dict[str, Any], comparable: dict[str, Any], authorization_evaluator: Any = None) -> tuple[bool, list[str]]:
+def hard_pool(account: dict[str, Any], comparable: dict[str, Any]) -> tuple[bool, list[str]]:
     account, comparable = adapt_profile(account), adapt_profile(comparable)
     reasons = _independence_reasons(account, comparable)
     reasons.extend(_price_semantic_reasons(account, "target_"))
     reasons.extend(_price_semantic_reasons(comparable))
-    reasons.extend(model_training_authorization_reasons(comparable, authorization_evaluator))
+    reasons.extend(model_training_authorization_reasons(comparable))
     for field in ("currency", "server"):
         a, b = _value(account, field), _value(comparable, field)
         if a in ("unknown", None):
@@ -457,12 +457,12 @@ def _describe(account: dict[str, Any], row: dict[str, Any], dimensions: dict[str
     return {"major_matches": same, "major_differences": different, "unconfirmed_dimensions": unknown}
 
 
-def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]], authorization_evaluator: Any = None) -> dict[str, Any]:
+def estimate(account: dict[str, Any], comparables: Iterable[dict[str, Any]]) -> dict[str, Any]:
     account = adapt_profile(account)
     strict, rejected, quality_rejected, selection_rejected = [], [], [], []
     for row in comparables:
         comparable = adapt_profile(row)
-        ok, reasons = hard_pool(account, comparable, authorization_evaluator)
+        ok, reasons = hard_pool(account, comparable)
         if not ok:
             rejected.append({"comparable_id": _value(comparable, "comparable_id", "history_id", default="unknown"), "reasons": reasons})
             continue
@@ -550,25 +550,13 @@ def main() -> None:
     parser.add_argument("account", type=Path)
     parser.add_argument("comparables", type=Path, nargs="?", default=Path(__file__).resolve().parents[2] / "data" / "comparables" / "accounts.jsonl")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--market-authorization-authority-bundle", type=Path)
-    parser.add_argument("--market-authorization-authority-bundle-sha256")
-    parser.add_argument("--market-authorization-statement", type=Path)
-    parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[2]
-    evaluator = make_authorization_evaluator(
-        root, args.market_authorization_authority_bundle,
-        args.market_authorization_authority_bundle_sha256,
-        args.market_authorization_statement, args.market_authorization_statement_sha256,
-    )
-    if evaluator.errors:
-        parser.error("authorized market intake is invalid: " + "; ".join(evaluator.errors))
     comparables = _read_jsonl(args.comparables)
     if not comparables or any(not isinstance(row.get("base_account"), dict) for row in comparables):
         parser.error("comparables must be complete comparable account profiles (data/comparables/accounts.jsonl); history-only JSONL is not accepted")
-    # The signed intake currently binds market-price facts, not the complete
-    # account-feature/vector bytes used for similarity.  Keep the public
-    # estimator fail closed until a separate feature-lineage evaluator exists.
+    # The public estimator intentionally has no injectable authorization seam.
+    # A future endpoint must replay external authorization internally before
+    # it can pass signed comparables into selection.
     result = estimate(json.loads(args.account.read_text(encoding="utf-8")), comparables)
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

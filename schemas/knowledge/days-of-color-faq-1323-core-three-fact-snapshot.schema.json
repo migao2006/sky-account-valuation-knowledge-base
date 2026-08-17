@@ -1,0 +1,22 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"knowledge/days-of-color-faq-1323-core-three-fact-snapshot.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["snapshot_format","snapshot_id","source_id","source_url","retrieved_at","capture_policy","facts","non_claims"],
+  "properties":{
+    "snapshot_format":{"const":"fact_limited_official_support_snapshot_v1"},
+    "snapshot_id":{"const":"tgc_faq_1323_days_of_color_core_three_2026_08_17"},
+    "source_id":{"const":"source_tgc_faq_1323_days_of_color_core_three"},
+    "source_url":{"const":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1323-patch-notes---may-23-2024---0-25-5-264243-android-huawei-ios-pc-playstation-switch/?s=patch-notes"},
+    "retrieved_at":{"type":"string","format":"date"},"capture_policy":{"type":"string","minLength":1},
+    "facts":{"type":"object","additionalProperties":false,"required":["historical_window_start_date","historical_window_end_date","new_items"],"properties":{
+      "historical_window_start_date":{"const":"2024-06-24"},"historical_window_end_date":{"const":"2024-07-07"},
+      "new_items":{"const":[
+        {"item_id":"item_days_of_color_dark_rainbow_mask","official_name_en":"Dark Rainbow Mask","original_currency":"event_currency","original_cost":32},
+        {"item_id":"item_days_of_color_color_glam_cut","official_name_en":"Color Glam Cut","original_currency":"event_currency","original_cost":18},
+        {"item_id":"item_days_of_color_color_bubble_machine","official_name_en":"Color Bubble Machine","original_currency":"USD","original_cost":14.99}
+      ]}
+    }},
+    "non_claims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}
