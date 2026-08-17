@@ -337,7 +337,7 @@ def build(root: Path, review_authority_bundle: str | Path | None = None, review_
         *entity_checks,
     ]
     return {
-        "schema_version": "1.4-p4.2",
+        "schema_version": "1.5-p4.3",
         "catalog_status": "complete" if all(check["passed"] for check in checks) else "partial",
         "complete": all(check["passed"] for check in checks),
         "counts": {"universe": len(universe), "canonical_items": len(items), "candidates": len(candidates), "unresolved_review_scopes": len(unresolved), "unmapped_aliases": len(unmapped), "alias_conflicts": len(alias_conflicts), "source_scoped_unresolved": source_unresolved, "scope_review": scope_review, **{name: len(rows) for name, rows in entities.items()}},

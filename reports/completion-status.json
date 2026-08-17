@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.6-p4.2",
+  "schema_version": "1.7-p4.3",
   "goal": "precise_account_valuation_and_complete_knowledge_base",
   "status": "incomplete",
   "complete": false,
@@ -37,7 +37,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1340
+        "source_references": 1336
       },
       "requirement": "no catalog review scope or source-scoped reference remains unresolved",
       "evidence_paths": [
@@ -71,7 +71,7 @@
       "contract_id": "catalog.all_canonical_verified",
       "passed": false,
       "actual": {
-        "canonical_items": 155,
+        "canonical_items": 159,
         "non_verified_count": 78,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -163,7 +163,7 @@
       "contract_id": "catalog.required_field_evidence",
       "passed": false,
       "actual": {
-        "items_missing_required_fields": 155,
+        "items_missing_required_fields": 159,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_as_of",
@@ -2168,6 +2168,54 @@
             "set_membership",
             "source_type",
             "ultimate_reward"
+          ],
+          "item_days_of_bloom_arum_petal_cape": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_spiky_sprig_hair": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_arum_petal_hair": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_lilypad_umbrella": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
           ]
         },
         "registry_replay_error_count": 0,
@@ -2185,7 +2233,7 @@
       "passed": false,
       "actual": {
         "items_missing_independent_identity": 96,
-        "official_identity_count": 59,
+        "official_identity_count": 63,
         "two_secondary_identity_count": 0,
         "item_ids": [
           "item_anniversary_bass",
@@ -2296,7 +2344,7 @@
       "contract_id": "catalog.visual_state_verified",
       "passed": false,
       "actual": {
-        "items_without_complete_visual_state": 155,
+        "items_without_complete_visual_state": 159,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -2346,6 +2394,10 @@
           "item_days_mischief_cat_ears_tail",
           "item_days_mischief_witch_hat",
           "item_days_music_white_guitar",
+          "item_days_of_bloom_arum_petal_cape",
+          "item_days_of_bloom_arum_petal_hair",
+          "item_days_of_bloom_lilypad_umbrella",
+          "item_days_of_bloom_spiky_sprig_hair",
           "item_days_of_color_color_bubble_machine",
           "item_days_of_color_color_glam_cut",
           "item_days_of_color_dark_rainbow_loafers",
@@ -3226,7 +3278,7 @@
       "contract_id": "catalog.model_eligible_positive",
       "passed": true,
       "actual": {
-        "verified": 77,
+        "verified": 81,
         "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",
