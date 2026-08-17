@@ -33,7 +33,7 @@ class AuthorizedMarketIntakeTest(unittest.TestCase):
     def _sha(self, path): return sha256_bytes(path.read_bytes())
     def _write_fixture(self):
         dsid = "authorized_market_fixture"; ddir = self.root / "data/review/market-authorization/datasets" / dsid
-        observation = {"observation_id":"observation_fixture_0001", "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000}
+        observation = {"observation_id":"observation_fixture_0001", "source_snapshot_sha256":"A" * 64, "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000}
         op = ddir / "observations.jsonl"; op.write_bytes(canonical_bytes(observation))
         manifest = {"schema_version":"authorized-market-manifest-v1", "dataset_id":dsid,
             "observations_path":f"data/review/market-authorization/datasets/{dsid}/observations.jsonl", "observations_sha256":self._sha(op),
@@ -152,8 +152,8 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         (self.root / "knowledge/sets/item-sets.jsonl").write_text("", encoding="utf-8")
         dsid="authorized_market_fixture"; ddir=self.root / "data/review/market-authorization/datasets" / dsid
         observations=[
-            {"observation_id":"observation_fixture_0001", "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000},
-            {"observation_id":"observation_fixture_0002", "dedup_cluster_id":"cluster_fixture_0002", "post_date":"2026-08-02", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"reduced", "price_twd":2000},
+            {"observation_id":"observation_fixture_0001", "source_snapshot_sha256":"A" * 64, "dedup_cluster_id":"cluster_fixture_0001", "post_date":"2026-08-01", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"asking", "price_twd":1000},
+            {"observation_id":"observation_fixture_0002", "source_snapshot_sha256":"B" * 64, "dedup_cluster_id":"cluster_fixture_0002", "post_date":"2026-08-02", "date_verified":True, "currency":"TWD", "currency_verified":True, "server":"international", "server_verified":True, "offer_kind":"seller_listing", "entity_kind":"single_account", "price_line":"reduced", "price_twd":2000},
         ]
         if verified_sales:
             for observation in observations:
@@ -172,7 +172,7 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         provenance=catalog_provenance(self.root)
         examples=[]
         for number, observation in enumerate(observations, 1):
-            example={"training_example_id":f"training_example_fixture_{number:04d}", "observation_id":observation["observation_id"], "account_id":f"account_fixture_{number:04d}", "feature_payload":{"model_inputs":{"fixture_value":number}, "vector_schema":"fixture-v1"}, "catalog_provenance":provenance, "dedup_cluster_id":observation["dedup_cluster_id"]}
+            example={"training_example_id":f"training_example_fixture_{number:04d}", "observation_id":observation["observation_id"], "source_snapshot_sha256":observation["source_snapshot_sha256"], "account_id":f"account_fixture_{number:04d}", "feature_payload":{"feature_groups":{"base_account":{"account_type":"unknown", "owned_count":number}}}, "catalog_provenance":provenance, "dedup_cluster_id":observation["dedup_cluster_id"]}
             example["feature_payload_sha256"]=sha256_bytes(canonical_bytes(example["feature_payload"]))
             example["catalog_provenance_sha256"]=sha256_bytes(canonical_bytes(provenance))
             example["dedup_cluster_digest"]=sha256_bytes(canonical_bytes(example["dedup_cluster_id"]))
@@ -223,12 +223,10 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         row=self._lineage_row(observations,examples,manifest)
         self.assertTrue(evaluator(row))
         authorized=dict(row, history_id="history_fixture_0001", observed_at="2026-08-01", base_account_type="unknown", market_data_authorization=dict(row["market_data_authorization"], status="authorized_model_training", allowed_uses=["model_training","comparable_estimation"], source_snapshot={"replayable":True,"sha256":"A"*64}, replay_evidence=[{"source_locator":"fixture","content_sha256":"A"*64}], license_evidence={"verified":True,"kind":"explicit_data_license"}))
-        self.assertEqual([], model_training_authorization_reasons(authorized, evaluator))
+        self.assertEqual(["market_data_cluster_independence_evaluator_required"], model_training_authorization_reasons(authorized, evaluator))
         normal, urgent, exclusions=clean_authorized([authorized], self.root, *self.args())
-        self.assertEqual((1, []), (len(urgent), exclusions))
-        self.assertEqual(observations[0]["dedup_cluster_id"], normal[0]["cluster_id"])
-        self.assertEqual(examples[0]["training_example_id"], normal[0]["training_example_id"])
-        self.assertEqual(examples[0]["feature_payload_sha256"], normal[0]["feature_payload_sha256"])
+        self.assertEqual(0, len(urgent)); self.assertTrue(any("market_data_cluster_independence_evaluator_required" in row["reason_codes"] for row in exclusions))
+        self.assertEqual([], normal)
         changed=dict(row, feature_payload={"model_inputs":{"fixture_value":99},"vector_schema":"fixture-v1"})
         self.assertFalse(evaluator(changed))
         swapped=dict(row, feature_payload=examples[1]["feature_payload"])
@@ -244,10 +242,10 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         self.assertFalse(evaluator(row))
         authorized = dict(row, history_id="history_verified_sale_0001", observed_at="2026-08-01", base_account_type="unknown",
             market_data_authorization=dict(row["market_data_authorization"], status="authorized_model_training", allowed_uses=["model_training", "comparable_estimation"], source_snapshot={"replayable":True,"sha256":"A"*64}, replay_evidence=[{"source_locator":"fixture","content_sha256":"A"*64}], license_evidence={"verified":True,"kind":"explicit_data_license"}))
-        self.assertIn("market_data_external_authorization_evaluator_required", model_training_authorization_reasons(authorized, evaluator))
+        self.assertIn("market_data_cluster_independence_evaluator_required", model_training_authorization_reasons(authorized, evaluator))
         normal, urgent, sales, exclusions = clean_authorized_with_verified_sales([authorized], self.root, *self.args())
         self.assertEqual(([], [], []), (normal, urgent, sales))
-        self.assertTrue(any("market_data_external_authorization_evaluator_required" in row["reason_codes"] for row in exclusions))
+        self.assertTrue(any("market_data_cluster_independence_evaluator_required" in row["reason_codes"] for row in exclusions))
         validator = OfflineSchemaValidator(REPO_ROOT / "schemas")
         self.assertEqual([], validator.validate(exclusions[0], REPO_ROOT / "schemas/modeling/price-exclusion.schema.json"))
         self.assertEqual([], clean_authorized([authorized], self.root, *self.args())[0])

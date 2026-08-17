@@ -382,6 +382,8 @@ def _export_plain_json_model(pipe, numeric, categorical):
     prep = pipe.named_steps["preprocess"]
     model = pipe.named_steps["model"]
     names = list(prep.get_feature_names_out())
+    if len(names) != len(set(names)):
+        raise ModelingInputError("nonunique_transformed_feature_names")
     coefficients = {name: float(value) for name, value in zip(names, model.coef_)}
     numeric_pipe = prep.named_transformers_["numeric"]
     imputer = numeric_pipe.named_steps["impute"]
@@ -532,7 +534,10 @@ def train(input_path: Path, price_line: str, prices_path: Path | None = None):
     except (ValueError, ModelingInputError) as exc:
         return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, str(exc), catalog_binding)
     feature_names = list(pipe.named_steps["preprocess"].get_feature_names_out())
-    model_export = _export_plain_json_model(pipe, numeric, categorical)
+    try:
+        model_export = _export_plain_json_model(pipe, numeric, categorical)
+    except ModelingInputError as exc:
+        return insufficient_artifact(price_line, source_paths, source_hash, groups, minimum, rows, rejected, str(exc), catalog_binding)
     artifact = {
         "schema_version": SCHEMA_VERSION,
         "status": "trained",
@@ -554,20 +559,50 @@ def train(input_path: Path, price_line: str, prices_path: Path | None = None):
     return artifact
 
 
+def train_publication_runtime(root: Path, price_line: str = "normal_listing"):
+    """Construct a P3.5 artifact from the evaluator-owned frozen split.
+
+    This is intentionally separate from ``train``: ordinary grouped CV input
+    must never be mistaken for the independent time-forward publication fit.
+    Test-only synthetic manifests are rejected by the runtime builder.
+    """
+    root = root.resolve()
+    vector, normal = root / "data/modeling/account-item-vectors.jsonl", root / "data/modeling/price-cleaned-normal.jsonl"
+    paths, snapshot = input_snapshot(vector, normal)
+    binding = catalog_provenance(root)
+    if price_line != "normal_listing":
+        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "publication_runtime_supports_normal_listing_only", binding)
+    from tools.modeling.publication_dataset import build as build_publication_dataset
+    from tools.modeling.publication_dataset import _derive_split
+    from tools.modeling.publication_runtime import PublicationRuntimeError, build_expected_artifact
+    manifest, _ = build_publication_dataset(root)
+    split = _derive_split(manifest, allow_test_synthetic=False)
+    pools = [pool for pool in split.get("market_pools", []) if pool.get("requirements_met") is True and pool.get("price_line") == "normal_listing"]
+    if len(pools) != 1:
+        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "no_single_eligible_normal_listing_publication_pool", binding)
+    try:
+        return build_expected_artifact(root, manifest, pools[0])
+    except (PublicationRuntimeError, ValueError, ImportError, KeyError, TypeError) as exc:
+        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], str(exc), binding)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Offline grouped-nested-CV Elastic Net trainer")
-    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--input", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--price-line", required=True, choices=("normal_listing", "urgent_sale"))
     parser.add_argument("--prices", type=Path, help="optional cleaned-price JSONL joined by account_id")
+    parser.add_argument("--publication-root", type=Path, help="build only from the frozen production publication split")
     args = parser.parse_args(argv)
-    if not args.input.is_file():
+    if bool(args.input) == bool(args.publication_root):
+        parser.error("provide exactly one of --input or --publication-root")
+    if args.input is not None and not args.input.is_file():
         parser.error(f"input does not exist: {args.input}")
     price_path = args.prices
-    if price_path is None:
+    if args.input is not None and price_path is None:
         candidate = args.input.parent / f"price-cleaned-{'normal' if args.price_line == 'normal_listing' else 'urgent'}.jsonl"
         price_path = candidate if candidate.is_file() else None
-    result = train(args.input, args.price_line, price_path)
+    result = train_publication_runtime(args.publication_root, args.price_line) if args.publication_root else train(args.input, args.price_line, price_path)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output = args.output_dir / f"elastic-net-{args.price_line}.json"
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")

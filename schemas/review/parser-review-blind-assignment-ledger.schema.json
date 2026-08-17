@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/parser-review-blind-assignment-ledger.schema.json",
+  "description": "Safe candidate ledger. It contains opaque assignments and hashes only; raw packets remain external.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "queue_manifest_sha256", "assignment_count", "assignments", "formal_gold_written", "ledger_sha256"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.5"}, "status": {"const": "external_blind_packets_issued"},
+    "queue_manifest_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "assignment_count": {"const": 400},
+    "assignments": {"type": "array", "minItems": 400, "maxItems": 400, "items": {"type": "object", "additionalProperties": false, "required": ["assignment_id", "reviewer", "input_sha256"], "properties": {"assignment_id": {"type": "string", "pattern": "^assignment_annotator_[ab]_[a-f0-9]{24}$"}, "reviewer": {"enum": ["annotator_a", "annotator_b"]}, "input_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}}}},
+    "formal_gold_written": {"const": false}, "ledger_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}
+  }
+}

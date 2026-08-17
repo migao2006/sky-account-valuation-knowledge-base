@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-intake-capacity.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "cluster_count", "observation_count", "requirements", "independence_verified", "date_split", "price_line_counts"],
+  "properties": {
+    "schema_version": {"const": "authorized-market-intake-capacity-v1"},
+    "cluster_count": {"type": "integer", "minimum": 0}, "observation_count": {"type": "integer", "minimum": 0},
+    "requirements": {"const": {"training_clusters": 300, "heldout_clusters": 100}},
+    "independence_verified": {"const": false},
+    "date_split": {"type": "object", "additionalProperties": false, "required": ["cut_date", "training_cluster_count", "heldout_cluster_count", "excluded_spanning_cluster_count", "cluster_overlap", "requirements_met"], "properties": {"cut_date": {"type": ["string", "null"]}, "training_cluster_count": {"type": "integer", "minimum": 0}, "heldout_cluster_count": {"type": "integer", "minimum": 0}, "excluded_spanning_cluster_count": {"type": "integer", "minimum": 0}, "cluster_overlap": {"const": false}, "requirements_met": {"type": "boolean"}}},
+    "price_line_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+  }
+}

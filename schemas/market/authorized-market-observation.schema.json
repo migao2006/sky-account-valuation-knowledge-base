@@ -3,9 +3,10 @@
   "$id": "market/authorized-market-observation.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["observation_id", "dedup_cluster_id", "post_date", "date_verified", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "price_line", "price_twd"],
+  "required": ["observation_id", "source_snapshot_sha256", "dedup_cluster_id", "post_date", "date_verified", "currency", "currency_verified", "server", "server_verified", "offer_kind", "entity_kind", "price_line", "price_twd"],
   "properties": {
     "observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]+$"},
+    "source_snapshot_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "dedup_cluster_id": {"type": "string", "pattern": "^cluster_[a-z0-9_]+$"},
     "post_date": {"type": "string", "format": "date"}, "date_verified": {"const": true},
     "currency": {"const": "TWD"}, "currency_verified": {"const": true},

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
-from model_estimator import estimate_model, _predict_elastic_net, _runtime_model_sha256
+from model_estimator import estimate_model, _predict, _predict_elastic_net, _runtime_model_sha256
 sys.path.insert(0, str(ROOT / "tools" / "validate"))
 from schema_validator import OfflineSchemaValidator
 from modeling.train_elastic_net import train as train_elastic_net, load_rows, classify_columns, _frame, _fit_with_inner_groups
@@ -129,6 +129,23 @@ class ModelEstimatorTest(unittest.TestCase):
         self.assertFalse(outlier_result["eligible"])
         self.assertIn("publication_evaluation_report_missing_or_invalid", unknown_result["insufficiency_reasons"])
 
+    def test_elastic_runtime_uses_trainer_flattening_for_nested_list_features(self):
+        contract = {"kind": "additive_log_price", "intercept": 8.0, "coefficients": {"categorical__bindings.google.state_linked": .2},
+                    "continuous": {"columns": [], "imputation_medians": {}, "means": {}, "scales": {}, "missing_mask_columns": [], "missing_indicator_scaling": {}},
+                    "categorical_vocabulary": {"bindings.google.state": ["linked"]}, "feature_order": ["categorical__bindings.google.state_linked"], "required_feature_columns": ["bindings.google.state"],
+                    "runtime_domain": {"categorical": {"bindings.google.state": ["linked"]}}}
+        value, _, reasons = _predict_elastic_net(contract, {"bindings": [{"platform": "google", "state": "linked"}]}, {})
+        self.assertEqual(reasons, []); self.assertAlmostEqual(value, 8.2)
+
+    def test_elastic_runtime_rejects_extreme_numeric_and_overflow_before_exp(self):
+        artifact = self._artifact("elastic_net", "0" * 64)
+        artifact["feature_schema"]["runtime_domain"] = {"numeric": {"resources.values.white_candles": {"min": 0, "max": 1000}}, "categorical": {}}
+        value, _, reasons = _predict(artifact, {"resources": {"values": {"white_candles": 1000000}}})
+        self.assertIsNone(value); self.assertIn("out_of_distribution:resources.values.white_candles", reasons)
+        artifact["prediction_contract"]["coefficients"]["numeric__resources.values.white_candles"] = 1e308
+        value, _, reasons = _predict(artifact, {"resources": {"values": {"white_candles": 1000}}})
+        self.assertIsNone(value); self.assertIn("out_of_distribution:nonfinite_or_overflow_prediction", reasons)
+
     def test_market_and_evidence_gates_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); self._write_artifacts(root)
@@ -211,6 +228,17 @@ class ModelEstimatorTest(unittest.TestCase):
                 self.assertTrue(math.isclose(received, expected, rel_tol=0, abs_tol=1e-10))
         self.assertFalse(result["eligible"])
         self.assertIn("publication_evaluation_report_missing_or_invalid", result["insufficiency_reasons"])
+
+    def test_trainer_rejects_colliding_onehot_export_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); (root / "manifest.json").write_text("{}\n", encoding="utf-8")
+            source = root / "vectors.jsonl"
+            rows = [{"account_id": f"a{index}", "price_twd": 1000 + index, "price_type": "normal_listing", "group_id": f"g{index}",
+                     "features": {"a": "b_c" if index % 2 else "d", "a_b": "c" if index % 2 else "d"}} for index in range(100)]
+            source.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            artifact = train_elastic_net(source, "normal_listing")
+        self.assertEqual(artifact["status"], "insufficient_training_data")
+        self.assertIn("nonunique_transformed_feature_names", artifact["limitations"])
 
     def test_formal_p1_artifacts_are_present_but_insufficient(self):
         result = estimate_model(self._account(), root=ROOT)

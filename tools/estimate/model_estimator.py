@@ -164,12 +164,11 @@ def _publication_binding_reasons(root: Path, path: Path, artifact: dict[str, Any
     rows = published.get("artifact_bindings")
     if not isinstance(rows, list):
         return ["publication_artifact_bindings_missing"]
-    supported = {
-        ("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale"),
-        ("xgboost", "normal_listing"), ("xgboost", "urgent_sale"),
-    }
+    # P3.5 deliberately publishes one contract only.  Accepting a binding for
+    # another model here would let it bypass its missing train-only evaluator.
+    supported = {("elastic_net", "normal_listing")}
     observed = [(row.get("model_type"), row.get("price_line")) for row in rows if isinstance(row, dict)]
-    if len(observed) != len(rows) or len(set(observed)) != len(observed) or not set(observed) <= supported:
+    if len(observed) != len(rows) or len(set(observed)) != len(observed) or set(observed) != supported:
         return ["publication_artifact_binding_set_not_exact"]
     matches = [row for row in rows if isinstance(row, dict) and all(row.get(key) == value for key, value in binding.items())]
     if len(matches) != 1:
@@ -182,6 +181,10 @@ def _training_quality_reasons(artifact: dict[str, Any]) -> list[str]:
     training = artifact.get("training")
     if not isinstance(training, dict):
         return ["artifact_training_metadata_missing"]
+    if (artifact.get("model_type"), artifact.get("price_line")) == ("elastic_net", "normal_listing") and training.get("publication_train_only") is True and training.get("publication_holdout_rows_excluded_from_fit") is True:
+        # Holdout quality is owned by the replayed publication report, not by
+        # artifact metadata.  Still require its immutable train-only minimum.
+        return [] if isinstance(training.get("eligible_rows"), int) and training["eligible_rows"] >= 300 else ["publication_training_minimum_rows_not_met"]
     rows = training.get("eligible_rows", training.get("records"))
     minimum = training.get("minimum_rows", training.get("min_required_records"))
     groups = training.get("group_count", training.get("independent_group_count"))
@@ -212,7 +215,8 @@ def _artifact_valid(root: Path, path: Path, expected_line: str) -> tuple[dict[st
         failures.append("artifact_price_line_mismatch")
     if artifact.get("model_type") not in SUPPORTED_MODEL_TYPES:
         failures.append("artifact_model_type_invalid")
-    if _outer_mae(artifact) is None:
+    runtime_publication_artifact = (artifact.get("model_type"), artifact.get("price_line")) == ("elastic_net", "normal_listing") and artifact.get("training", {}).get("publication_train_only") is True
+    if _outer_mae(artifact) is None and not runtime_publication_artifact:
         failures.append("artifact_outer_cv_mae_invalid")
     failures.extend(_training_quality_reasons(artifact))
     failures.extend(_publication_binding_reasons(root, path, artifact))
@@ -311,6 +315,11 @@ def _feature_contract(artifact: dict[str, Any]) -> tuple[list[str], dict[str, tu
             if isinstance(boundary, dict):
                 lo, hi = boundary.get("min"), boundary.get("max")
                 bounds[str(name)] = (float(lo) if isinstance(lo, (int, float)) else None, float(hi) if isinstance(hi, (int, float)) else None)
+    runtime_numeric = schema.get("runtime_domain", {}).get("numeric", {}) if isinstance(schema.get("runtime_domain"), dict) else {}
+    if isinstance(runtime_numeric, dict):
+        for name, boundary in runtime_numeric.items():
+            if isinstance(boundary, dict) and isinstance(boundary.get("min"), (int, float)) and isinstance(boundary.get("max"), (int, float)):
+                bounds[str(name)] = (float(boundary["min"]), float(boundary["max"]))
     baselines = schema.get("baselines", {})
     return features, bounds, {str(k): float(v) for k, v in baselines.items() if isinstance(v, (int, float))}
 
@@ -328,7 +337,9 @@ def _predict(artifact: dict[str, Any], account: dict[str, Any]) -> tuple[float |
     if contract.get("kind") != "additive_log_price":
         return None, [], ["unsupported_prediction_contract"]
     if artifact.get("model_type") == "elastic_net":
-        return _predict_elastic_net(contract, account, _feature_contract(artifact)[1])
+        runtime_contract = dict(contract)
+        runtime_contract["runtime_domain"] = artifact.get("feature_schema", {}).get("runtime_domain", {})
+        return _predict_elastic_net(runtime_contract, account, _feature_contract(artifact)[1])
     intercept = contract.get("intercept")
     coefficients = contract.get("coefficients")
     if not isinstance(intercept, (int, float)) or not isinstance(coefficients, dict):
@@ -376,10 +387,25 @@ def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], boun
         return None, [], ["elastic_scaler_means_missing"]
     if any(not isinstance(name, str) or not isinstance(medians.get(name), (int, float)) or not isinstance(scales.get(name), (int, float)) or not isinstance(means.get(name), (int, float)) or float(scales[name]) == 0 for name in columns):
         return None, [], ["elastic_continuous_contract_invalid"]
+    try:
+        from modeling.train_elastic_net import feature_mapping
+        # Runtime consumes the same flattened representation as training,
+        # including structured list entries and nested feature groups.
+        source = account.get("features") if isinstance(account.get("features"), dict) else account.get("feature_groups", account)
+        flattened = feature_mapping({"features": source})
+    except Exception as exc:
+        return None, [], [f"elastic_feature_mapping_failed:{type(exc).__name__}"]
     transformed: dict[str, float] = {}
     for name in columns:
-        value = _lookup(account, name)
+        raw = flattened.get(name)
+        try:
+            value = float(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) else None
+        except (OverflowError, ValueError):
+            return None, [], [f"out_of_distribution:nonfinite:{name}"]
         is_missing = value is None
+        domain = contract.get("runtime_domain", {}).get("numeric", {}).get(name) if isinstance(contract.get("runtime_domain"), dict) else None
+        if is_missing and isinstance(domain, dict) and domain.get("missing_observed") is False:
+            return None, [], [f"out_of_distribution:missing_unobserved:{name}"]
         lower, upper = bounds.get(name, (None, None))
         if value is not None and ((lower is not None and value < lower) or (upper is not None and value > upper)):
             return None, [], [f"out_of_distribution:{name}"]
@@ -394,8 +420,11 @@ def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], boun
     for name, values in vocabulary.items():
         if not isinstance(name, str) or not isinstance(values, list) or not all(isinstance(x, str) for x in values):
             return None, [], ["elastic_categorical_contract_invalid"]
-        value = _lookup_raw(account, name)
-        token = "__unknown__" if value is None else str(value)
+        value = flattened.get(name)
+        token = "__unknown__" if value in (None, "unknown") else str(value)
+        domain = contract.get("runtime_domain", {}).get("categorical", {}).get(name) if isinstance(contract.get("runtime_domain"), dict) else None
+        if isinstance(domain, list) and token not in domain:
+            return None, [], [f"out_of_distribution:{name}"]
         # OneHotEncoder(handle_unknown='ignore') emits all zeroes for a token
         # absent from its fitted vocabulary, including unknown when no explicit
         # unknown category was observed during training.
@@ -414,6 +443,8 @@ def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], boun
         contribution = float(coefficients[name]) * transformed[name]
         prediction += contribution
         drivers.append({"feature": name, "contribution_log_twd": round(contribution, 8), "method": "elastic_net_exact_preprocessing"})
+    if not math.isfinite(prediction) or prediction < -700 or prediction > 700:
+        return None, [], ["out_of_distribution:nonfinite_or_overflow_prediction"]
     drivers.sort(key=lambda row: abs(row["contribution_log_twd"]), reverse=True)
     return prediction, drivers[:10], []
 
@@ -564,6 +595,10 @@ def estimate_model(account: dict[str, Any], *, root: Path, comparables: Iterable
             ood_reasons.extend(reasons)
             continue
         mae = _outer_mae(entry["artifact"])
+        if mae is None and entry["artifact"].get("training", {}).get("publication_train_only") is True:
+            # The evaluator's holdout MAE is the quality metric.  It has
+            # already been checked by the exact binding gate above.
+            mae = 1.0
         if mae is None:  # also protects inverse weighting from singular values.
             selection.append({"model_type": model_type, "used": False, "reasons": ["nonpositive_outer_cv_mae"]})
             continue
@@ -574,11 +609,20 @@ def estimate_model(account: dict[str, Any], *, root: Path, comparables: Iterable
         status = "out_of_distribution" if any(reason.startswith("out_of_distribution:") for reason in ood_reasons) else "insufficient_training_data"
         reasons = ["no_verified_usable_model_artifact"] + ood_reasons + [reason for row in artifact_rejections for reason in row["reasons"]]
         return _result(status, price_line, selection, market_gate, evidence_gate, {"passed": False, "reasons": ood_reasons or ["no_usable_model"]}, reasons, artifact_rejections, fallback)
-    weights = [1.0 / _outer_mae(entry["artifact"]) for entry, _, _ in predictions]
+    def selection_mae(entry: dict[str, Any]) -> float:
+        value = _outer_mae(entry["artifact"])
+        return value if value is not None else 1.0
+    weights = [1.0 / selection_mae(entry) for entry, _, _ in predictions]
     weighted_log = sum(weight * value for weight, (_, value, _) in zip(weights, predictions)) / sum(weights)
-    combined_mae = sum(weight * _outer_mae(entry["artifact"]) for weight, (entry, _, _) in zip(weights, predictions)) / sum(weights)
-    point = math.exp(weighted_log)
-    interval = {"low": round(math.exp(weighted_log - combined_mae), 2), "point": round(point, 2), "high": round(math.exp(weighted_log + combined_mae), 2)}
+    combined_mae = sum(weight * selection_mae(entry) for weight, (entry, _, _) in zip(weights, predictions)) / sum(weights)
+    point = max(1.0, math.exp(weighted_log))
+    runtime_intervals = [entry["artifact"].get("artifact", {}).get("runtime_interval_contract") for entry, _, _ in predictions]
+    if len(runtime_intervals) == 1 and isinstance(runtime_intervals[0], dict) and runtime_intervals[0].get("kind") == "train_residual_p10_p90_twd" and all(isinstance(runtime_intervals[0].get(key), (int, float)) for key in ("residual_lower_twd", "residual_upper_twd")):
+        low = max(1.0, point + float(runtime_intervals[0]["residual_lower_twd"]))
+        high = max(point, point + float(runtime_intervals[0]["residual_upper_twd"]))
+        interval = {"low": round(min(low, point), 2), "point": round(point, 2), "high": round(max(high, point), 2)}
+    else:
+        interval = {"low": round(math.exp(weighted_log - combined_mae), 2), "point": round(point, 2), "high": round(math.exp(weighted_log + combined_mae), 2)}
     drivers = [driver for _, _, contribution in predictions for driver in contribution]
     drivers.sort(key=lambda row: abs(row["contribution_log_twd"]), reverse=True)
     fallback = _fallback(account, comparables)
