@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.5-p4.1",
+  "schema_version": "1.6-p4.2",
   "goal": "precise_account_valuation_and_complete_knowledge_base",
   "status": "incomplete",
   "complete": false,
@@ -37,7 +37,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1342
+        "source_references": 1340
       },
       "requirement": "no catalog review scope or source-scoped reference remains unresolved",
       "evidence_paths": [
@@ -71,7 +71,7 @@
       "contract_id": "catalog.all_canonical_verified",
       "passed": false,
       "actual": {
-        "canonical_items": 152,
+        "canonical_items": 155,
         "non_verified_count": 78,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -163,7 +163,7 @@
       "contract_id": "catalog.required_field_evidence",
       "passed": false,
       "actual": {
-        "items_missing_required_fields": 152,
+        "items_missing_required_fields": 155,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_as_of",
@@ -2132,6 +2132,42 @@
             "set_membership",
             "source_type",
             "ultimate_reward"
+          ],
+          "item_days_of_moonlight_blossom_accessory": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_moonlight_lantern_decoration": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_moonlight_earrings": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
           ]
         },
         "registry_replay_error_count": 0,
@@ -2149,7 +2185,7 @@
       "passed": false,
       "actual": {
         "items_missing_independent_identity": 96,
-        "official_identity_count": 56,
+        "official_identity_count": 59,
         "two_secondary_identity_count": 0,
         "item_ids": [
           "item_anniversary_bass",
@@ -2260,7 +2296,7 @@
       "contract_id": "catalog.visual_state_verified",
       "passed": false,
       "actual": {
-        "items_without_complete_visual_state": 152,
+        "items_without_complete_visual_state": 155,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -2330,6 +2366,9 @@
           "item_days_of_mischief_spider_bun_hair",
           "item_days_of_mischief_star_sticker",
           "item_days_of_mischief_withered_broom",
+          "item_days_of_moonlight_blossom_accessory",
+          "item_days_of_moonlight_earrings",
+          "item_days_of_moonlight_lantern_decoration",
           "item_days_of_music_marching_band_cape",
           "item_days_of_music_music_marching_uniform",
           "item_days_of_nature_earth_cape",
@@ -3187,7 +3226,7 @@
       "contract_id": "catalog.model_eligible_positive",
       "passed": true,
       "actual": {
-        "verified": 74,
+        "verified": 77,
         "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",

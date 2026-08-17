@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 5.4.0-p4.2 — 2026-08-17
+
+- 新增 FAQ 1343 Days of Moonlight 2024 bounded core-three，離線重播三件物品的官方歷史價格與活動時窗；排除 bundle、同名類型衝突、目前 availability、視覺與轉售價推論。
+- 新增 keyed market-review finalizer：重播外部 custodian、A/B 200-row decisions、只處理分歧的 adjudication、私有 queue 雙射與每 bucket 5/5 split，再由 custodian 雙簽 candidate/binding 後匯入。
+- Market audit、gold evaluator、validator、reports、completion、release 與 fresh-LF checkout 現共用同一外部 keyed replay；legacy v2 與 keyed artifacts 嚴格互斥，partial inputs fail closed。
+- Parser 與 market formal import 新增 crash-resume 邊界；只有同一簽署 candidate 的 journal／receipt 與精確 prefix residue可補完，foreign 或不匹配輸出不會被覆寫。
+- 重建 catalog、vectors、四個 insufficient model artifacts、歷史成本、completion reports 與 package manifest；正式真人 gold、市場訓練、完整知識與視覺門檻仍未完成。
+
 ## 5.3.0-p4.1 — 2026-08-17
 
 - 新增 FAQ 1356 Days of Mischief 2024 bounded core-five，離線重播五件物品的官方歷史價格與活動時窗；不宣稱目前 availability、永久性、視覺、中文名稱或轉售價。

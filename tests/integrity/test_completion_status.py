@@ -48,7 +48,10 @@ class CompletionStatusTests(unittest.TestCase):
         ):
             report = completion_module.build(ROOT, "external-authority.json", "A" * 64)
 
-        replay.assert_called_once_with(ROOT.resolve(), "external-authority.json", "A" * 64)
+        replay.assert_called_once()
+        replay_args = replay.call_args.args
+        self.assertEqual(replay_args[:3], (ROOT.resolve(), "external-authority.json", "A" * 64))
+        self.assertTrue(all(value is None for value in replay_args[3:]))
         market_check = next(row for row in report["checks"] if row["contract_id"] == "market.human_gold_evaluation_passed")
         self.assertTrue(market_check["passed"])
 

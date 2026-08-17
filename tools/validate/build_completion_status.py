@@ -66,6 +66,9 @@ def build(
     parser_keyed_replay_binding_sha256: str | None = None,
     canonical_review_authority_bundle: str | Path | None = None,
     canonical_review_authority_bundle_sha256: str | None = None,
+    market_keyed_custodian_authority_bundle: str | Path | None = None, market_keyed_custodian_authority_bundle_sha256: str | None = None,
+    market_keyed_review_authority_bundle: str | Path | None = None, market_keyed_review_authority_bundle_sha256: str | None = None,
+    market_keyed_contract: str | Path | None = None, market_keyed_assignment_ledger: str | Path | None = None, market_keyed_decisions_a: str | Path | None = None, market_keyed_decisions_b: str | Path | None = None, market_keyed_adjudications: str | Path | None = None, market_keyed_resolution_map: str | Path | None = None, market_keyed_candidate: str | Path | None = None, market_keyed_candidate_signature: str | Path | None = None, market_keyed_binding_signature: str | Path | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     parser = _json(root / "reports/parser-knowledge-coverage.json")
@@ -111,7 +114,7 @@ def build(
         market_gold_replayed = market_gold_report == replay_market_gold_evaluation(
             root,
             market_audit_authority_bundle,
-            market_audit_authority_bundle_sha256,
+            market_audit_authority_bundle_sha256, market_keyed_custodian_authority_bundle, market_keyed_custodian_authority_bundle_sha256, market_keyed_review_authority_bundle, market_keyed_review_authority_bundle_sha256, market_keyed_contract, market_keyed_assignment_ledger, market_keyed_decisions_a, market_keyed_decisions_b, market_keyed_adjudications, market_keyed_resolution_map, market_keyed_candidate, market_keyed_candidate_signature, market_keyed_binding_signature,
         )
     except Exception:
         market_gold_replayed = False
@@ -150,7 +153,7 @@ def build(
         _check("model.replayable_publication_passed", runtime_publication_bound, {"evaluation_status": evaluation.get("status"), "publication_ready": evaluation.get("publication_ready"), "trained_artifacts": sum(row.get("status") == "trained" for row in artifacts), "runtime_artifact_bindings": len(bindings) if isinstance(bindings, list) else 0}, "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold and binds every published runtime artifact", ["reports/model-publication-evaluation.json", "modeling/artifacts"]),
     ]
     return {
-        "schema_version": "1.5-p4.1",
+        "schema_version": "1.6-p4.2",
         "goal": "precise_account_valuation_and_complete_knowledge_base",
         "status": "complete" if all(row["passed"] for row in checks) else "incomplete",
         "complete": all(row["passed"] for row in checks),
@@ -165,6 +168,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--market-audit-authority-bundle")
     parser.add_argument("--market-audit-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-custodian-authority-bundle"); parser.add_argument("--market-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-review-authority-bundle"); parser.add_argument("--market-keyed-review-authority-bundle-sha256")
+    parser.add_argument("--market-keyed-contract"); parser.add_argument("--market-keyed-assignment-ledger"); parser.add_argument("--market-keyed-decisions-a"); parser.add_argument("--market-keyed-decisions-b"); parser.add_argument("--market-keyed-adjudications"); parser.add_argument("--market-keyed-resolution-map"); parser.add_argument("--market-keyed-candidate"); parser.add_argument("--market-keyed-candidate-signature"); parser.add_argument("--market-keyed-binding-signature")
     parser.add_argument("--parser-gold-replay-inputs")
     parser.add_argument("--parser-gold-replay-inputs-sha256")
     parser.add_argument("--parser-gold-authority-bundle")
@@ -195,6 +201,7 @@ def main() -> None:
             args.parser_keyed_replay_binding_sha256,
             args.canonical_review_authority_bundle,
             args.canonical_review_authority_bundle_sha256,
+            args.market_keyed_custodian_authority_bundle, args.market_keyed_custodian_authority_bundle_sha256, args.market_keyed_review_authority_bundle, args.market_keyed_review_authority_bundle_sha256, args.market_keyed_contract, args.market_keyed_assignment_ledger, args.market_keyed_decisions_a, args.market_keyed_decisions_b, args.market_keyed_adjudications, args.market_keyed_resolution_map, args.market_keyed_candidate, args.market_keyed_candidate_signature, args.market_keyed_binding_signature,
         ),
         ensure_ascii=False,
         indent=2,
