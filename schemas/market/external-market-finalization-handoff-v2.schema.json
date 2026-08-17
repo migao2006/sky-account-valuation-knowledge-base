@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/external-market-finalization-handoff-v2.schema.json",
+  "description": "Outside-root append handoff. The injected statement bundle must exactly cover every existing dataset plus this candidate.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "candidate", "authority_bundle_sha256", "statement_bundle_sha256", "attestations"],
+  "properties": {
+    "schema_version": {"const": "authorized-market-finalization-handoff-v2"},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["dataset_id", "authorization_record_id", "manifest_sha256", "observations_sha256", "training_examples_sha256", "registry_candidate_sha256"], "properties": {"dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"}, "authorization_record_id": {"type": "string", "pattern": "^authorization_record_[a-z0-9_]+$"}, "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "training_examples_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "registry_candidate_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}},
+    "authority_bundle_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "statement_bundle_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "attestations": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["attestation", "attestation_sha256", "signature_path", "signature_sha256"], "properties": {"attestation": {"$ref": "authorized-market-attestation.schema.json"}, "attestation_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "signature_path": {"type": "string", "minLength": 1}, "signature_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}}}
+  }
+}

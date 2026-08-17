@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 5.3.0-p4.1 — 2026-08-17
+
+- 新增 FAQ 1356 Days of Mischief 2024 bounded core-five，離線重播五件物品的官方歷史價格與活動時窗；不宣稱目前 availability、永久性、視覺、中文名稱或轉售價。
+- 新增獨立 `append-v2` market finalizer，只允許已是 v2-native 的既有授權 ledger 追加新 dataset；statement bundle 必須精確覆蓋既有與新增資料，碰撞、CAS 變更或完整 replay 失敗皆回滾。
+- 授權 verifier 新增 release-wide authorization record、attestation ID 與 signature path 唯一性檢查。
+- 新增 market-review keyed custodian 核心：驗證外部 trust root、簽署 contract、400 個 opaque assignments、受限 packets 與 aggregate-only public manifest；不持有 secret、不產生標註或簽章，formal-gold importer／evaluator 尚未接線並保持 fail closed。
+- 同步 completion/catalog 子報告版本與 P4.1 package metadata；完整知識庫、真人 gold、視覺與正式市場訓練資料仍未達完成門檻。
+
 ## 5.2.0-p4.0 — 2026-08-17
 
 - 新增 FAQ 1362 Days of Music 2024 bounded core-four，離線重播四件物品的官方歷史價格、活動時窗及兩件明示的 post-event Harmony Hall availability；目前 storefront 狀態仍為 `unknown`。

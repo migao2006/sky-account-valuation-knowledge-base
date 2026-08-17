@@ -28,6 +28,7 @@ from tools.validate.schema_validator import OfflineSchemaValidator
 ROOT = Path(__file__).resolve().parents[2]
 SHA256 = re.compile(r"^[A-Fa-f0-9]{64}$")
 HANDOFF_VERSION = "authorized-market-finalization-handoff-v1"
+APPEND_HANDOFF_VERSION = "authorized-market-finalization-handoff-v2"
 _CANDIDATE_FILES = ("observations.jsonl", "training-examples.jsonl", "manifest.json", "registry-candidate.json")
 _ATTESTATION_FIELDS = {"attestation_id", "dataset_id", "role", "authority_id", "fingerprint", "statement_sha256", "manifest_sha256", "observations_sha256", "payload_sha256", "signature_file"}
 
@@ -276,13 +277,214 @@ def finalize(root: Path, candidate_dir: Path, candidate_manifest_sha256: str,
     return {"dataset_id": final_registry["dataset_id"], "manifest_sha256": final_registry["manifest_sha256"], "statement_sha256": final_registry["statement_sha256"], "attestation_count": len(attestations)}
 
 
+def _append_lock(root: Path) -> tuple[Path, bytes]:
+    """Acquire an intentionally simple, exclusive transaction lock.
+
+    The lock is an advisory boundary for finalizer processes.  Every mutable
+    file still gets a byte-for-byte compare immediately before replacement,
+    because a non-cooperating writer must never be silently overwritten.
+    """
+    path = root / "data/review/market-authorization/.finalization-append.lock"
+    token = os.urandom(32).hex().encode("ascii")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("xb") as handle:
+            handle.write(token)
+    except FileExistsError as exc:
+        raise FinalizationError("another market finalization transaction holds the exclusive lock") from exc
+    return path, token
+
+
+def _release_lock(path: Path, token: bytes) -> None:
+    # Do not delete a replacement file that does not belong to this process.
+    try:
+        if path.is_file() and path.read_bytes() == token:
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _owned_dataset_dir(path: Path, expected_sha256: dict[str, str]) -> bool:
+    """Only remove a rollback directory when it is exactly our staged copy."""
+    expected = set(_CANDIDATE_FILES[:3])
+    try:
+        if not path.is_dir() or {entry.name for entry in path.iterdir()} != expected:
+            return False
+        return all(_sha((path / name).read_bytes()) == expected_sha256[name] for name in expected)
+    except OSError:
+        return False
+
+
+def _rewrite_if_bytes(path: Path, expected: bytes, replacement: bytes, label: str) -> None:
+    """Compare and rewrite through one open handle.
+
+    This removes the pre-check/write gap used by a non-cooperating writer to
+    replace a ledger after the transaction CAS check but before write_bytes.
+    """
+    try:
+        handle = path.open("r+b")
+    except FileNotFoundError:
+        if expected:
+            raise FinalizationError(f"{label} disappeared after preflight")
+        handle = path.open("x+b")
+    with handle:
+        current = handle.read()
+        if current != expected:
+            raise FinalizationError(f"{label} changed after preflight")
+        handle.seek(0); handle.write(replacement); handle.truncate(); handle.flush(); os.fsync(handle.fileno())
+
+
+def finalize_append_v2(root: Path, candidate_dir: Path, candidate_manifest_sha256: str,
+                       authority_bundle: Path, authority_bundle_sha256: str,
+                       statement_bundle: Path, statement_bundle_sha256: str,
+                       handoff: Path, handoff_sha256: str) -> dict[str, Any]:
+    """Append one v2-authorized dataset atomically, or leave the tree intact.
+
+    This is deliberately separate from :func:`finalize`: v1 remains an
+    empty-ledger bootstrap protocol.  The v2 bundle must cover *all* existing
+    datasets plus the candidate, so historic approvals are replayed before
+    and after the append operation.
+    """
+    root = root.resolve(); candidate_dir = Path(candidate_dir).expanduser().resolve()
+    if _inside(candidate_dir, root) or not candidate_dir.is_dir():
+        raise FinalizationError("candidate directory must be an existing directory outside the release root")
+    manifest_path = _external_file(candidate_dir / "manifest.json", candidate_manifest_sha256, root, "candidate manifest")
+    for name in _CANDIDATE_FILES:
+        if not (candidate_dir / name).is_file():
+            raise FinalizationError(f"candidate {name} is missing")
+    bundle_path = _external_file(authority_bundle, authority_bundle_sha256, root, "external authority bundle")
+    statement_path = _external_file(statement_bundle, statement_bundle_sha256, root, "external authorization statement bundle")
+    handoff_path = _external_file(handoff, handoff_sha256, root, "external append finalization handoff")
+    candidate = {"manifest": _load_json(manifest_path, "candidate manifest"), "registry": _load_json(candidate_dir / "registry-candidate.json", "candidate registry")}
+    observations = _jsonl(candidate_dir / "observations.jsonl", "candidate observations")
+    examples = _jsonl(candidate_dir / "training-examples.jsonl", "candidate training examples")
+    bundle, statement_value, handoff_value = _load_json(bundle_path, "external authority bundle"), _load_json(statement_path, "external authorization statement bundle"), _load_json(handoff_path, "external append finalization handoff")
+    validator = OfflineSchemaValidator(root / "schemas")
+    _require_schema(validator, candidate["manifest"], root, "market/authorized-market-manifest.schema.json", "candidate manifest")
+    _require_schema(validator, candidate["registry"], root, "market/authorized-market-registry-candidate.schema.json", "candidate registry")
+    for row in observations: _require_schema(validator, row, root, "market/authorized-market-observation.schema.json", "candidate observation")
+    for row in examples: _require_schema(validator, row, root, "market/authorized-market-training-example.schema.json", "candidate training example")
+    _require_schema(validator, handoff_value, root, "market/external-market-finalization-handoff-v2.schema.json", "external append finalization handoff")
+    _require_schema(validator, statement_value, root, "market/external-market-authorization-statement-bundle.schema.json", "external authorization statement bundle")
+    if handoff_value.get("authority_bundle_sha256", "").upper() != _sha(bundle_path.read_bytes()) or handoff_value.get("statement_bundle_sha256", "").upper() != _sha(statement_path.read_bytes()):
+        raise FinalizationError("append handoff does not bind injected trust bytes")
+    registry_path, attestation_path = root / REGISTRY_REL, root / ATTESTATIONS_REL
+    old_registry = registry_path.read_bytes() if registry_path.exists() else b""
+    old_attestations = attestation_path.read_bytes() if attestation_path.exists() else b""
+    try:
+        old_datasets = _jsonl(registry_path, "formal registry") if old_registry.strip() else []
+        old_attestations_rows = _jsonl(attestation_path, "formal attestations") if old_attestations.strip() else []
+    except FinalizationError:
+        raise
+    except Exception as exc:
+        raise FinalizationError("existing formal ledger is unreadable") from exc
+    from tools.market_authorization import _statement_claims
+    expected_ids = {str(row.get("dataset_id")) for row in old_datasets} | {str(candidate["manifest"].get("dataset_id"))}
+    claims, claim_errors = _statement_claims(statement_value, old_datasets + [{"dataset_id": candidate["manifest"].get("dataset_id")}], _sha(statement_path.read_bytes()))
+    if claim_errors or set(claims) != expected_ids:
+        raise FinalizationError("statement bundle does not exactly cover existing and candidate datasets: " + "; ".join(claim_errors))
+    # The incoming bundle deliberately has one extra (candidate) claim, while
+    # the current ledger must still be replayed before it changes.  Project
+    # only existing claims into a temporary, outside-root transport envelope;
+    # claim bytes and their per-dataset attestation digests are unchanged.
+    if old_datasets:
+        prior = {"schema_version": "authorized-market-statement-bundle-v2", "statements": [claims[str(row["dataset_id"])][0] for row in old_datasets]}
+        with tempfile.TemporaryDirectory(prefix="sky-market-append-prior-") as prior_dir:
+            prior_path = Path(prior_dir) / "statement-bundle.json"; prior_path.write_bytes(canonical_bytes(prior))
+            replay_before = verify_authorized_market_intake(root, bundle_path, _sha(bundle_path.read_bytes()), prior_path, _sha(prior_path.read_bytes()))
+        if replay_before:
+            raise FinalizationError("existing formal authorization replay failed: " + "; ".join(replay_before))
+    candidate_claim, candidate_claim_sha = claims.get(str(candidate["manifest"].get("dataset_id")), ({}, ""))
+    # Reuse the exact v1 receipt verifier with the embedded claim and its
+    # canonical digest; signatures bind the claim, never transport bytes.
+    virtual_handoff = dict(handoff_value)
+    virtual_handoff["schema_version"] = HANDOFF_VERSION
+    virtual_handoff["statement_sha256"] = candidate_claim_sha
+    virtual_handoff.pop("statement_bundle_sha256", None)
+    final_registry, attestations, signature_sources = _verify_handoff(
+        virtual_handoff, candidate, candidate_dir, bundle, candidate_claim,
+        candidate_claim_sha, root,
+    )
+    _require_schema(validator, final_registry, root, "market/authorized-market-dataset.schema.json", "final registry row")
+    for row in attestations: _require_schema(validator, row, root, "market/authorized-market-attestation.schema.json", "final attestation")
+    old_dataset_ids = {str(row.get("dataset_id")) for row in old_datasets}
+    old_auth_ids = {str(row.get("authorization_record_id")) for row in old_datasets}
+    old_attestation_ids = {str(row.get("attestation_id")) for row in old_attestations_rows}
+    old_signature_files = {str(row.get("signature_file")) for row in old_attestations_rows}
+    new_signature_files = {str(row["signature_file"]) for row in attestations}
+    if (final_registry["dataset_id"] in old_dataset_ids or final_registry["authorization_record_id"] in old_auth_ids
+            or len({row["attestation_id"] for row in attestations}) != 3
+            or {row["attestation_id"] for row in attestations} & old_attestation_ids
+            or len(new_signature_files) != 3 or new_signature_files & old_signature_files):
+        raise FinalizationError("append would collide with an existing dataset, authorization, attestation, or signature")
+    dataset_dir = root / "data/review/market-authorization/datasets" / final_registry["dataset_id"]
+    signatures_dir = root / SIGNATURES_REL
+    targets = [signatures_dir / name for _source, name in signature_sources]
+    if dataset_dir.exists() or any(target.exists() for target in targets):
+        raise FinalizationError("append target already exists; overwrite is forbidden")
+    new_registry = old_registry + (b"" if not old_registry or old_registry.endswith(b"\n") else b"\n") + canonical_bytes(final_registry)
+    new_attestations = old_attestations + (b"" if not old_attestations or old_attestations.endswith(b"\n") else b"\n") + b"".join(canonical_bytes(row) for row in attestations)
+    installed_hashes = {name: _sha((candidate_dir / name).read_bytes()) for name in _CANDIDATE_FILES[:3]}
+    signature_hashes = {name: _sha(source.read_bytes()) for source, name in signature_sources}
+    lock_path, lock_token = _append_lock(root)
+    installed_dataset = False; created_signatures: list[tuple[Path, tuple[int, int]]] = []; registry_written = False; attestations_written = False
+    try:
+        # Re-check the immutable external input immediately before mutation.
+        for path, digest, label in ((manifest_path, candidate_manifest_sha256, "candidate manifest"), (bundle_path, authority_bundle_sha256, "authority bundle"), (statement_path, statement_bundle_sha256, "statement bundle"), (handoff_path, handoff_sha256, "append handoff")):
+            if _sha(path.read_bytes()) != digest.upper(): raise FinalizationError(f"{label} changed after preflight")
+        if (registry_path.read_bytes() if registry_path.exists() else b"") != old_registry or (attestation_path.read_bytes() if attestation_path.exists() else b"") != old_attestations:
+            raise FinalizationError("formal ledger changed after preflight")
+        with tempfile.TemporaryDirectory(prefix="sky-market-append-", dir=root) as temp:
+            staging = Path(temp); staged_dataset = staging / "dataset"; staged_dataset.mkdir()
+            for name in _CANDIDATE_FILES[:3]: shutil.copyfile(candidate_dir / name, staged_dataset / name)
+            staged_signatures = staging / "signatures"; staged_signatures.mkdir()
+            for source, name in signature_sources: shutil.copyfile(source, staged_signatures / name)
+            if any(_sha((staged_dataset / name).read_bytes()) != installed_hashes[name] for name in _CANDIDATE_FILES[:3]):
+                raise FinalizationError("candidate dataset bytes changed after preflight")
+            if any(_sha((staged_signatures / name).read_bytes()) != signature_hashes[name] for _source, name in signature_sources):
+                raise FinalizationError("candidate signature bytes changed after preflight")
+            dataset_dir.parent.mkdir(parents=True, exist_ok=True); signatures_dir.mkdir(parents=True, exist_ok=True)
+            os.rename(staged_dataset, dataset_dir); installed_dataset = True
+            _rewrite_if_bytes(registry_path, old_registry, new_registry, "formal registry"); registry_written = True
+            _rewrite_if_bytes(attestation_path, old_attestations, new_attestations, "formal attestations"); attestations_written = True
+            for _source, name in signature_sources:
+                target = signatures_dir / name
+                with (staged_signatures / name).open("rb") as source_handle:
+                    with target.open("xb") as target_handle:
+                        stat = os.fstat(target_handle.fileno())
+                        created_signatures.append((target, (stat.st_dev, stat.st_ino)))
+                        shutil.copyfileobj(source_handle, target_handle)
+            errors = verify_authorized_market_intake(root, bundle_path, _sha(bundle_path.read_bytes()), statement_path, _sha(statement_path.read_bytes()))
+            if errors: raise FinalizationError("formal authorization replay failed: " + "; ".join(errors))
+    except BaseException:
+        for target, expected_identity in created_signatures:
+            try:
+                stat = target.stat()
+                if target.is_file() and (stat.st_dev, stat.st_ino) == expected_identity:
+                    target.unlink()
+            except OSError: pass
+        if attestations_written:
+            try: _rewrite_if_bytes(attestation_path, new_attestations, old_attestations, "formal attestations during rollback")
+            except (FinalizationError, OSError): pass
+        if registry_written:
+            try: _rewrite_if_bytes(registry_path, new_registry, old_registry, "formal registry during rollback")
+            except (FinalizationError, OSError): pass
+        if installed_dataset and _owned_dataset_dir(dataset_dir, installed_hashes): shutil.rmtree(dataset_dir, ignore_errors=True)
+        raise
+    finally:
+        _release_lock(lock_path, lock_token)
+    return {"dataset_id": final_registry["dataset_id"], "manifest_sha256": final_registry["manifest_sha256"], "statement_sha256": final_registry["statement_sha256"], "attestation_count": 3, "append_protocol": "v2"}
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import a first fully authorized external market candidate.")
+    parser = argparse.ArgumentParser(description="Import an externally authorized market candidate.")
     parser.add_argument("--root", type=Path, default=ROOT); parser.add_argument("--candidate-dir", type=Path, required=True)
     parser.add_argument("--candidate-manifest-sha256", required=True); parser.add_argument("--authority-bundle", type=Path, required=True); parser.add_argument("--authority-bundle-sha256", required=True)
     parser.add_argument("--statement", type=Path, required=True); parser.add_argument("--statement-sha256", required=True); parser.add_argument("--handoff", type=Path, required=True); parser.add_argument("--handoff-sha256", required=True)
+    parser.add_argument("--append-v2", action="store_true", help="append under the v2 exact-coverage statement-bundle protocol")
     args = parser.parse_args()
-    print(json.dumps(finalize(args.root, args.candidate_dir, args.candidate_manifest_sha256, args.authority_bundle, args.authority_bundle_sha256, args.statement, args.statement_sha256, args.handoff, args.handoff_sha256), sort_keys=True))
+    operation = finalize_append_v2 if args.append_v2 else finalize
+    print(json.dumps(operation(args.root, args.candidate_dir, args.candidate_manifest_sha256, args.authority_bundle, args.authority_bundle_sha256, args.statement, args.statement_sha256, args.handoff, args.handoff_sha256), sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -150,7 +150,7 @@ def build(
         _check("model.replayable_publication_passed", runtime_publication_bound, {"evaluation_status": evaluation.get("status"), "publication_ready": evaluation.get("publication_ready"), "trained_artifacts": sum(row.get("status") == "trained" for row in artifacts), "runtime_artifact_bindings": len(bindings) if isinstance(bindings, list) else 0}, "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold and binds every published runtime artifact", ["reports/model-publication-evaluation.json", "modeling/artifacts"]),
     ]
     return {
-        "schema_version": "1.4-p3.8",
+        "schema_version": "1.5-p4.1",
         "goal": "precise_account_valuation_and_complete_knowledge_base",
         "status": "complete" if all(row["passed"] for row in checks) else "incomplete",
         "complete": all(row["passed"] for row in checks),

@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["attestation_id", "dataset_id", "role", "authority_id", "fingerprint", "statement_sha256", "manifest_sha256", "observations_sha256", "payload_sha256", "signature_file"],
   "properties": {
-    "attestation_id": {"type": "string", "pattern": "^authorized_market_attestation_[0-9]{4}$"},
+    "attestation_id": {"type": "string", "pattern": "^authorized_market_attestation_(?:[0-9]{4}|[a-z0-9_]{3,96}_(?:data_steward|privacy_reviewer|method_reviewer)_[a-f0-9]{8,32})$"},
     "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
     "role": {"enum": ["data_steward", "privacy_reviewer", "method_reviewer"]},
     "authority_id": {"type": "string", "pattern": "^authority_[a-z0-9_]+$"},

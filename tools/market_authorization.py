@@ -223,6 +223,17 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
     if not isinstance(bundle.get("authorities"),list): errors.append("external authority bundle has no authorities array")
     by={}
     for x in attestations: by.setdefault(str(x.get("dataset_id")),[]).append(x)
+    # These identifiers address release-wide objects, not merely a dataset.
+    # Rejecting reuse here makes a copied ledger fail canonical replay even if
+    # each individual dataset would otherwise have three valid signatures.
+    def _duplicate(values: list[Any]) -> bool:
+        return any(not isinstance(value, str) for value in values) or len(values) != len(set(values))
+    authorization_ids = [x.get("authorization_record_id") for x in datasets]
+    attestation_ids = [x.get("attestation_id") for x in attestations]
+    signature_files = [x.get("signature_file") for x in attestations]
+    if _duplicate(authorization_ids): errors.append("authorized market authorization_record_id is duplicated globally")
+    if _duplicate(attestation_ids): errors.append("authorized market attestation_id is duplicated globally")
+    if _duplicate(signature_files): errors.append("authorized market signature_file is duplicated globally")
     seen=set()
     mappings: dict[str, set[tuple[str,str,str,str]]] = {}
     committed_training_clusters: set[str] = set()

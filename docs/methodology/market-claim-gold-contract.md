@@ -97,3 +97,27 @@ the repository):
 python tools/market_review/onboarding.py receipt-payload --queue-row D:\restricted\queue-row.json --submission D:\restricted\human-submission.json --output D:\restricted\unsigned-receipt.json
 python tools/market_review/onboarding.py build-conflict-packet --decisions-a D:\restricted\annotator-a.jsonl --decisions-b D:\restricted\annotator-b.jsonl --output D:\restricted\conflicts.json
 ```
+
+## P4.1 keyed-custodian packet boundary
+
+P4.1 adds a separate, external keyed-custodian protocol for safely issuing
+market-review packets. It is intentionally narrower than formal-gold import:
+it verifies a custodian-provided, SHA-256-pinned and revocable authority bundle
+and a detached OpenSSH-signed contract, then verifies and copies packets the
+custodian has already created. It cannot accept a caller secret or map, derive
+assignments, generate keys/signatures/labels, or write gold.
+
+The custodian contract fixes a 200-listing cohort and 400 opaque assignments:
+200 each for annotator A and B. The public manifest contains aggregate counts,
+a Merkle commitment, split commitment, the two packet digests, and custodian
+identity only. It never contains a listing ID/hash, review ID, input hash,
+per-row assignment, or per-row split. The restricted external assignment ledger
+is limited to opaque assignment IDs and reviewer role; the two restricted
+packets are each exactly 200 rows and are accepted only when their existing
+digest and assignment coverage match the signed contract.
+
+All authority, contract, signature, ledger, packet and handoff paths must be
+outside the release checkout. The only permitted in-checkout output is
+`data/review/market-keyed-queue-manifest.json`; a normal release has no such
+manifest until an external custodian supplies the signed artifacts. Candidate
+and formal-gold import remain fail-closed under the v2 market-audit contract.
