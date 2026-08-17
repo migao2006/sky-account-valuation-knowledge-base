@@ -208,10 +208,20 @@ def clean_authorized(
     rows: list[dict[str, Any]], root: Path,
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
     statement: str | Path | None = None, statement_sha256: str | None = None,
+    identity_authority_bundle: str | Path | None = None, identity_authority_bundle_sha256: str | None = None,
+    identity_mapping: str | Path | None = None, identity_mapping_sha256: str | None = None,
+    identity_statement: str | Path | None = None, identity_statement_sha256: str | None = None,
+    receipt_archive: str | Path | None = None, receipt_archive_sha256: str | None = None,
+    receipt_authority_bundle: str | Path | None = None, receipt_authority_bundle_sha256: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Replay external trust material internally, then clean exact bound rows."""
     evaluator = make_authorization_evaluator(
         root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+        identity_authority_bundle, identity_authority_bundle_sha256,
+        identity_mapping, identity_mapping_sha256,
+        identity_statement, identity_statement_sha256,
+        receipt_archive, receipt_archive_sha256,
+        receipt_authority_bundle, receipt_authority_bundle_sha256,
     )
     if evaluator.errors:
         raise ValueError("authorized market intake is invalid: " + "; ".join(evaluator.errors))
@@ -229,9 +239,21 @@ def clean_authorized_with_verified_sales(
     rows: list[dict[str, Any]], root: Path,
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
     statement: str | Path | None = None, statement_sha256: str | None = None,
+    identity_authority_bundle: str | Path | None = None, identity_authority_bundle_sha256: str | None = None,
+    identity_mapping: str | Path | None = None, identity_mapping_sha256: str | None = None,
+    identity_statement: str | Path | None = None, identity_statement_sha256: str | None = None,
+    receipt_archive: str | Path | None = None, receipt_archive_sha256: str | None = None,
+    receipt_authority_bundle: str | Path | None = None, receipt_authority_bundle_sha256: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Return a dedicated verified-sale pool; it is never mixed with asking prices."""
-    evaluator = make_authorization_evaluator(root, authority_bundle, authority_bundle_sha256, statement, statement_sha256)
+    evaluator = make_authorization_evaluator(
+        root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+        identity_authority_bundle, identity_authority_bundle_sha256,
+        identity_mapping, identity_mapping_sha256,
+        identity_statement, identity_statement_sha256,
+        receipt_archive, receipt_archive_sha256,
+        receipt_authority_bundle, receipt_authority_bundle_sha256,
+    )
     if evaluator.errors:
         raise ValueError("authorized market intake is invalid: " + "; ".join(evaluator.errors))
     projected = evaluator.bound_training_rows()
@@ -247,11 +269,21 @@ def build(
     root: Path, input_path: Path | None = None, output_dir: Path | None = None,
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
     statement: str | Path | None = None, statement_sha256: str | None = None,
+    identity_authority_bundle: str | Path | None = None, identity_authority_bundle_sha256: str | None = None,
+    identity_mapping: str | Path | None = None, identity_mapping_sha256: str | None = None,
+    identity_statement: str | Path | None = None, identity_statement_sha256: str | None = None,
+    receipt_archive: str | Path | None = None, receipt_archive_sha256: str | None = None,
+    receipt_authority_bundle: str | Path | None = None, receipt_authority_bundle_sha256: str | None = None,
 ) -> dict[str, int]:
     source = input_path or root / "data/comparables/accounts.jsonl"
     destination = output_dir or root / "data/modeling"
     normal, urgent, verified_sales, exclusions = clean_authorized_with_verified_sales(
         read_jsonl(source), root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+        identity_authority_bundle, identity_authority_bundle_sha256,
+        identity_mapping, identity_mapping_sha256,
+        identity_statement, identity_statement_sha256,
+        receipt_archive, receipt_archive_sha256,
+        receipt_authority_bundle, receipt_authority_bundle_sha256,
     )
     write_jsonl(destination / "price-cleaned-normal.jsonl", normal)
     write_jsonl(destination / "price-cleaned-urgent.jsonl", urgent)
@@ -269,6 +301,16 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--market-identity-authority-bundle", type=Path)
+    parser.add_argument("--market-identity-authority-bundle-sha256")
+    parser.add_argument("--market-identity-mapping", type=Path)
+    parser.add_argument("--market-identity-mapping-sha256")
+    parser.add_argument("--market-identity-statement", type=Path)
+    parser.add_argument("--market-identity-statement-sha256")
+    parser.add_argument("--market-receipt-archive", type=Path)
+    parser.add_argument("--market-receipt-archive-sha256")
+    parser.add_argument("--market-receipt-authority-bundle", type=Path)
+    parser.add_argument("--market-receipt-authority-bundle-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
     try:
@@ -277,6 +319,11 @@ def main() -> None:
             args.market_authorization_authority_bundle,
             args.market_authorization_authority_bundle_sha256,
             args.market_authorization_statement, args.market_authorization_statement_sha256,
+            args.market_identity_authority_bundle, args.market_identity_authority_bundle_sha256,
+            args.market_identity_mapping, args.market_identity_mapping_sha256,
+            args.market_identity_statement, args.market_identity_statement_sha256,
+            args.market_receipt_archive, args.market_receipt_archive_sha256,
+            args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
         )
     except ValueError as exc:
         parser.error(str(exc))

@@ -74,6 +74,16 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--market-identity-authority-bundle", type=Path)
+    parser.add_argument("--market-identity-authority-bundle-sha256")
+    parser.add_argument("--market-identity-mapping", type=Path)
+    parser.add_argument("--market-identity-mapping-sha256")
+    parser.add_argument("--market-identity-statement", type=Path)
+    parser.add_argument("--market-identity-statement-sha256")
+    parser.add_argument("--market-receipt-archive", type=Path)
+    parser.add_argument("--market-receipt-archive-sha256")
+    parser.add_argument("--market-receipt-authority-bundle", type=Path)
+    parser.add_argument("--market-receipt-authority-bundle-sha256")
     parser.add_argument("--parser-gold-authority-bundle", type=Path)
     parser.add_argument("--parser-gold-authority-bundle-sha256")
     parser.add_argument("--parser-gold-replay-inputs", type=Path)
@@ -159,6 +169,11 @@ def main() -> None:
         rows["comparable_accounts"], root,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
+        args.market_identity_authority_bundle, args.market_identity_authority_bundle_sha256,
+        args.market_identity_mapping, args.market_identity_mapping_sha256,
+        args.market_identity_statement, args.market_identity_statement_sha256,
+        args.market_receipt_archive, args.market_receipt_archive_sha256,
+        args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
     )
     if rows["clean_normal"] != expected_normal or rows["clean_urgent"] != expected_urgent or rows["clean_verified_sales"] != expected_verified_sales or rows["model_exclusions"] != expected_exclusions:
         raise RuntimeError("formal clean prices differ from deterministic feature-lineage-gated rebuild")
@@ -217,7 +232,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.7-p3.5",
+        "schema_version": "4.8-p3.6",
         "as_of_date": "2026-08-17",
         "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
         "full_item_catalog_complete": catalog_completion["complete"],
@@ -470,13 +485,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.7-p3.5"
+    previous_validation["schema_version"] = "4.8-p3.6"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p35"
-    manifest["package_version"] = "4.7.0-p3.5"
+    manifest["package_id"] = "sky-valuation-v4-p36"
+    manifest["package_version"] = "4.8.0-p3.6"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/verified-sale-receipt-authority-bundle.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "authorities", "revoked_fingerprints"],
+  "properties": {"schema_version": {"const": "verified-sale-receipt-authority-bundle-v1"}, "revoked_fingerprints": {"type": "array", "items": {"type": "string"}}, "authorities": {"type": "array", "minItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["issuer_id", "public_key", "fingerprint", "independence_group"], "properties": {"issuer_id": {"type": "string", "pattern": "^issuer_[a-z0-9_]{1,96}$"}, "public_key": {"type": "string"}, "fingerprint": {"type": "string", "pattern": "^SHA256:.+"}, "independence_group": {"type": "string", "pattern": "^[a-z0-9_]{1,96}$"}}}}}
+}

@@ -25,10 +25,22 @@ v3, structural completed-sale evidence IDs and hashes. v2 accepts asking,
 reduced, and urgent listings. v3 accepts only verified completed sales, with
 at least two independent structural evidence commitments.
 
-The current feature allowlist deliberately contains only bounded
-`base_account` fields. It is a privacy-safe bootstrap contract, not coverage of
-the full valuation surface or a claim of precision; expanding it requires a
-separate exact bounded-schema and privacy review.
+P3.6 replaces the bootstrap payload with the exact
+`authorized-market-feature-payload-v1` contract. It carries all eight model
+groups (`season_profiles`, `item_sets`, `collection`, `resources`,
+`map_completion`, `base_account`, `bindings`, and `ownership_history`) plus an
+exact, catalog-bound `item_states` universe. All supplier values are bounded
+enums, pinned canonical IDs, booleans, or bounded integers. Free prose,
+account identifiers, short IDs, source descriptions, URLs, handles and contact
+fields are not contract fields and are rejected.
+
+The provider supplies an empty `item_sets` array. On import, the shared feature
+canonicalizer derives every set summary and every model-eligibility flag from
+the pinned catalog and the supplied item states; neither can be self-attested.
+The same canonicalizer is used by authorization replay, publication training,
+and Elastic Net inference, so signed training rows and runtime estimates use
+the same item and aggregate features. A stale catalog binding, a missing or
+duplicate canonical item state, or any unsupported field fails closed.
 
 The builder re-hashes every immutable source file before emitting output. The
 full source hash determines each derived observation/training ID and is included
@@ -55,6 +67,26 @@ Consequently, even a cryptographically valid v2/v3 candidate remains ineligible
 for model training and cleaning with
 `market_data_cluster_independence_evaluator_required` until that mapping
 contract exists.
+
+## P3.6 external identity-to-cluster replay
+
+`tools.market_identity.verifier` can now consume the required mapping contract,
+but no mapping, identity key, or restricted source is stored in this repository.
+The resolver supplies three outside-root inputs: an authority bundle, a PII-free
+JSONL mapping, and a signed statement, each accompanied by its actual SHA-256.
+The mapping binds every exact signed training example and observation to its
+existing opaque account and cluster IDs.  It contains a resolver-generated
+HMAC commitment only—never an account name, handle, source locator, identity
+value, or resolver salt.
+
+Two distinct OpenSSH identities are required: `identity_resolver` and
+`identity_dedup_reviewer`. They attest the mapping byte digest, dataset roots,
+expiry, and canonical receipt payload. A verifier rejects a missing or extra
+row, any binding mismatch, one commitment assigned to multiple clusters, one
+cluster assigned to multiple commitments, local release-root inputs, expired
+statements, revoked keys, or invalid signatures. Only a fully replayed mapping
+sets the factory evaluator's `cluster_independence_bound` flag; the cleaner and
+publication freezer receive no raw identity commitment.
 
 For the exact unsigned payload used by the existing OpenSSH verifier, import
 `canonical_signing_payload(dataset_candidate, manifest, statement, attestation)`.

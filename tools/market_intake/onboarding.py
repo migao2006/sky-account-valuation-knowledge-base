@@ -26,24 +26,10 @@ PHONE = re.compile(r"(?:\+\d[\d .()-]{6,}\d|\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{3,4
 OBSERVATION_BASE = {"post_date", "currency", "server", "offer_kind", "entity_kind", "price_line", "price_twd"}
 STAGING_REQUIRED = OBSERVATION_BASE | {"source_snapshot_path", "source_snapshot_sha256", "dedup_cluster_digest", "account_commitment_digest", "feature_payload", "catalog_provenance", "catalog_provenance_sha256"}
 V3_REQUIRED = {"completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence", "completion_evidence_digest", "independent_evidence_ids"}
-ACCOUNT_TYPES = {"unknown", "winged_or_unspecified", "winged", "no_wing"}
-
-
-def feature_payload_errors(value: Any) -> list[str]:
-    """Exact low-cardinality runtime feature contract; no free text/handles."""
-    if not isinstance(value, dict) or set(value) != {"feature_groups"}:
-        return ["feature payload must contain exactly feature_groups"]
-    groups = value.get("feature_groups")
-    if not isinstance(groups, dict) or set(groups) != {"base_account"}:
-        return ["feature_groups must contain exactly base_account"]
-    base = groups.get("base_account")
-    if not isinstance(base, dict) or set(base) - {"account_type", "owned_count"} or "account_type" not in base:
-        return ["base_account has unsupported or missing fields"]
-    if base.get("account_type") not in ACCOUNT_TYPES:
-        return ["base_account.account_type is not an approved enum"]
-    if "owned_count" in base and (not isinstance(base["owned_count"], int) or isinstance(base["owned_count"], bool) or not 0 <= base["owned_count"] <= 100000):
-        return ["base_account.owned_count is outside the approved integer range"]
-    return []
+def feature_payload_errors(value: Any, root: Path = ROOT) -> list[str]:
+    """Validate the shared P3.6 canonical feature contract."""
+    from tools.modeling.market_feature_contract import errors
+    return errors(value, root)
 
 
 class IntakeError(ValueError):
@@ -156,7 +142,7 @@ def _validate_record(record: Any, version: str, root: Path) -> None:
         raise IntakeError(f"{version} price_line is not permitted")
     if not isinstance(record.get("price_twd"), int) or isinstance(record["price_twd"], bool) or record["price_twd"] < 1:
         raise IntakeError("price_twd must be a supplied positive integer; it is never inferred")
-    feature_errors = feature_payload_errors(record.get("feature_payload"))
+    feature_errors = feature_payload_errors(record.get("feature_payload"), root)
     if feature_errors:
         raise IntakeError("feature_payload runtime contract invalid: " + "; ".join(feature_errors))
     if not isinstance(record.get("catalog_provenance"), dict) or not isinstance(record.get("catalog_provenance_sha256"), str) or not SHA256.fullmatch(record["catalog_provenance_sha256"]) or record["catalog_provenance_sha256"].upper() != sha256(canonical_bytes(record["catalog_provenance"])):

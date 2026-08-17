@@ -1,0 +1,23 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1374_days_of_love_core_four_2026_08_17",
+  "source_id":"source_tgc_faq_1374_days_of_love_core_four",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1374-patch-notes---january-16-2025---0-28-0-308028-android-huawei-ios-playstation-steam-switch/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1374's Days of Love 2025 window and four named new-item offers. No HTML, images, current storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2025-02-10",
+    "historical_window_end_date":"2025-02-23",
+    "new_items":[
+      {"item_id":"item_days_of_love_violet_crystal_prop","official_name_en":"Days of Love Violet Crystal Prop","original_currency":"event_currency","original_cost":14},
+      {"item_id":"item_days_of_love_braids","official_name_en":"Days of Love Braids","original_currency":"event_currency","original_cost":35},
+      {"item_id":"item_days_of_love_amethyst_accessory","official_name_en":"Days of Love Amethyst Accessory","original_currency":"USD","original_cost":2.99},
+      {"item_id":"item_days_of_love_amethyst_tipped_tails","official_name_en":"Days of Love Amethyst-Tipped Tails hairstyle","original_currency":"USD","original_cost":6.99}
+    ]
+  },
+  "non_claims":[
+    "This historical FAQ does not establish current availability, a return policy, permanent-account property, or current storefront state.",
+    "The FAQ does not provide formal Traditional Chinese names, image assets, or a visual match.",
+    "This bounded core-four cohort is not a complete Days of Love catalog and asserts no bundle or set membership."
+  ]
+}

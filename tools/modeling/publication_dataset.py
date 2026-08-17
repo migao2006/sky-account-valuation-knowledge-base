@@ -180,8 +180,8 @@ def _example_index(training_examples: list[dict[str, Any]]) -> dict[str, dict[st
 
 
 def _assert_signed_lineage(
-    payload: dict[str, Any], vector: dict[str, Any], provenance: dict[str, Any], examples: dict[str, dict[str, Any]],
-) -> None:
+    payload: dict[str, Any], provenance: dict[str, Any], examples: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     """Require one atomic v2 commitment, not merely five plausible strings."""
     example = examples.get(payload["training_example_id"])
     if example is None:
@@ -196,9 +196,10 @@ def _assert_signed_lineage(
         raise PublicationDatasetError(f"signed_training_example_commitment_mismatch:{payload['training_example_id']}")
     if payload["account_id"] != example.get("account_id") or payload["cluster_id"] != example.get("dedup_cluster_id"):
         raise PublicationDatasetError(f"signed_training_example_account_or_cluster_mismatch:{payload['account_id']}")
-    if payload["feature_payload_sha256"].upper() != _signed_payload_sha256(vector).upper():
+    signed_feature_payload = example.get("feature_payload")
+    if not isinstance(signed_feature_payload, dict) or payload["feature_payload_sha256"].upper() != _signed_payload_sha256(signed_feature_payload).upper():
         raise PublicationDatasetError(f"signed_feature_payload_vector_mismatch:{payload['account_id']}")
-    if payload["catalog_provenance_sha256"].upper() != _signed_payload_sha256(provenance).upper():
+    if example.get("catalog_provenance") != provenance or payload["catalog_provenance_sha256"].upper() != _signed_payload_sha256(provenance).upper():
         raise PublicationDatasetError(f"signed_catalog_provenance_mismatch:{payload['account_id']}")
     if payload["dedup_cluster_digest"].upper() != _signed_payload_sha256(payload["cluster_id"]).upper():
         raise PublicationDatasetError(f"signed_dedup_cluster_mismatch:{payload['account_id']}")
@@ -218,6 +219,7 @@ def _assert_signed_lineage(
     if payload["price_line"] == "verified_sale":
         if any(payload.get(field) != example.get(field) for field in ("completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence_digest", "independent_evidence_ids", "observation_row_digest")):
             raise PublicationDatasetError(f"signed_verified_sale_commitment_mismatch:{payload['training_example_id']}")
+    return signed_feature_payload
 
 
 def _evaluation_subgroup(vector: dict[str, Any]) -> str:
@@ -257,20 +259,22 @@ def _freeze(
             raise
         if payload["cleaned_price_id"] in ids or payload["history_id"] in histories:
             raise PublicationDatasetError("duplicate_clean_price_or_history_id")
-        matching_vectors = vectors.get(payload["account_id"], [])
-        if not matching_vectors:
-            raise PublicationDatasetError(f"row_missing_vector:{payload['account_id']}")
-        if len(matching_vectors) != 1:
-            raise PublicationDatasetError(f"duplicate_vector_account_id:{payload['account_id']}")
-        if matching_vectors[0].get("catalog_provenance") != provenance:
-            raise PublicationDatasetError(f"stale_or_forged_catalog_provenance:{payload['account_id']}")
         if require_signed_lineage:
-            _assert_signed_lineage(payload, matching_vectors[0], provenance, examples)
-        payload["evaluation_subgroup"] = _evaluation_subgroup(matching_vectors[0])
+            feature_payload = _assert_signed_lineage(payload, provenance, examples)
+        else:
+            matching_vectors = vectors.get(payload["account_id"], [])
+            if not matching_vectors:
+                raise PublicationDatasetError(f"row_missing_vector:{payload['account_id']}")
+            if len(matching_vectors) != 1:
+                raise PublicationDatasetError(f"duplicate_vector_account_id:{payload['account_id']}")
+            if matching_vectors[0].get("catalog_provenance") != provenance:
+                raise PublicationDatasetError(f"stale_or_forged_catalog_provenance:{payload['account_id']}")
+            feature_payload = matching_vectors[0]
+        payload["evaluation_subgroup"] = _evaluation_subgroup(feature_payload)
         # Preserve the *exact* signed account vector in the frozen row.  The
         # evaluator must never silently substitute listing date or an
         # unbound feature projection for an account-feature model.
-        payload["feature_payload"] = matching_vectors[0]
+        payload["feature_payload"] = feature_payload
         ids.add(payload["cleaned_price_id"])
         histories.add(payload["history_id"])
         frozen.append({**payload, "row_sha256": _sha256(payload)})

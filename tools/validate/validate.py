@@ -154,6 +154,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1343-days-of-sunlight-core-three.json": "schemas/knowledge/days-of-sunlight-faq-1343-core-three-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1308-cinnamoroll-popup-cafe.json": "schemas/knowledge/cinnamoroll-popup-cafe-faq-1308-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1264-days-of-fortune-core-five.json": "schemas/knowledge/days-of-fortune-faq-1264-core-five-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1374-days-of-love-core-four.json": "schemas/knowledge/days-of-love-faq-1374-core-four-fact-snapshot.schema.json",
 }
 
 
@@ -228,10 +229,20 @@ def formal_price_rebuild_errors(
     root: Path,
     authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
     statement: str | Path | None = None, statement_sha256: str | None = None,
+    identity_authority_bundle: str | Path | None = None, identity_authority_bundle_sha256: str | None = None,
+    identity_mapping: str | Path | None = None, identity_mapping_sha256: str | None = None,
+    identity_statement: str | Path | None = None, identity_statement_sha256: str | None = None,
+    receipt_archive: str | Path | None = None, receipt_archive_sha256: str | None = None,
+    receipt_authority_bundle: str | Path | None = None, receipt_authority_bundle_sha256: str | None = None,
 ) -> list[str]:
     """Reject any formal model-price row not produced by the authorization gate."""
     expected_normal, expected_urgent, expected_verified_sales, expected_exclusions = clean_model_prices(
         comparable_accounts, root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+        identity_authority_bundle, identity_authority_bundle_sha256,
+        identity_mapping, identity_mapping_sha256,
+        identity_statement, identity_statement_sha256,
+        receipt_archive, receipt_archive_sha256,
+        receipt_authority_bundle, receipt_authority_bundle_sha256,
     )
     problems: list[str] = []
     if actual_normal != expected_normal:
@@ -383,6 +394,16 @@ def validate(
     market_authorization_authority_bundle_sha256: str | None = None,
     market_authorization_statement: str | Path | None = None,
     market_authorization_statement_sha256: str | None = None,
+    market_identity_authority_bundle: str | Path | None = None,
+    market_identity_authority_bundle_sha256: str | None = None,
+    market_identity_mapping: str | Path | None = None,
+    market_identity_mapping_sha256: str | None = None,
+    market_identity_statement: str | Path | None = None,
+    market_identity_statement_sha256: str | None = None,
+    market_receipt_archive: str | Path | None = None,
+    market_receipt_archive_sha256: str | None = None,
+    market_receipt_authority_bundle: str | Path | None = None,
+    market_receipt_authority_bundle_sha256: str | None = None,
     parser_gold_authority_bundle: str | Path | None = None,
     parser_gold_authority_bundle_sha256: str | None = None,
     parser_gold_replay_inputs: Path | None = None,
@@ -882,6 +903,11 @@ def validate(
         actual_normal, actual_urgent, actual_verified_sales, actual_exclusions,
         root, market_authorization_authority_bundle, market_authorization_authority_bundle_sha256,
         market_authorization_statement, market_authorization_statement_sha256,
+        market_identity_authority_bundle, market_identity_authority_bundle_sha256,
+        market_identity_mapping, market_identity_mapping_sha256,
+        market_identity_statement, market_identity_statement_sha256,
+        market_receipt_archive, market_receipt_archive_sha256,
+        market_receipt_authority_bundle, market_receipt_authority_bundle_sha256,
     ))
     # Clean model prices must be a strict, reproducible subset of vectors.
     for relative, expected_line in (
@@ -1175,7 +1201,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.7-p3.5", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.8-p3.6", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1192,6 +1218,16 @@ def main() -> None:
     parser.add_argument("--market-authorization-authority-bundle-sha256")
     parser.add_argument("--market-authorization-statement", type=Path)
     parser.add_argument("--market-authorization-statement-sha256")
+    parser.add_argument("--market-identity-authority-bundle", type=Path)
+    parser.add_argument("--market-identity-authority-bundle-sha256")
+    parser.add_argument("--market-identity-mapping", type=Path)
+    parser.add_argument("--market-identity-mapping-sha256")
+    parser.add_argument("--market-identity-statement", type=Path)
+    parser.add_argument("--market-identity-statement-sha256")
+    parser.add_argument("--market-receipt-archive", type=Path)
+    parser.add_argument("--market-receipt-archive-sha256")
+    parser.add_argument("--market-receipt-authority-bundle", type=Path)
+    parser.add_argument("--market-receipt-authority-bundle-sha256")
     parser.add_argument("--parser-gold-authority-bundle", type=Path)
     parser.add_argument("--parser-gold-authority-bundle-sha256")
     parser.add_argument("--parser-gold-replay-inputs", type=Path)
@@ -1201,6 +1237,11 @@ def main() -> None:
         args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
         args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
         args.market_authorization_statement, args.market_authorization_statement_sha256,
+        args.market_identity_authority_bundle, args.market_identity_authority_bundle_sha256,
+        args.market_identity_mapping, args.market_identity_mapping_sha256,
+        args.market_identity_statement, args.market_identity_statement_sha256,
+        args.market_receipt_archive, args.market_receipt_archive_sha256,
+        args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
         args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
         args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
     )

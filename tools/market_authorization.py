@@ -64,10 +64,10 @@ def _valid_observation(row: dict[str, Any], version: str) -> bool:
         ))
     )
 
-def _valid_feature_payload(value: Any) -> bool:
+def _valid_feature_payload(value: Any, root: Path | None = None) -> bool:
     try:
         from tools.market_intake.onboarding import feature_payload_errors
-        return not feature_payload_errors(value)
+        return not feature_payload_errors(value, root or Path(__file__).resolve().parents[1])
     except Exception:
         return False
 def _inside(p: Path, parent: Path) -> bool:
@@ -231,7 +231,7 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                 reused_across_datasets = set(clusters) & committed_training_clusters
                 committed_training_clusters.update(clusters)
                 hashes_ok=all(
-                    _valid_feature_payload(example.get("feature_payload"))
+                    _valid_feature_payload(example.get("feature_payload"), root)
                     and
                     example.get("feature_payload_sha256", "").upper()==_catalog_digest(example.get("feature_payload"))
                     and example.get("catalog_provenance_sha256", "").upper()==_catalog_digest(example.get("catalog_provenance"))
@@ -298,6 +298,7 @@ class AuthorizedMarketEvaluator:
     errors: tuple[str,...]=()
     feature_lineage_bound: bool=False
     cluster_independence_bound: bool=False
+    receipt_bound_observation_ids: tuple[str, ...]=()
     _factory_capability: object|None=None
     @property
     def factory_verified(self) -> bool:
@@ -317,7 +318,7 @@ class AuthorizedMarketEvaluator:
         # A signed metadata assertion is not a replayable receipt or
         # counterparty proof.  Keep verified-sale intake fail-closed until a
         # privacy-preserving completion-evidence archive/evaluator exists.
-        if expected_line == "verified_sale":
+        if expected_line == "verified_sale" and observation["observation_id"] not in self.receipt_bound_observation_ids:
             return False
         line_matches = (
             (expected_line == "asking" and price_type in {"asking", "normal_listing"})
@@ -410,7 +411,15 @@ class AuthorizedMarketEvaluator:
             result.append(row)
         return result
 
-def make_authorization_evaluator(root: Path, authority_bundle: str|Path|None=None, authority_bundle_sha256: str|None=None, statement: str|Path|None=None, statement_sha256: str|None=None) -> AuthorizedMarketEvaluator:
+def make_authorization_evaluator(
+    root: Path, authority_bundle: str|Path|None=None, authority_bundle_sha256: str|None=None,
+    statement: str|Path|None=None, statement_sha256: str|None=None,
+    identity_authority_bundle: str|Path|None=None, identity_authority_bundle_sha256: str|None=None,
+    identity_mapping: str|Path|None=None, identity_mapping_sha256: str|None=None,
+    identity_statement: str|Path|None=None, identity_statement_sha256: str|None=None,
+    receipt_archive: str|Path|None=None, receipt_archive_sha256: str|None=None,
+    receipt_authority_bundle: str|Path|None=None, receipt_authority_bundle_sha256: str|None=None,
+) -> AuthorizedMarketEvaluator:
     errors=verify_authorized_market_intake(root,authority_bundle,authority_bundle_sha256,statement,statement_sha256)
     mappings: list[tuple[tuple[str,str,str,str,str], dict[str,Any]]] = []
     feature_lineage_bound=False
@@ -426,7 +435,54 @@ def make_authorization_evaluator(root: Path, authority_bundle: str|Path|None=Non
                 ((str(ds["authorization_record_id"]), str(ds["dataset_id"]), str(row["observation_id"]), sha256_bytes(canonical_bytes(row)), str(ds["manifest_sha256"]).upper()), {"observation": row, "training_example": examples_by_observation.get(str(row["observation_id"])), "dataset": ds, "manifest": manifest})
                 for row in rows
             )
-    return AuthorizedMarketEvaluator(tuple(mappings),tuple(errors),feature_lineage_bound,False,_FACTORY_CAPABILITY)
+    # Supplier-derived opaque cluster digests are only labels.  They become an
+    # independence boundary when a separate, externally held resolver mapping
+    # has replayed every exact signed training-example binding.
+    identity_args = (
+        identity_authority_bundle, identity_authority_bundle_sha256,
+        identity_mapping, identity_mapping_sha256, identity_statement, identity_statement_sha256,
+    )
+    cluster_independence_bound = False
+    identity_index: dict[tuple[str, str], dict[str, Any]] = {}
+    if not errors and feature_lineage_bound and any(value is not None for value in identity_args):
+        from tools.market_identity.verifier import verify_identity_mapping
+        identity_errors, identity_index = verify_identity_mapping(
+            root, [binding for _key, binding in mappings],
+            identity_authority_bundle, identity_authority_bundle_sha256,
+            identity_mapping, identity_mapping_sha256,
+            identity_statement, identity_statement_sha256,
+        )
+        errors.extend(identity_errors)
+        cluster_independence_bound = not identity_errors
+    receipt_bound: list[str] = []
+    receipt_args = (receipt_archive, receipt_archive_sha256, receipt_authority_bundle, receipt_authority_bundle_sha256)
+    sale_bindings = [binding for _key, binding in mappings if binding["observation"].get("price_line") == "verified_sale"]
+    if not errors and sale_bindings and any(value is not None for value in receipt_args):
+        from tools.market_receipts.verifier import disclosure_matches_authorized_sale, verify_receipt_archive
+        replay = verify_receipt_archive(root, receipt_archive, receipt_archive_sha256, receipt_authority_bundle, receipt_authority_bundle_sha256)
+        errors.extend(replay.errors)
+        if not replay.errors:
+            for binding in sale_bindings:
+                observation, example = binding["observation"], binding.get("training_example") or {}
+                identity = identity_index.get((str(binding["dataset"]["dataset_id"]), str(example.get("training_example_id"))), {})
+                expected = {
+                    **observation,
+                    **{key: example.get(key) for key in ("training_example_id", "training_example_digest", "observation_row_digest")},
+                    "identity_mapping_commitment_sha256": identity.get("identity_commitment"),
+                }
+                matches = [row for row in replay.disclosures if disclosure_matches_authorized_sale(row, expected)]
+                if len(matches) != 1:
+                    errors.append(f"{observation['observation_id']}: receipt archive does not bind exactly one authorized sale")
+                else:
+                    receipt_bound.append(str(observation["observation_id"]))
+            expected_ids = {str(binding["observation"]["observation_id"]) for binding in sale_bindings}
+            replay_ids = {str(row["observation_id"]) for row in replay.disclosures}
+            if replay_ids != expected_ids:
+                errors.append("receipt archive observations differ from formal verified-sale observations")
+    return AuthorizedMarketEvaluator(
+        tuple(mappings), tuple(errors), feature_lineage_bound, cluster_independence_bound,
+        tuple(sorted(receipt_bound)) if not errors else (), _FACTORY_CAPABILITY,
+    )
 
 def model_training_authorization_reasons(row: dict[str,Any], external_evaluator: Callable[[dict[str,Any]],bool]|None=None) -> list[str]:
     x=row.get("market_data_authorization")

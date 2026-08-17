@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "market/external-market-identity-statement.schema.json", "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "mapping_sha256", "dataset_roots", "expires_at", "attestations"],
+  "properties": {"schema_version": {"const": "market-identity-statement-v1"}, "mapping_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "dataset_roots": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["dataset_id", "manifest_sha256", "observations_sha256"], "properties": {"dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"}, "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "observations_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}}}, "expires_at": {"type": "string", "format": "date"}, "attestations": {"type": "array", "minItems": 2}}
+}

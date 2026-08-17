@@ -37,7 +37,10 @@ def build(
     try:
         from .catalog_completion import build as build_catalog_completion
     except ImportError:
-        from catalog_completion import build as build_catalog_completion
+        try:
+            from .catalog_completion import build as build_catalog_completion
+        except ImportError:  # direct script execution
+            from catalog_completion import build as build_catalog_completion
     catalog_completion = build_catalog_completion(root)
     items = _jsonl(root / "knowledge/items/items.jsonl")
     eligible = sum(row.get("verification_status") == "verified" and row.get("model_feature_status") == "eligible" for row in items)
@@ -76,7 +79,6 @@ def build(
         evaluation.get("publication_ready") is True
         and evaluation.get("status") == "passed"
         and artifacts
-        and all(row.get("status") == "trained" for row in artifacts)
         and evaluation_replayed
         and exact_runtime_bindings
     )

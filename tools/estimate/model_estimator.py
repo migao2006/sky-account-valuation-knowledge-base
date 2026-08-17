@@ -391,8 +391,12 @@ def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], boun
         from modeling.train_elastic_net import feature_mapping
         # Runtime consumes the same flattened representation as training,
         # including structured list entries and nested feature groups.
-        source = account.get("features") if isinstance(account.get("features"), dict) else account.get("feature_groups", account)
-        flattened = feature_mapping({"features": source})
+        if account.get("feature_contract_version") == "authorized-market-feature-payload-v1":
+            from tools.modeling.market_feature_contract import feature_mapping_for_payload
+            flattened = feature_mapping_for_payload(account, Path(__file__).resolve().parents[2])
+        else:
+            source = account.get("features") if isinstance(account.get("features"), dict) else account.get("feature_groups", account)
+            flattened = feature_mapping({"features": source})
     except Exception as exc:
         return None, [], [f"elastic_feature_mapping_failed:{type(exc).__name__}"]
     transformed: dict[str, float] = {}

@@ -67,6 +67,40 @@ class ProgressionContractTests(unittest.TestCase):
             path.write_text(json.dumps(artifact), encoding="utf-8")
             self.assertFalse(model_artifacts_release_valid([artifact], passed, paths, True))
 
+    def test_canonical_normal_only_publication_allows_other_lines_to_remain_insufficient(self):
+        """The release envelope has four slots, but P3.5 publishes one runtime.
+
+        A forged second trained slot, stale artifact byte hash, or non-canonical
+        slot must not be able to make this legal normal-only publication pass.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "elastic-net-normal_listing.json"
+            trained = {
+                "status": "trained", "model_type": "elastic_net", "price_line": "normal_listing",
+                "prediction_contract": {"kind": "additive_log_price", "intercept": 8.0, "coefficients": {}},
+            }
+            path.write_text(json.dumps(trained), encoding="utf-8")
+            insufficient = [
+                {"status": "insufficient_training_data", "model_type": "elastic_net", "price_line": "urgent_sale"},
+                {"status": "insufficient_training_data", "model_type": "xgboost", "price_line": "normal_listing"},
+                {"status": "insufficient_training_data", "model_type": "xgboost", "price_line": "urgent_sale"},
+            ]
+            shared = {key: "A" * 64 for key in ("dataset_sha256", "dataset_manifest_sha256", "split_sha256")}
+            binding = {
+                "price_line": "normal_listing", "model_type": "elastic_net", **shared,
+                "model_sha256": _artifact_model_sha256(trained, path), "artifact_sha256": sha256(path),
+            }
+            passed = {"status": "passed", "publication_ready": True, **shared, "artifact_bindings": [binding]}
+            artifacts = [trained, *insufficient]
+            paths = {("elastic_net", "normal_listing"): path}
+            self.assertTrue(model_artifacts_release_valid(artifacts, passed, paths, True))
+            self.assertFalse(model_artifacts_release_valid(artifacts, {**passed, "artifact_bindings": [{**binding, "artifact_sha256": "B" * 64}]}, paths, True))
+            forged_mixed = [{**trained}, {**insufficient[0], "status": "trained"}, *insufficient[1:]]
+            self.assertFalse(model_artifacts_release_valid(forged_mixed, passed, paths, True))
+            trained["prediction_contract"]["intercept"] = 9.0
+            path.write_text(json.dumps(trained), encoding="utf-8")
+            self.assertFalse(model_artifacts_release_valid(artifacts, passed, paths, True))
+
     def test_mixed_or_unpassed_model_release_is_rejected(self):
         trained = {"status": "trained", "model_type": "elastic_net", "price_line": "normal_listing"}
         insufficient = {"status": "insufficient_training_data"}

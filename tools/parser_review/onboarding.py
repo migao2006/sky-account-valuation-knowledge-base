@@ -25,6 +25,12 @@ STRATUM_VALUE_PATTERN = re.compile(r"bucket_[0-9]{1,2}")
 QUEUE_SIZE = 200
 SPLIT_SIZE = QUEUE_SIZE // 2
 COMMITMENT_NAMESPACE = "sky-parser-review-commitment-v1"
+KEYED_PROTOCOL = "sky-parser-review-keyed-hmac-v1"
+KEYED_CONTRACT_NAMESPACE = "sky-parser-review-keyed-custodian-v1"
+KEYED_QUEUE_SIZE = 200
+KEYED_SPLIT_COUNTS = {"development": 100, "heldout": 100}
+_KEYED_HEX = re.compile(r"[A-F0-9]{64}")
+_KEYED_ASSIGNMENT_ID = re.compile(r"assignment_annotator_[ab]_[a-f0-9]{32}")
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -46,11 +52,53 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         "reason": "No external replay inputs have been supplied; no queue or formal gold exists.",
     }:
         return []
+    if isinstance(manifest, dict) and manifest.get("schema_version") == "1.0-p3.6":
+        try:
+            _validate_keyed_public_manifest(manifest)
+        except ValueError as exc:
+            return [str(exc)]
+        return []
     try:
         _validate_frozen_manifest(manifest)
     except ValueError as exc:
         return [str(exc)]
     return []
+
+
+def _validate_keyed_public_manifest(manifest: dict[str, Any]) -> None:
+    """Validate only the non-linkable public surface of a P3.6 cohort.
+
+    Detached custodian signature validation is deliberately separate because
+    its contract lives outside the release root.  This guard rejects any old
+    per-input/split field before a future release validator consumes it.
+    """
+    required = {
+        "schema_version", "status", "cohort_id", "keyed_protocol", "queue_size", "split_counts",
+        "required_strata", "strata_distinct_value_counts", "commitment_merkle_root", "split_commitment",
+        "packet_sha256", "assignment_ledger_sha256", "custodian_id", "custodian_fingerprint",
+        "custodian_contract_sha256", "manifest_sha256",
+    }
+    forbidden = {"queue", "input_sha256", "input_commitment", "source_sha256", "queue_id", "split", "profile", "listing"}
+    if not isinstance(manifest, dict) or set(manifest) != required or any(key in manifest for key in forbidden):
+        raise ValueError("keyed public manifest contains unsupported or linkable fields")
+    if manifest.get("schema_version") != "1.0-p3.6" or manifest.get("status") != "keyed_frozen_pending_external_decisions" or manifest.get("keyed_protocol") != KEYED_PROTOCOL:
+        raise ValueError("keyed public manifest protocol/version is invalid")
+    if not isinstance(manifest.get("cohort_id"), str) or not re.fullmatch(r"parser_keyed_[a-z0-9_]{8,64}", manifest["cohort_id"]):
+        raise ValueError("keyed public manifest cohort ID is invalid")
+    if manifest.get("queue_size") != KEYED_QUEUE_SIZE or manifest.get("split_counts") != KEYED_SPLIT_COUNTS or manifest.get("required_strata") != list(REQUIRED_STRATA):
+        raise ValueError("keyed public manifest weakens 200/100 policy")
+    coverage = manifest.get("strata_distinct_value_counts")
+    if not isinstance(coverage, dict) or set(coverage) != set(REQUIRED_STRATA) or any(not isinstance(value, int) or value < 2 for value in coverage.values()):
+        raise ValueError("keyed public manifest strata coverage is invalid")
+    if any(not isinstance(manifest.get(key), str) or not _KEYED_HEX.fullmatch(manifest[key]) for key in ("commitment_merkle_root", "split_commitment", "assignment_ledger_sha256", "custodian_contract_sha256")):
+        raise ValueError("keyed public manifest commitment digest is invalid")
+    packets = manifest.get("packet_sha256")
+    if not isinstance(packets, dict) or set(packets) != {"annotator_a", "annotator_b"} or any(not isinstance(value, str) or not _KEYED_HEX.fullmatch(value) for value in packets.values()):
+        raise ValueError("keyed public manifest packet commitments are invalid")
+    if not isinstance(manifest.get("custodian_id"), str) or not re.fullmatch(r"parser_custodian_[a-z0-9_]{3,64}", manifest["custodian_id"]) or not isinstance(manifest.get("custodian_fingerprint"), str) or not manifest["custodian_fingerprint"]:
+        raise ValueError("keyed public manifest custodian identity is invalid")
+    if manifest.get("manifest_sha256") != digest(canonical_bytes({key: value for key, value in manifest.items() if key != "manifest_sha256"})):
+        raise ValueError("keyed public manifest digest does not bind its contents")
 
 
 def _outside_root(path: Path, root: Path, purpose: str) -> Path:
@@ -76,6 +124,153 @@ def _safe_queue_manifest_output(path: Path, root: Path) -> Path:
     if resolved == allowed:
         return resolved
     return _safe_workflow_output(resolved, root, "queue manifest output")
+
+
+def _verify_openssh_payload(payload: dict[str, Any], *, public_key: str, fingerprint: str, signature: Path, identity: str, namespace: str) -> None:
+    """Verify an external authority's detached OpenSSH signature.
+
+    The key and signature authenticate a public contract only.  In particular,
+    this helper never receives an HMAC key, source input, or split mapping.
+    """
+    actual = _fingerprint(public_key)
+    if not actual or actual != fingerprint:
+        raise ValueError("custodian public key fingerprint is invalid")
+    with tempfile.TemporaryDirectory(prefix="parser-keyed-review-") as temporary:
+        allowed = Path(temporary) / "allowed_signers"
+        allowed.write_text(f"{identity} {public_key.strip()}\n", encoding="utf-8")
+        result = subprocess.run(
+            ["ssh-keygen", "-Y", "verify", "-f", str(allowed), "-I", identity,
+             "-n", namespace, "-s", str(signature)],
+            input=canonical_bytes(payload), capture_output=True, check=False,
+        )
+    if result.returncode:
+        raise ValueError("custodian detached signature verification failed")
+
+
+def _keyed_contract_payload(contract: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in contract.items() if key not in {"signature_file", "contract_sha256"}}
+
+
+def validate_keyed_custodian_contract(contract: dict[str, Any], contract_path: Path, root: Path) -> dict[str, Any]:
+    """Validate a P3.6 external custodian contract without seeing its secrets.
+
+    A custodian creates the keyed HMAC commitments and private raw-input/split
+    map outside the repository.  The public issuer may only act on this signed,
+    fixed-size contract; callers cannot supply a blind secret or an ad-hoc map.
+    """
+    contract_path = _outside_root(contract_path, root, "keyed custodian contract")
+    required = {
+        "schema_version", "contract_type", "cohort_id", "keyed_protocol",
+        "queue_size", "split_counts", "required_strata", "strata_distinct_value_counts",
+        "commitment_merkle_root", "split_commitment", "packet_sha256",
+        "assignment_ledger_sha256", "custodian_id", "public_key", "fingerprint",
+        "signature_file", "contract_sha256",
+    }
+    if not isinstance(contract, dict) or set(contract) != required:
+        raise ValueError("keyed custodian contract has unsupported fields")
+    if contract.get("schema_version") != "1.0-p3.6" or contract.get("contract_type") != "parser_review_keyed_custodian_contract" or contract.get("keyed_protocol") != KEYED_PROTOCOL:
+        raise ValueError("keyed custodian contract protocol/version is invalid")
+    if not isinstance(contract.get("cohort_id"), str) or not re.fullmatch(r"parser_keyed_[a-z0-9_]{8,64}", contract["cohort_id"]):
+        raise ValueError("keyed custodian cohort ID is invalid")
+    if contract.get("queue_size") != KEYED_QUEUE_SIZE or contract.get("split_counts") != KEYED_SPLIT_COUNTS or contract.get("required_strata") != list(REQUIRED_STRATA):
+        raise ValueError("keyed custodian contract weakens the fixed 200/100 policy")
+    if not isinstance(contract.get("strata_distinct_value_counts"), dict) or set(contract["strata_distinct_value_counts"]) != set(REQUIRED_STRATA) or any(not isinstance(value, int) or value < 2 for value in contract["strata_distinct_value_counts"].values()):
+        raise ValueError("keyed custodian contract strata coverage is invalid")
+    if any(not isinstance(contract.get(name), str) or not _KEYED_HEX.fullmatch(contract[name]) for name in ("commitment_merkle_root", "split_commitment", "assignment_ledger_sha256")):
+        raise ValueError("keyed custodian commitment digest is invalid")
+    packets = contract.get("packet_sha256")
+    if not isinstance(packets, dict) or set(packets) != {"annotator_a", "annotator_b"} or any(not isinstance(value, str) or not _KEYED_HEX.fullmatch(value) for value in packets.values()):
+        raise ValueError("keyed custodian packet commitments are invalid")
+    if not isinstance(contract.get("custodian_id"), str) or not re.fullmatch(r"parser_custodian_[a-z0-9_]{3,64}", contract["custodian_id"]):
+        raise ValueError("keyed custodian ID is invalid")
+    if contract.get("contract_sha256") != digest(canonical_bytes(_keyed_contract_payload(contract))):
+        raise ValueError("keyed custodian contract digest does not bind its payload")
+    signature_name = contract.get("signature_file")
+    if not isinstance(signature_name, str) or Path(signature_name).name != signature_name:
+        raise ValueError("keyed custodian signature path is invalid")
+    _verify_openssh_payload(
+        _keyed_contract_payload(contract), public_key=contract["public_key"], fingerprint=contract["fingerprint"],
+        signature=contract_path.parent / signature_name, identity=contract["custodian_id"], namespace=KEYED_CONTRACT_NAMESPACE,
+    )
+    return contract
+
+
+def _read_keyed_assignment_ledger(path: Path, contract: dict[str, Any], root: Path) -> list[dict[str, Any]]:
+    """Read safe opaque assignment IDs; the raw-to-split mapping stays private."""
+    path = _outside_root(path, root, "keyed assignment ledger")
+    rows = _read_jsonl(path)
+    if digest(b"".join(canonical_bytes(row) for row in rows)) != contract["assignment_ledger_sha256"]:
+        raise ValueError("keyed assignment ledger digest does not match custodian contract")
+    if len(rows) != 400 or len({row.get("assignment_id") for row in rows if isinstance(row, dict)}) != 400:
+        raise ValueError("keyed assignment ledger must contain exactly 400 unique assignments")
+    counts = {"annotator_a": 0, "annotator_b": 0}
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"assignment_id", "reviewer"} or not isinstance(row.get("assignment_id"), str) or not _KEYED_ASSIGNMENT_ID.fullmatch(row["assignment_id"]) or row.get("reviewer") not in counts:
+            raise ValueError("keyed assignment ledger exposes or contains invalid fields")
+        counts[row["reviewer"]] += 1
+    if counts != {"annotator_a": 200, "annotator_b": 200}:
+        raise ValueError("each keyed reviewer must receive exactly 200 assignments")
+    return rows
+
+
+def issue_keyed_blind_packages(contract_path: Path, assignment_ledger_path: Path, packet_dir: Path, output_dir: Path, root: Path) -> dict[str, Any]:
+    """Validate and copy custodian-issued blind packets outside the release root.
+
+    It deliberately cannot construct packets from source input.  Only a signed
+    external custodian contract may authorize this public handoff.
+    """
+    contract_path = _outside_root(contract_path, root, "keyed custodian contract")
+    packet_dir = _outside_root(packet_dir, root, "keyed restricted packet directory")
+    output_dir = _outside_root(output_dir, root, "keyed blind package output")
+    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root)
+    assignments = _read_keyed_assignment_ledger(assignment_ledger_path, contract, root)
+    by_reviewer = {reviewer: {row["assignment_id"] for row in assignments if row["reviewer"] == reviewer} for reviewer in ("annotator_a", "annotator_b")}
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: dict[str, str] = {}
+    for reviewer in ("annotator_a", "annotator_b"):
+        path = packet_dir / f"parser-review-{reviewer}-blind.jsonl"
+        content = path.read_bytes()
+        if digest(content) != contract["packet_sha256"][reviewer]:
+            raise ValueError(f"{reviewer} blind packet digest does not match custodian contract")
+        rows = _read_jsonl(path)
+        if len(rows) != 200:
+            raise ValueError(f"{reviewer} blind packet must contain exactly 200 rows")
+        ids: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"assignment_id", "profile", "listing", "strata"}:
+                raise ValueError("keyed blind packet has unsupported/linkable fields")
+            if not isinstance(row.get("assignment_id"), str) or row["assignment_id"] not in by_reviewer[reviewer] or row["assignment_id"] in ids:
+                raise ValueError("keyed blind packet assignment coverage is invalid")
+            if not isinstance(row.get("profile"), dict) or not isinstance(row.get("listing"), dict):
+                raise ValueError("keyed blind packet profile/listing is invalid")
+            _strata(row.get("strata")); ids.add(row["assignment_id"])
+        if ids != by_reviewer[reviewer]:
+            raise ValueError("keyed blind packet does not exactly cover issued assignments")
+        destination = output_dir / path.name
+        destination.write_bytes(content)
+        written[reviewer] = digest(content)
+    return {"schema_version": "1.0-p3.6", "status": "external_keyed_blind_packets_issued", "cohort_id": contract["cohort_id"], "contract_sha256": contract["contract_sha256"], "packet_sha256": written, "formal_gold_written": False}
+
+
+def publish_keyed_queue_manifest(contract_path: Path, manifest_out: Path, root: Path) -> dict[str, Any]:
+    """Publish only the signed public commitment surface of a keyed cohort."""
+    contract_path = _outside_root(contract_path, root, "keyed custodian contract")
+    manifest_out = _safe_queue_manifest_output(manifest_out, root)
+    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root)
+    manifest = {
+        "schema_version": "1.0-p3.6", "status": "keyed_frozen_pending_external_decisions",
+        "cohort_id": contract["cohort_id"], "keyed_protocol": contract["keyed_protocol"],
+        "queue_size": contract["queue_size"], "split_counts": contract["split_counts"],
+        "required_strata": contract["required_strata"], "strata_distinct_value_counts": contract["strata_distinct_value_counts"],
+        "commitment_merkle_root": contract["commitment_merkle_root"], "split_commitment": contract["split_commitment"],
+        "packet_sha256": contract["packet_sha256"], "assignment_ledger_sha256": contract["assignment_ledger_sha256"],
+        "custodian_id": contract["custodian_id"], "custodian_fingerprint": contract["fingerprint"],
+        "custodian_contract_sha256": contract["contract_sha256"],
+    }
+    manifest["manifest_sha256"] = digest(canonical_bytes(manifest))
+    manifest_out.parent.mkdir(parents=True, exist_ok=True)
+    manifest_out.write_bytes(canonical_bytes(manifest))
+    return manifest
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -460,6 +655,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Freeze parser review packets outside the release root.")
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build-queue"); build.add_argument("--source", type=Path, required=True); build.add_argument("--source-sha256", required=True); build.add_argument("--manifest-out", type=Path, required=True); build.add_argument("--packet-dir", type=Path, required=True); build.add_argument("--root", type=Path, default=ROOT)
+    keyed_publish = sub.add_parser("publish-keyed-manifest", help="publish a signed custodian's non-linkable keyed cohort manifest")
+    keyed_publish.add_argument("--custodian-contract", type=Path, required=True); keyed_publish.add_argument("--manifest-out", type=Path, required=True); keyed_publish.add_argument("--root", type=Path, default=ROOT)
+    keyed_issue = sub.add_parser("issue-keyed-blind-packages", help="copy only contract-bound, already-issued custodian blind packets")
+    keyed_issue.add_argument("--custodian-contract", type=Path, required=True); keyed_issue.add_argument("--assignment-ledger", type=Path, required=True); keyed_issue.add_argument("--packet-dir", type=Path, required=True); keyed_issue.add_argument("--output-dir", type=Path, required=True); keyed_issue.add_argument("--root", type=Path, default=ROOT)
     packages = sub.add_parser("build-blind-packages"); packages.add_argument("--manifest", type=Path, required=True); packages.add_argument("--packet-dir", type=Path, required=True); packages.add_argument("--output-dir", type=Path, required=True); packages.add_argument("--blind-secret", required=True); packages.add_argument("--root", type=Path, default=ROOT)
     receipt = sub.add_parser("decision-receipt-payload"); receipt.add_argument("--assignment", type=Path, required=True); receipt.add_argument("--assignment-ledger", type=Path, required=True); receipt.add_argument("--decision", type=Path, required=True); receipt.add_argument("--manifest", type=Path, required=True); receipt.add_argument("--output", type=Path, required=True); receipt.add_argument("--root", type=Path, default=ROOT)
     conflict = sub.add_parser("build-conflict-packet"); conflict.add_argument("--manifest", type=Path, required=True); conflict.add_argument("--decisions-a", type=Path, required=True); conflict.add_argument("--decisions-b", type=Path, required=True); conflict.add_argument("--output", type=Path, required=True); conflict.add_argument("--root", type=Path, default=ROOT)
@@ -467,6 +666,10 @@ def main() -> None:
     importer = sub.add_parser("import-candidate-ledger"); importer.add_argument("--manifest", type=Path, required=True); importer.add_argument("--decisions-a", type=Path, required=True); importer.add_argument("--decisions-b", type=Path, required=True); importer.add_argument("--adjudications", type=Path); importer.add_argument("--output", type=Path, required=True); importer.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args()
     if args.command == "build-queue": build_queue(args.root.resolve(), args.source, args.source_sha256, args.manifest_out.resolve(), args.packet_dir)
+    elif args.command == "publish-keyed-manifest":
+        publish_keyed_queue_manifest(args.custodian_contract, args.manifest_out, args.root.resolve())
+    elif args.command == "issue-keyed-blind-packages":
+        issue_keyed_blind_packages(args.custodian_contract, args.assignment_ledger, args.packet_dir, args.output_dir, args.root.resolve())
     elif args.command == "build-blind-packages":
         manifest = json.loads(args.manifest.read_text(encoding="utf-8")); build_blind_packages(manifest, args.packet_dir, args.output_dir, args.blind_secret, args.root.resolve())
     elif args.command == "decision-receipt-payload":

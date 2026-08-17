@@ -222,14 +222,14 @@ def _runtime_replay_metrics(root: Path, manifest: dict[str, Any], rows: list[dic
     predictions: list[float] = []
     for row in holdout:
         try:
-            prediction = max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain)))
+            prediction = max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain, root)))
         except (PublicationRuntimeError, OverflowError, ValueError):
             continue
         supported.append(row); predictions.append(prediction)
     if not supported:
         raise PublicationRuntimeError("runtime_supported_holdout_case_count_zero")
     holdout = supported
-    train_predictions = [max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain))) for row in train]
+    train_predictions = [max(1.0, math.exp(predict_log(artifact["prediction_contract"], row, domain, root))) for row in train]
     interval_contract = artifact.get("artifact", {}).get("runtime_interval_contract", {})
     if not isinstance(interval_contract, dict) or interval_contract.get("kind") != "train_residual_p10_p90_twd" or interval_contract.get("quantiles") != [.10, .90] or not all(isinstance(interval_contract.get(key), (int, float)) for key in ("residual_lower_twd", "residual_upper_twd")):
         raise PublicationRuntimeError("runtime_interval_contract_invalid")
