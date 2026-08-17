@@ -321,20 +321,20 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         normal, urgent, exclusions = clean_authorized([], self.root, *self.args(), *identity_args)
         self.assertEqual([], exclusions)
         # The fixture's reduced listing is intentionally classified as an
-        # urgent price line by the cleaner; the asking listing remains a
-        # non-empty normal pool and is the publication input under test.
+        # urgent price line by the cleaner; both signed lines must be accepted
+        # by the production freezer using the identical mapping.
         self.assertEqual(1, len(normal))
         self.assertEqual(1, len(urgent))
         registered = [{**example, "_registered_observation": observation} for observation, example in zip(observations, examples)]
-        frozen = freeze(normal, [], catalog_provenance(self.root), [], registered)
-        self.assertEqual(1, frozen["dataset_row_count"])
+        frozen = freeze([*normal, *urgent], [], catalog_provenance(self.root), [], registered)
+        self.assertEqual(2, frozen["dataset_row_count"])
         self.assertEqual("production_signed", frozen["lineage_mode"])
         # ``build`` is the production split entrypoint: it must rebuild from
         # the registered intake rather than trust a caller-provided manifest.
         modeling = self.root / "data/modeling"
         modeling.mkdir(parents=True, exist_ok=True)
         (modeling / "price-cleaned-normal.jsonl").write_bytes(b"".join(canonical_bytes(row) for row in normal))
-        (modeling / "price-cleaned-urgent.jsonl").write_bytes(b"")
+        (modeling / "price-cleaned-urgent.jsonl").write_bytes(b"".join(canonical_bytes(row) for row in urgent))
         (modeling / "price-cleaned-verified-sales.jsonl").write_bytes(b"")
         (modeling / "account-item-vectors.jsonl").write_bytes(b"")
         rebuilt, derived = build_publication_dataset(self.root)

@@ -9,7 +9,7 @@
     "evidence_id": {"type": "string", "pattern": "^canonical_evidence_[a-z0-9_]+$"},
     "target_type": {"enum": ["item", "set"]},
     "target_id": {"type": "string", "pattern": "^(?:item|set)_[a-z0-9_]+$"},
-    "field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history", "availability_status", "availability_history", "original_cost", "original_currency", "first_release_date", "free_or_premium", "permanent_account_item", "collaboration", "visual_reference"]},
+    "field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history", "availability_status", "availability_history", "availability_as_of", "original_cost", "original_currency", "first_release_date", "free_or_premium", "pass_required", "ultimate_reward", "permanent_account_item", "collaboration", "visual_reference"]},
     "claim_value": {},
     "claim_hash": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
     "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
@@ -26,11 +26,12 @@
     "notes": {"type": "string"}
   },
   "allOf": [
-    {"if": {"required": ["target_type"], "properties": {"target_type": {"const": "item"}}}, "then": {"properties": {"target_id": {"pattern": "^item_[a-z0-9_]+$"}, "field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "availability_status", "availability_history", "original_cost", "original_currency", "first_release_date", "free_or_premium", "permanent_account_item", "collaboration", "visual_reference"]}}}},
+    {"if": {"required": ["target_type"], "properties": {"target_type": {"const": "item"}}}, "then": {"properties": {"target_id": {"pattern": "^item_[a-z0-9_]+$"}, "field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "availability_status", "availability_history", "availability_as_of", "original_cost", "original_currency", "first_release_date", "free_or_premium", "pass_required", "ultimate_reward", "permanent_account_item", "collaboration", "visual_reference"]}}}},
     {"if": {"required": ["target_type"], "properties": {"target_type": {"const": "set"}}}, "then": {"properties": {"target_id": {"pattern": "^set_[a-z0-9_]+$"}, "field_path": {"enum": ["identity_description", "source_type", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history", "availability_history"]}}}},
-    {"if": {"required": ["field_path"], "properties": {"field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "platform_access_history", "availability_status", "availability_history", "original_currency", "first_release_date", "free_or_premium", "permanent_account_item", "visual_reference"]}}}, "then": {"properties": {"claim_value": {"type": "string"}}}},
+    {"if": {"required": ["field_path"], "properties": {"field_path": {"enum": ["canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_guid", "vendor_item_type", "source_type", "set_membership", "platform_access_history", "availability_status", "availability_history", "availability_as_of", "original_currency", "first_release_date", "free_or_premium", "pass_required", "permanent_account_item", "visual_reference"]}}}, "then": {"properties": {"claim_value": {"type": "string"}}}},
     {"if": {"required": ["field_path"], "properties": {"field_path": {"enum": ["original_cost", "historical_pack_price_usd"]}}}, "then": {"properties": {"claim_value": {"type": "number"}}}},
     {"if": {"required": ["field_path"], "properties": {"field_path": {"const": "collaboration"}}}, "then": {"properties": {"claim_value": {"type": "boolean"}}}},
+    {"if": {"required": ["field_path"], "properties": {"field_path": {"const": "ultimate_reward"}}}, "then": {"properties": {"claim_value": {"type": "boolean"}}}},
     {"if": {"required": ["field_path"], "properties": {"field_path": {"enum": ["set_required_item_ids", "scope_definition"]}}}, "then": {"properties": {"claim_value": {"type": "array"}}}}
   ]
 }

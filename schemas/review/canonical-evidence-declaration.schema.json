@@ -1,16 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review/canonical-evidence-declaration.schema.json",
-  "description": "Data-only shadow declaration. It cannot promote catalog, model, or visual data.",
+  "description": "Data-only declaration. Production v2 can only be admitted through a separately dual-approved registry cohort.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["declaration_format", "cohort_id", "mode", "reviewed_at", "sources", "rules"],
+  "required": ["declaration_format", "cohort_id", "mode", "sources", "rules"],
   "properties": {
-    "declaration_format": {"const": "canonical_evidence_declaration_v1"},
+    "declaration_format": {"enum": ["canonical_evidence_declaration_v1", "canonical_evidence_declaration_v2"]},
     "cohort_id": {"type": "string", "pattern": "^canonical_cohort_[a-z0-9_]+$"},
-    "mode": {"const": "shadow_only"},
+    "mode": {"enum": ["shadow_only", "production"]},
     "reviewed_at": {"type": "string", "format": "date"},
     "sources": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "source_id", "source_lineage_id", "source_tier"], "properties": {"path": {"type": "string", "pattern": "^data/source/[A-Za-z0-9._/-]+\\.json$"}, "sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "source_lineage_id": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"}, "source_tier": {"enum": ["official_item_specific", "official_general", "secondary_reference"]}}}},
     "rules": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["target_type", "target_id", "field_path", "source_key", "source_item_pointer", "source_item_id_exact", "claim_locator", "evidence_role", "notes"], "properties": {"target_type": {"enum": ["item", "set"]}, "target_id": {"type": "string", "pattern": "^(?:item|set)_[a-z0-9_]+$"}, "field_path": {"type": "string"}, "source_key": {"type": "string", "minLength": 1}, "source_item_pointer": {"type": "string", "pattern": "^/"}, "source_item_id_exact": {"type": ["string", "integer"]}, "claim_locator": {"type": "string", "pattern": "^/"}, "evidence_role": {"enum": ["independent_identity", "independent_field", "secondary_field"]}, "notes": {"type": "string"}}}}
-  }
+  },
+  "allOf": [
+    {"if": {"properties": {"declaration_format": {"const": "canonical_evidence_declaration_v1"}}}, "then": {"required": ["reviewed_at"], "properties": {"mode": {"const": "shadow_only"}}}},
+    {"if": {"properties": {"declaration_format": {"const": "canonical_evidence_declaration_v2"}}}, "then": {"required": ["reviewed_at"], "properties": {"mode": {"const": "production"}}}}
+  ]
 }

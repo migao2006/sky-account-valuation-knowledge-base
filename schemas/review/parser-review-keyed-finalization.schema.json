@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"review/parser-review-keyed-finalization.schema.json",
+  "description":"External-only P3.8 custodian finalization. It binds independently signed A/B ledgers, an adjudication ledger, and the public V2 ledger without publishing input hashes or split assignments.",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","contract_type","cohort_id","assignment_ledger_sha256","annotator_a_ledger_sha256","annotator_b_ledger_sha256","adjudication_ledger_sha256","public_gold_sha256","authority_id","fingerprint","signature_file","finalization_sha256"],
+  "properties":{
+    "schema_version":{"const":"2.0-p3.8"},"contract_type":{"const":"parser_review_keyed_finalization"},
+    "cohort_id":{"type":"string","pattern":"^parser_keyed_[a-z0-9_]{8,64}$"},
+    "assignment_ledger_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"},"annotator_a_ledger_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"},"annotator_b_ledger_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"},"adjudication_ledger_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"},"public_gold_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"},
+    "authority_id":{"type":"string","pattern":"^parser_custodian_authority_[a-z0-9_]{3,64}$"},"fingerprint":{"type":"string","minLength":1},"signature_file":{"type":"string","pattern":"^[a-zA-Z0-9._-]+\\.sig$"},"finalization_sha256":{"type":"string","pattern":"^[A-F0-9]{64}$"}
+  }
+}

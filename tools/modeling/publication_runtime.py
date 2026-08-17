@@ -92,16 +92,12 @@ def _training_rows(rows: list[dict[str, Any]], root: Path) -> list[dict[str, Any
 
 
 def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str, Any]) -> dict[str, Any]:
-    """Build the sole production-runtime artifact allowed by P3.5.
-
-    The normal line only is intentional.  Urgent and XGBoost have no evaluator
-    contract yet and must remain insufficient rather than being implicitly
-    promoted by this code.
-    """
+    """Build an exact train-only Elastic artifact for one supported pool."""
     if manifest.get("lineage_mode") != "production_signed":
         raise PublicationRuntimeError("runtime_artifact_requires_production_signed_manifest")
-    if pool.get("price_line") != "normal_listing":
-        raise PublicationRuntimeError("runtime_artifact_supports_normal_listing_only")
+    price_line = pool.get("price_line")
+    if price_line not in {"normal_listing", "urgent_sale"}:
+        raise PublicationRuntimeError("runtime_artifact_price_line_unsupported")
     train, _holdout = _pool_rows(manifest, pool)
     rows = _training_rows(train, root)
     if len({row["group"] for row in rows}) < 3:
@@ -121,8 +117,8 @@ def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str
     pipe = _fit_with_inner_groups(frame, y, groups, numeric, categorical)
     exported = _export_plain_json_model(pipe, numeric, categorical)
     vector = root / "data/modeling/account-item-vectors.jsonl"
-    normal = root / "data/modeling/price-cleaned-normal.jsonl"
-    paths, snapshot = input_snapshot(vector, normal)
+    price_path = root / "data/modeling" / ("price-cleaned-normal.jsonl" if price_line == "normal_listing" else "price-cleaned-urgent.jsonl")
+    paths, snapshot = input_snapshot(vector, price_path)
     contract = additive_prediction_contract(exported, numeric, categorical)
     numeric_domains = {
         name: {"min": min(float(row["features"][name]) for row in rows if isinstance(row["features"].get(name), (int, float)) and not isinstance(row["features"].get(name), bool)),
@@ -142,7 +138,7 @@ def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str
     if residual_low > 0 or residual_high < 0:
         raise PublicationRuntimeError("runtime_interval_must_contain_zero")
     return {
-        "schema_version": SCHEMA_VERSION, "status": "trained", "price_line": "normal_listing", "model_type": "elastic_net", "random_seed": 1729,
+        "schema_version": SCHEMA_VERSION, "status": "trained", "price_line": price_line, "model_type": "elastic_net", "random_seed": 1729,
         "input_snapshot_paths": paths, "input_snapshot_sha256": snapshot,
         "catalog_provenance": catalog_provenance(root),
         "training": {"eligible_rows": len(rows), "minimum_rows": 300, "feature_group_count": len({key.split('.', 1)[0] for row in rows for key in row["features"]}),
@@ -155,7 +151,7 @@ def build_expected_artifact(root: Path, manifest: dict[str, Any], pool: dict[str
                            "categorical_columns": categorical, "continuous_columns": numeric,
                            "missing_mask_columns": [f"numeric__missingindicator_{name}" for name in numeric], "target": "log_twd_price",
                            "runtime_domain": domain},
-        "prediction_contract": contract, "rejected_rows": [], "limitations": ["normal_listing_only", "metrics_and_publication_binding_owned_by_publication_evaluator"],
+        "prediction_contract": contract, "rejected_rows": [], "limitations": ["verified_sale_is_evidence_only_not_estimator", "metrics_and_publication_binding_owned_by_publication_evaluator"],
         "artifact": {"serialization": "plain_json", "model": exported,
                      "runtime_interval_contract": {"kind": "train_residual_p10_p90_twd", "quantiles": [0.10, 0.90],
                                                    "residual_lower_twd": residual_low, "residual_upper_twd": residual_high}},

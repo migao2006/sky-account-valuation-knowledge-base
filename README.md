@@ -1,8 +1,8 @@
-# Sky 光遇知識庫與授權估價框架 v4.9 P3.7
+# Sky 光遇知識庫與授權估價框架 v5.0 P3.8
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v4.9 P3.7 新增 Days of Treasure／Days of Bloom FAQ 1381 core-six 的可重播官方／vendor evidence，並把 keyed parser protocol 接到受信任、可撤銷的外部 custodian authority 與 gold replay binding。正式測試現已覆蓋 identity mapping、授權市場資料、verified-sale receipt、清理、publication freeze/split，以及完整八組特徵從訓練到 runtime estimator 的一致性；declarative cohort verifier 目前只作 shadow parity，不具有 promotion 權限。上述能力仍只接受 release root 外、SHA-256 固定且可重播的資料；正式 registry、外部 mapping／receipt、真人 gold 與圖片資產仍為空，所以 production training／verified-sale pool／估價保持 not ready。所有正式工具只處理本機檔案，不主動連網。
+v5.0 P3.8 把 keyed parser review 補成可驗證的 200-row A/B 標註、分歧裁決、custodian finalization 與不可公開連結 split 的正式 gold 流程；公開 ledger 只保存 keyed commitment。`reduced` 市場觀測現在以單一契約進入 `urgent_sale`，normal 與 urgent Elastic runtime 可各自訓練、評估與精確綁定。Catalog completion 同時驗 items、seasons、events、ancestors、sets、availability 與 aliases，並要求完整欄位、新鮮 lineage 與 item-bound rights evidence；受雙獨立外部 OpenSSH 審核的 restricted declarative cohort 可在不新增任意程式碼的情況下重播。上述能力仍只接受 release root 外、SHA-256 固定且可重播的資料；正式市場 registry、外部 mapping／receipt、真人 gold、完整 catalog evidence 與圖片資產仍為空，所以 production training／估價保持 not ready。所有正式工具只處理本機檔案，不主動連網。
 
 目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。133 個 canonical item 中 54 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 

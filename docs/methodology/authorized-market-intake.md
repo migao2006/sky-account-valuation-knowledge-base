@@ -25,11 +25,24 @@ and at least two unique `evidence_*` IDs. Asking, reduced, and urgent rows are
 rejected if they try to attach any of those fields.
 
 The v3 training example repeats and signs the observation-row digest, sale
-line, completion digest, and independent evidence IDs alongside the P3.2
-feature/vector/catalog/cluster commitment. These fields are structural intake
-metadata only: an ID and hash do not preserve or replay the underlying receipt
-or independent counterparty proof. P3.3 therefore rejects every
-`verified_sale` at the production evaluator boundary. A future version must add
-a privacy-preserving completion-evidence archive and evaluator before the
-dedicated cleaner pool can contain a row. The empty pool remains separate from
-normal asking and urgent listings; no sale or model eligibility is claimed.
+line, completion digest, and independent evidence IDs alongside the feature,
+catalog, and cluster commitments. Those row fields alone are not sufficient:
+production admission additionally requires both external trust paths below.
+
+1. The market identity mapping verifier must bind the signed example to an
+   independently reviewed account and deduplication cluster. Resolver and
+   reviewer signatures, mapping bytes, statement bytes, and their SHA-256
+   values are injected from outside the release root.
+2. The verified-sale receipt archive must replay the exact observation,
+   training-example digest, seller-cluster commitment, completed-sale date,
+   price, currency, and server. It requires distinct authorized settlement and
+   completion assertions, with revocation and expiry checks. Archive and
+   authority-bundle bytes and SHA-256 values are likewise external inputs.
+
+`make_authorization_evaluator(...)` joins those two verified disclosures to the
+signed v3 dataset. Missing, partial, stale, mismatched, reused, or in-repository
+trust material keeps the sale out of `bound_training_rows()` and the dedicated
+verified-sale cleaner pool. A positive receipt is provenance evidence for a
+completed transaction; it does not by itself publish a completed-sale price
+model. The pool remains separate from normal asking and urgent listings, and
+the committed repository currently contains no formal sale rows.

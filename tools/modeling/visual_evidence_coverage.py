@@ -40,11 +40,13 @@ def _json_pointer(document: Any, pointer: object) -> Any:
 
 def _validate_rights_evidence(row: dict[str, Any], root: Path) -> None:
     evidence = row.get("rights_evidence")
-    required = {"source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value"}
+    required = {"source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value", "item_id"}
     if not isinstance(evidence, dict) or set(evidence) != required:
         raise ValueError("unavailable visual reference lacks replayable rights evidence")
     if evidence.get("source_id") not in row.get("source_ids", []):
         raise ValueError("rights evidence source is not bound by the visual reference")
+    if evidence.get("item_id") != row.get("item_id"):
+        raise ValueError("rights evidence is not item-bound")
     registered = {entry.get("source_id") for entry in read_jsonl(root / "knowledge/sources/sources.jsonl")}
     if evidence.get("source_id") not in registered:
         raise ValueError("rights evidence source is not registered")
@@ -57,7 +59,10 @@ def _validate_rights_evidence(row: dict[str, Any], root: Path) -> None:
     if not isinstance(evidence.get("snapshot_sha256"), str) or _sha256(snapshot).upper() != evidence["snapshot_sha256"].upper():
         raise ValueError("rights evidence snapshot SHA-256 mismatch")
     document = json.loads(snapshot.read_text(encoding="utf-8"))
-    if _json_pointer(document, evidence.get("claim_locator")) != evidence.get("claim_value") or evidence.get("claim_value") != "rights_not_granted_for_redistribution":
+    claim = _json_pointer(document, evidence.get("claim_locator"))
+    if (not isinstance(claim, dict) or claim.get("item_id") != row.get("item_id")
+            or claim.get("redistribution") != evidence.get("claim_value")
+            or evidence.get("claim_value") != "rights_not_granted_for_redistribution"):
         raise ValueError("rights evidence claim does not establish redistribution unavailability")
 
 

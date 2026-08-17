@@ -67,7 +67,7 @@ def model_artifacts_release_valid(
     artifacts: list[dict[str, object]], publication_evaluation: dict[str, object] | None = None,
     artifact_paths: dict[tuple[str, str], Path] | None = None, publication_replayed: bool = False,
 ) -> bool:
-    """Allow all-insufficient, or P3.5's one exact normal Elastic binding.
+    """Allow all-insufficient, or exact replayed Elastic line bindings.
 
     Publication metadata embedded in an artifact is intentionally ignored.  A
     trained release must be covered one-to-one by the evaluator's current
@@ -91,7 +91,8 @@ def model_artifacts_release_valid(
         return True
     trained = [artifact for artifact in artifacts if artifact.get("status") == "trained"]
     insufficient = [artifact for artifact in artifacts if artifact.get("status") == "insufficient_training_data"]
-    if len(trained) != 1 or len(insufficient) + len(trained) != len(artifacts) or (trained[0].get("model_type"), trained[0].get("price_line")) != ("elastic_net", "normal_listing") or not publication_replayed or not isinstance(publication_evaluation, dict) or artifact_paths is None:
+    supported_trained = {("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale")}
+    if not trained or len(insufficient) + len(trained) != len(artifacts) or any((row.get("model_type"), row.get("price_line")) not in supported_trained for row in trained) or not publication_replayed or not isinstance(publication_evaluation, dict) or artifact_paths is None:
         return False
     if publication_evaluation.get("status") != "passed" or publication_evaluation.get("publication_ready") is not True:
         return False
@@ -181,6 +182,8 @@ def verify_fresh_lf_checkout(
     parser_keyed_custodian_contract_sha256: str | None = None,
     parser_keyed_replay_binding: Path | None = None,
     parser_keyed_replay_binding_sha256: str | None = None,
+    canonical_review_authority_bundle: Path | None = None,
+    canonical_review_authority_bundle_sha256: str | None = None,
 ) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
@@ -231,6 +234,8 @@ def verify_fresh_lf_checkout(
         if parser_keyed_custodian_contract_sha256 is not None: command.extend(["--parser-keyed-custodian-contract-sha256", parser_keyed_custodian_contract_sha256])
         if parser_keyed_replay_binding is not None: command.extend(["--parser-keyed-replay-binding", str(parser_keyed_replay_binding)])
         if parser_keyed_replay_binding_sha256 is not None: command.extend(["--parser-keyed-replay-binding-sha256", parser_keyed_replay_binding_sha256])
+        if canonical_review_authority_bundle is not None: command.extend(["--canonical-review-authority-bundle", str(canonical_review_authority_bundle)])
+        if canonical_review_authority_bundle_sha256 is not None: command.extend(["--canonical-review-authority-bundle-sha256", canonical_review_authority_bundle_sha256])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -273,6 +278,8 @@ def main() -> None:
     parser.add_argument("--parser-keyed-custodian-contract-sha256")
     parser.add_argument("--parser-keyed-replay-binding", type=Path)
     parser.add_argument("--parser-keyed-replay-binding-sha256")
+    parser.add_argument("--canonical-review-authority-bundle", type=Path)
+    parser.add_argument("--canonical-review-authority-bundle-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
     integrity = validate(
@@ -289,6 +296,7 @@ def main() -> None:
         args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
         args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
         args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
+        args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
     )
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
@@ -495,6 +503,18 @@ def main() -> None:
             root,
             args.market_audit_authority_bundle,
             args.market_audit_authority_bundle_sha256,
+            args.parser_gold_replay_inputs,
+            args.parser_gold_replay_inputs_sha256,
+            args.parser_gold_authority_bundle,
+            args.parser_gold_authority_bundle_sha256,
+            args.parser_keyed_custodian_authority_bundle,
+            args.parser_keyed_custodian_authority_bundle_sha256,
+            args.parser_keyed_custodian_contract,
+            args.parser_keyed_custodian_contract_sha256,
+            args.parser_keyed_replay_binding,
+            args.parser_keyed_replay_binding_sha256,
+            args.canonical_review_authority_bundle,
+            args.canonical_review_authority_bundle_sha256,
         ),
         "p3_1_parser_knowledge_coverage_replayed_non_model": (
             parser_knowledge_coverage == build_parser_knowledge_coverage(root)
@@ -511,7 +531,7 @@ def main() -> None:
             and (market_gold_evaluation.get("publication_ready") is False or market_gold_evaluation.get("status") == "evaluated")
         ),
         "p3_4_catalog_completion_replayed": (
-            catalog_completion == build_catalog_completion(root)
+            catalog_completion == build_catalog_completion(root, args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256)
             and coverage.get("full_item_catalog_complete") is catalog_completion.get("complete")
             and coverage.get("catalog_claim") == ("complete_verified_catalog" if catalog_completion.get("complete") else "partial_verified_catalog")
         ),
@@ -537,10 +557,11 @@ def main() -> None:
             args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
             args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
             args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
+            args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.9-p3.7", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "5.0-p3.8", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

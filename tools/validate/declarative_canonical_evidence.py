@@ -1,4 +1,4 @@
-"""Restricted, data-only canonical-evidence shadow interpreter.
+"""Restricted, data-only canonical-evidence declaration interpreter.
 
 This is deliberately *not* a promotion mechanism.  It may only replay field
 evidence from pinned JSON snapshots into the already-existing evidence ledger
@@ -19,7 +19,8 @@ class DeclarationError(ValueError):
 
 _SOURCE_KEYS = frozenset({"path", "sha256", "source_id", "source_lineage_id", "source_tier"})
 _RULE_KEYS = frozenset({"target_type", "target_id", "field_path", "source_key", "source_item_pointer", "source_item_id_exact", "claim_locator", "evidence_role", "notes"})
-_TOP_LEVEL_KEYS = frozenset({"declaration_format", "cohort_id", "mode", "reviewed_at", "sources", "rules"})
+_SHADOW_TOP_LEVEL_KEYS = frozenset({"declaration_format", "cohort_id", "mode", "reviewed_at", "sources", "rules"})
+_PRODUCTION_TOP_LEVEL_KEYS = frozenset({"declaration_format", "cohort_id", "mode", "reviewed_at", "sources", "rules"})
 _FORBIDDEN_KEYS = frozenset({"regex", "transform", "import", "module", "callable", "script", "command"})
 _ALLOWED_TIERS = frozenset({"official_item_specific", "official_general", "secondary_reference"})
 _ALLOWED_ROLES = frozenset({"independent_identity", "independent_field", "secondary_field"})
@@ -86,20 +87,33 @@ def _reject_forbidden(value: Any) -> None:
             _reject_forbidden(nested)
 
 
-def replay(root: Path, declaration_path: str | Path) -> list[dict[str, Any]]:
-    """Replay one shadow declaration. It performs no writes and no promotion."""
+def load_declaration(root: Path, declaration_path: str | Path) -> tuple[dict[str, Any], bytes]:
+    """Load one declaration from a repository-local JSON file, fail closed."""
     root = root.resolve()
     path = (root / declaration_path).resolve() if not Path(declaration_path).is_absolute() else Path(declaration_path).resolve()
     if root not in path.parents:
         raise DeclarationError("declaration path escapes repository root")
-    declaration = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(declaration, dict) or set(declaration) != _TOP_LEVEL_KEYS:
+    raw_declaration = path.read_bytes()
+    declaration = json.loads(raw_declaration)
+    if not isinstance(declaration, dict):
         raise DeclarationError("declaration has unknown or missing top-level keys")
     _reject_forbidden(declaration)
-    if declaration["declaration_format"] != "canonical_evidence_declaration_v1" or declaration["mode"] != "shadow_only":
-        raise DeclarationError("only canonical_evidence_declaration_v1 shadow_only is accepted")
-    if not isinstance(declaration["reviewed_at"], str) or not isinstance(declaration["cohort_id"], str):
-        raise DeclarationError("cohort_id and reviewed_at are required strings")
+    shadow = declaration.get("declaration_format") == "canonical_evidence_declaration_v1" and declaration.get("mode") == "shadow_only"
+    production = declaration.get("declaration_format") == "canonical_evidence_declaration_v2" and declaration.get("mode") == "production"
+    expected_keys = _SHADOW_TOP_LEVEL_KEYS if shadow else _PRODUCTION_TOP_LEVEL_KEYS if production else frozenset()
+    if set(declaration) != expected_keys:
+        raise DeclarationError("unsupported declaration format or unknown/missing top-level keys")
+    if not isinstance(declaration["cohort_id"], str):
+        raise DeclarationError("cohort_id is required")
+    if not isinstance(declaration.get("reviewed_at"), str):
+        raise DeclarationError("reviewed_at is required")
+    return declaration, raw_declaration
+
+
+def replay(root: Path, declaration_path: str | Path) -> list[dict[str, Any]]:
+    """Replay a shadow or production declaration. It performs no writes."""
+    root = root.resolve()
+    declaration, _raw_declaration = load_declaration(root, declaration_path)
     sources = declaration["sources"]
     rules = declaration["rules"]
     if not isinstance(sources, dict) or not isinstance(rules, list) or not rules:
@@ -136,7 +150,15 @@ def replay(root: Path, declaration_path: str | Path) -> list[dict[str, Any]]:
         id_value = selected.get("item_id", selected.get("id"))
         if not _exact(id_value, rule["source_item_id_exact"]):
             raise DeclarationError("source_item_id_exact does not match selected snapshot object")
-        claim = _pointer(document, rule["claim_locator"])
+        claim_locator = rule["claim_locator"]
+        # Production evidence is an item-scoped assertion: it may not borrow a
+        # convenient global/event fact while claiming it belongs to this item.
+        # Shadow fixtures deliberately retain their historical parity freedom.
+        if declaration["mode"] == "production" and not (
+            claim_locator == rule["source_item_pointer"] or claim_locator.startswith(rule["source_item_pointer"] + "/")
+        ):
+            raise DeclarationError("production claim_locator escapes selected source item")
+        claim = _pointer(document, claim_locator)
         duplicate = (rule["target_type"], rule["target_id"], rule["field_path"], source["source_id"], rule["claim_locator"])
         if duplicate in seen:
             raise DeclarationError("duplicate target/source/field/locator rule")

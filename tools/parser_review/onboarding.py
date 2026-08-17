@@ -16,6 +16,7 @@ import re
 import hmac
 import subprocess
 import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,23 @@ def keyed_commitment_merkle_root(commitments: list[str]) -> str:
             level.append(level[-1])
         level = [hashlib.sha256(level[index] + level[index + 1]).digest() for index in range(0, len(level), 2)]
     return level[0].hex().upper()
+
+
+def keyed_split_commitment(rows: list[dict[str, Any]]) -> str:
+    """Commit to the exact opaque cohort-to-split assignment.
+
+    Unlike an arbitrary declaration, this canonical digest is recomputable by
+    an external evaluator from the custodian binding.  Sorting by opaque leaf
+    keeps raw inputs and their order out of the public protocol.
+    """
+    pairs: list[dict[str, str]] = []
+    for row in rows:
+        if not isinstance(row, dict) or set(row) - {"gold_id", "input_sha256", "keyed_commitment", "split"} or not isinstance(row.get("keyed_commitment"), str) or not _KEYED_HEX.fullmatch(row["keyed_commitment"]) or row.get("split") not in KEYED_SPLIT_COUNTS:
+            raise ValueError("keyed split commitment rows are invalid")
+        pairs.append({"keyed_commitment": row["keyed_commitment"], "split": str(row["split"])})
+    if len(pairs) != KEYED_QUEUE_SIZE or len({pair["keyed_commitment"] for pair in pairs}) != KEYED_QUEUE_SIZE or Counter(pair["split"] for pair in pairs) != KEYED_SPLIT_COUNTS:
+        raise ValueError("keyed split commitment must cover exactly the fixed 200/100 cohort")
+    return digest(canonical_bytes(sorted(pairs, key=lambda pair: pair["keyed_commitment"])))
 
 
 def input_sha256(profile: dict[str, Any], listing: dict[str, Any]) -> str:

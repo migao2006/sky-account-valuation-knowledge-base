@@ -164,11 +164,11 @@ def _publication_binding_reasons(root: Path, path: Path, artifact: dict[str, Any
     rows = published.get("artifact_bindings")
     if not isinstance(rows, list):
         return ["publication_artifact_bindings_missing"]
-    # P3.5 deliberately publishes one contract only.  Accepting a binding for
-    # another model here would let it bypass its missing train-only evaluator.
-    supported = {("elastic_net", "normal_listing")}
+    # A report may carry one or both independently replayed Elastic price-line
+    # bindings.  XGBoost and verified-sale have no runtime evaluator contract.
+    supported = {("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale")}
     observed = [(row.get("model_type"), row.get("price_line")) for row in rows if isinstance(row, dict)]
-    if len(observed) != len(rows) or len(set(observed)) != len(observed) or set(observed) != supported:
+    if len(observed) != len(rows) or len(set(observed)) != len(observed) or not observed or not set(observed) <= supported:
         return ["publication_artifact_binding_set_not_exact"]
     matches = [row for row in rows if isinstance(row, dict) and all(row.get(key) == value for key, value in binding.items())]
     if len(matches) != 1:
@@ -181,7 +181,7 @@ def _training_quality_reasons(artifact: dict[str, Any]) -> list[str]:
     training = artifact.get("training")
     if not isinstance(training, dict):
         return ["artifact_training_metadata_missing"]
-    if (artifact.get("model_type"), artifact.get("price_line")) == ("elastic_net", "normal_listing") and training.get("publication_train_only") is True and training.get("publication_holdout_rows_excluded_from_fit") is True:
+    if (artifact.get("model_type"), artifact.get("price_line")) in {("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale")} and training.get("publication_train_only") is True and training.get("publication_holdout_rows_excluded_from_fit") is True:
         # Holdout quality is owned by the replayed publication report, not by
         # artifact metadata.  Still require its immutable train-only minimum.
         return [] if isinstance(training.get("eligible_rows"), int) and training["eligible_rows"] >= 300 else ["publication_training_minimum_rows_not_met"]
@@ -215,7 +215,7 @@ def _artifact_valid(root: Path, path: Path, expected_line: str) -> tuple[dict[st
         failures.append("artifact_price_line_mismatch")
     if artifact.get("model_type") not in SUPPORTED_MODEL_TYPES:
         failures.append("artifact_model_type_invalid")
-    runtime_publication_artifact = (artifact.get("model_type"), artifact.get("price_line")) == ("elastic_net", "normal_listing") and artifact.get("training", {}).get("publication_train_only") is True
+    runtime_publication_artifact = (artifact.get("model_type"), artifact.get("price_line")) in {("elastic_net", "normal_listing"), ("elastic_net", "urgent_sale")} and artifact.get("training", {}).get("publication_train_only") is True
     if _outer_mae(artifact) is None and not runtime_publication_artifact:
         failures.append("artifact_outer_cv_mae_invalid")
     failures.extend(_training_quality_reasons(artifact))

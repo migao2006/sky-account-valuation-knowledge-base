@@ -6,8 +6,13 @@ import argparse
 import collections
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools" / "validate"))
 
 from release_files import HASH_EXCLUSIONS, release_files
 from canonical_evidence_registry import load_registry, validate_registry
@@ -94,6 +99,8 @@ def main() -> None:
     parser.add_argument("--parser-keyed-custodian-contract-sha256")
     parser.add_argument("--parser-keyed-replay-binding", type=Path)
     parser.add_argument("--parser-keyed-replay-binding-sha256")
+    parser.add_argument("--canonical-review-authority-bundle", type=Path)
+    parser.add_argument("--canonical-review-authority-bundle-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
 
@@ -190,7 +197,7 @@ def main() -> None:
     market_gold_evaluation = build_market_gold_evaluation(
         root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
     )
-    catalog_completion = build_catalog_completion(root)
+    catalog_completion = build_catalog_completion(root, args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256)
     visual_evidence_coverage = build_visual_evidence_coverage(root)
     for relative, expected in (
         ("reports/model-publication-dataset-manifest.json", publication_dataset),
@@ -211,6 +218,7 @@ def main() -> None:
         {row["item_id"]: row for row in rows["items"]},
         {row["set_id"]: row for row in rows["sets"]},
         {row["source_id"]: row for row in rows["sources"]},
+        args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
     )
     if registry_problems:
         raise RuntimeError(f"canonical evidence registry is invalid: {registry_problems}")
@@ -238,7 +246,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.9-p3.7",
+        "schema_version": "5.0-p3.8",
         "as_of_date": "2026-08-17",
         "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
         "full_item_catalog_complete": catalog_completion["complete"],
@@ -437,6 +445,18 @@ def main() -> None:
         root,
         args.market_audit_authority_bundle,
         args.market_audit_authority_bundle_sha256,
+        args.parser_gold_replay_inputs,
+        args.parser_gold_replay_inputs_sha256,
+        args.parser_gold_authority_bundle,
+        args.parser_gold_authority_bundle_sha256,
+        args.parser_keyed_custodian_authority_bundle,
+        args.parser_keyed_custodian_authority_bundle_sha256,
+        args.parser_keyed_custodian_contract,
+        args.parser_keyed_custodian_contract_sha256,
+        args.parser_keyed_replay_binding,
+        args.parser_keyed_replay_binding_sha256,
+        args.canonical_review_authority_bundle,
+        args.canonical_review_authority_bundle_sha256,
     )
     write_utf8_lf(root / "reports/completion-status.json", json.dumps(completion_status, ensure_ascii=False, indent=2) + "\n")
 
@@ -491,13 +511,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.9-p3.7"
+    previous_validation["schema_version"] = "5.0-p3.8"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p37"
-    manifest["package_version"] = "4.9.0-p3.7"
+    manifest["package_id"] = "sky-valuation-v5-p38"
+    manifest["package_version"] = "5.0.0-p3.8"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),

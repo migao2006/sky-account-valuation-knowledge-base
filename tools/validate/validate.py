@@ -11,6 +11,7 @@ import math
 import re
 import sys
 import unicodedata
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -95,6 +96,7 @@ SCHEMA_FILES = {
     "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/canonical-evidence-cohorts.jsonl": "schemas/review/canonical-evidence-cohort.schema.json",
+    "data/review/official-rights-source-registry.jsonl": "schemas/review/official-rights-source.schema.json",
     "data/review/market-claim-review.jsonl": "schemas/review/market-claim-review.schema.json",
     "data/review/market-claim-gold.jsonl": "schemas/review/market-claim-gold.schema.json",
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
@@ -112,6 +114,24 @@ SCHEMA_FILES = {
     "reports/coverage/unresolved-items.jsonl": "schemas/reports/unresolved-item.schema.json",
     "reports/migration/migration-ledger.jsonl": "schemas/reports/migration-ledger.schema.json",
 }
+
+
+def is_publication_train_only_elastic_artifact(artifact: dict[str, Any]) -> bool:
+    """Identify the exact replay-owned Elastic artifact exception.
+
+    Both asking and urgent pools have the same evaluator-owned holdout
+    contract.  Other lines/models must retain the regular grouped-CV quality
+    and published-holdout requirements.
+    """
+    training = artifact.get("training", {})
+    return (
+        artifact.get("model_type") == "elastic_net"
+        and artifact.get("price_line") in {"normal_listing", "urgent_sale"}
+        and isinstance(training, dict)
+        and training.get("publication_train_only") is True
+        and training.get("publication_holdout_rows_excluded_from_fit") is True
+        and artifact.get("publication_gate", {}).get("status") == "not_evaluated"
+    )
 JSON_SCHEMA_FILES = {
     "manifest.json": "schemas/package-manifest.schema.json",
     "reports/coverage/catalog-coverage.json": "schemas/reports/coverage.schema.json",
@@ -269,12 +289,12 @@ def validate_canonical_field_evidence(
     seen: set[str] = set()
     item_fields = {
         "canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_type", "vendor_item_guid", "source_type",
-        "set_membership", "availability_status", "availability_history", "original_cost",
-        "original_currency", "first_release_date", "free_or_premium",
-        "permanent_account_item", "collaboration", "visual_reference",
+        "set_membership", "availability_status", "availability_history", "availability_as_of", "original_cost",
+        "original_currency", "first_release_date", "free_or_premium", "pass_required",
+        "ultimate_reward", "permanent_account_item", "collaboration", "visual_reference",
     }
     set_fields = {"identity_description", "source_type", "set_required_item_ids", "scope_definition", "historical_pack_price_usd", "platform_access_history", "availability_history"}
-    string_fields = item_fields - {"original_cost", "collaboration"}
+    string_fields = item_fields - {"original_cost", "collaboration", "ultimate_reward"}
     official_source_types = {"official_site", "official_news", "official_support", "thatgamecompany"}
     for label, rows in evidence_groups:
         for row in rows:
@@ -311,8 +331,8 @@ def validate_canonical_field_evidence(
                 problems.append(f"{prefix}: {field} claim must be a string")
             if field == "original_cost" and (isinstance(value, bool) or not isinstance(value, (int, float))):
                 problems.append(f"{prefix}: original_cost claim must be numeric")
-            if field == "collaboration" and not isinstance(value, bool):
-                problems.append(f"{prefix}: collaboration claim must be boolean")
+            if field in {"collaboration", "ultimate_reward"} and not isinstance(value, bool):
+                problems.append(f"{prefix}: {field} claim must be boolean")
             if field in {"set_required_item_ids", "scope_definition"} and not isinstance(value, list):
                 problems.append(f"{prefix}: {field} claim must be an array")
             target = items.get(target_id) if target_type == "item" else sets.get(target_id)
@@ -320,6 +340,15 @@ def validate_canonical_field_evidence(
                 problems.append(f"{prefix}: approved claim differs from canonical {field}")
             if target is not None and field == "item_category" and str(target.get(field, "")).casefold() != str(value).casefold():
                 problems.append(f"{prefix}: approved category differs from canonical item_category")
+            if target is not None and field in {"availability_status", "free_or_premium", "pass_required", "ultimate_reward", "permanent_account_item", "first_release_date"} and target.get(field) != value:
+                problems.append(f"{prefix}: approved claim differs from canonical {field}")
+            if target_type == "item" and field == "availability_as_of":
+                try:
+                    date.fromisoformat(value) if isinstance(value, str) else None
+                except ValueError:
+                    problems.append(f"{prefix}: availability_as_of claim must be an ISO date")
+                if not isinstance(value, str):
+                    problems.append(f"{prefix}: availability_as_of claim must be an ISO date")
     return problems
 
 
@@ -416,6 +445,8 @@ def validate(
     parser_keyed_custodian_contract_sha256: str | None = None,
     parser_keyed_replay_binding: str | Path | None = None,
     parser_keyed_replay_binding_sha256: str | None = None,
+    canonical_review_authority_bundle: str | Path | None = None,
+    canonical_review_authority_bundle_sha256: str | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -434,9 +465,18 @@ def validate(
         for row in load_registry(root)
         if isinstance(row.get("evidence_path"), str) and (root / row["evidence_path"]).is_file()
     }
+    declarative_json_schema_files = {
+        str(row[field]): schema
+        for row in load_registry(root)
+        for field, schema in (
+            ("declaration_path", "schemas/review/canonical-evidence-declaration.schema.json"),
+            ("review_metadata_path", "schemas/review/canonical-evidence-review.schema.json"),
+        )
+        if row.get("verifier_id") == "declarative_v2" and isinstance(row.get(field), str) and (root / row[field]).is_file()
+    }
     authorized_jsonl_files, authorized_json_files = authorized_market_schema_files(root)
     schema_files = {**SCHEMA_FILES, **cohort_schema_files, **authorized_jsonl_files}
-    json_schema_files = {**JSON_SCHEMA_FILES, **authorized_json_files}
+    json_schema_files = {**JSON_SCHEMA_FILES, **declarative_json_schema_files, **authorized_json_files}
     actual_formal_json = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
@@ -774,7 +814,7 @@ def validate(
     if any(row.get("canonical_write") != "not_performed" or row.get("model_feature_status") != "excluded_pending_verification" for row in promotion_ledger):
         errors.append("item-promotion: identity-only ledger attempted canonical/model promotion")
     source_records = {row["source_id"]: row for row in read_jsonl(root / "knowledge/sources/sources.jsonl")}
-    registry_problems, registry_evidence = validate_registry(root, items, sets, source_records)
+    registry_problems, registry_evidence = validate_registry(root, items, sets, source_records, canonical_review_authority_bundle, canonical_review_authority_bundle_sha256)
     errors.extend(registry_problems)
     evidence_groups = list(registry_evidence.items())
     errors.extend(validate_canonical_field_evidence(evidence_groups, items, sets, source_records))
@@ -1005,11 +1045,7 @@ def validate(
             errors.append(f"{relative}: input snapshot hash mismatch")
         if artifact.get("status") == "trained":
             training = artifact.get("training", {})
-            runtime_publication_artifact = (
-                artifact.get("model_type") == "elastic_net" and artifact.get("price_line") == "normal_listing"
-                and training.get("publication_train_only") is True and training.get("publication_holdout_rows_excluded_from_fit") is True
-                and artifact.get("publication_gate", {}).get("status") == "not_evaluated"
-            )
+            runtime_publication_artifact = is_publication_train_only_elastic_artifact(artifact)
             rows = training.get("eligible_rows", training.get("records"))
             minimum = training.get("minimum_rows", training.get("min_required_records"))
             groups = training.get("group_count", training.get("unique_clusters"))
@@ -1141,7 +1177,7 @@ def validate(
         errors.append(f"parser gold evaluation: {exc}")
     for relative, builder, label in (
         ("reports/market-gold-evaluation.json", lambda: build_market_gold_evaluation(root, market_audit_authority_bundle, market_audit_authority_bundle_sha256), "market gold evaluation"),
-        ("reports/catalog-completion.json", lambda: build_catalog_completion(root), "catalog completion"),
+        ("reports/catalog-completion.json", lambda: build_catalog_completion(root, canonical_review_authority_bundle, canonical_review_authority_bundle_sha256), "catalog completion"),
         ("reports/coverage/visual-evidence-capability.json", lambda: build_visual_evidence_coverage(root), "visual evidence capability"),
     ):
         try:
@@ -1161,6 +1197,18 @@ def validate(
             root,
             market_audit_authority_bundle,
             market_audit_authority_bundle_sha256,
+            parser_gold_replay_inputs,
+            parser_gold_replay_inputs_sha256,
+            parser_gold_authority_bundle,
+            parser_gold_authority_bundle_sha256,
+            parser_keyed_custodian_authority_bundle,
+            parser_keyed_custodian_authority_bundle_sha256,
+            parser_keyed_custodian_contract,
+            parser_keyed_custodian_contract_sha256,
+            parser_keyed_replay_binding,
+            parser_keyed_replay_binding_sha256,
+            canonical_review_authority_bundle,
+            canonical_review_authority_bundle_sha256,
         ):
             errors.append("completion status differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
@@ -1215,7 +1263,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.9-p3.7", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "5.0-p3.8", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1252,6 +1300,8 @@ def main() -> None:
     parser.add_argument("--parser-keyed-custodian-contract-sha256")
     parser.add_argument("--parser-keyed-replay-binding", type=Path)
     parser.add_argument("--parser-keyed-replay-binding-sha256")
+    parser.add_argument("--canonical-review-authority-bundle", type=Path)
+    parser.add_argument("--canonical-review-authority-bundle-sha256")
     args = parser.parse_args()
     result = validate(
         args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
@@ -1267,6 +1317,7 @@ def main() -> None:
         args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
         args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
         args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
+        args.canonical_review_authority_bundle, args.canonical_review_authority_bundle_sha256,
     )
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

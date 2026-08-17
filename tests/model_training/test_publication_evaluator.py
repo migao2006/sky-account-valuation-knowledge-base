@@ -165,12 +165,17 @@ class PublicationEvaluatorTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationRuntimeError, "production_signed"):
             build_expected_artifact(ROOT, manifest, split)
 
-    def test_runtime_contract_is_normal_listing_only(self):
+    def test_runtime_contract_supports_urgent_sale(self):
         manifest = self.frozen_fixture(trend=True)
         manifest["lineage_mode"] = "production_signed"
-        pool = dict(manifest["market_pools"][0]); pool["price_line"] = "urgent_sale"
-        with self.assertRaisesRegex(PublicationRuntimeError, "normal_listing_only"):
-            build_expected_artifact(ROOT, manifest, pool)
+        for row in manifest["dataset_rows"]:
+            row["price_line"] = "urgent_sale"
+            row["row_sha256"] = _sha256({key: value for key, value in row.items() if key != "row_sha256"})
+        manifest["dataset_sha256"] = _sha256(manifest["dataset_rows"])
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        artifact = build_expected_artifact(ROOT, manifest, pool)
+        self.assertEqual(artifact["price_line"], "urgent_sale")
+        self.assertIn("verified_sale_is_evidence_only_not_estimator", artifact["limitations"])
 
     def test_runtime_artifact_fit_is_invariant_to_holdout_targets(self):
         # This intentionally uses the test-only shape only after changing its

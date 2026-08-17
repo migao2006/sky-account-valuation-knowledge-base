@@ -573,19 +573,20 @@ def train_publication_runtime(root: Path, price_line: str = "normal_listing"):
     Test-only synthetic manifests are rejected by the runtime builder.
     """
     root = root.resolve()
-    vector, normal = root / "data/modeling/account-item-vectors.jsonl", root / "data/modeling/price-cleaned-normal.jsonl"
-    paths, snapshot = input_snapshot(vector, normal)
+    vector = root / "data/modeling/account-item-vectors.jsonl"
+    price_file = root / "data/modeling" / ("price-cleaned-normal.jsonl" if price_line == "normal_listing" else "price-cleaned-urgent.jsonl")
+    paths, snapshot = input_snapshot(vector, price_file)
     binding = catalog_provenance(root)
-    if price_line != "normal_listing":
-        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "publication_runtime_supports_normal_listing_only", binding)
+    if price_line not in {"normal_listing", "urgent_sale"}:
+        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "publication_runtime_price_line_unsupported", binding)
     from tools.modeling.publication_dataset import build as build_publication_dataset
     from tools.modeling.publication_dataset import _derive_split
     from tools.modeling.publication_runtime import PublicationRuntimeError, build_expected_artifact
     manifest, _ = build_publication_dataset(root)
     split = _derive_split(manifest, allow_test_synthetic=False)
-    pools = [pool for pool in split.get("market_pools", []) if pool.get("requirements_met") is True and pool.get("price_line") == "normal_listing"]
+    pools = [pool for pool in split.get("market_pools", []) if pool.get("requirements_met") is True and pool.get("price_line") == price_line]
     if len(pools) != 1:
-        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "no_single_eligible_normal_listing_publication_pool", binding)
+        return insufficient_artifact(price_line, paths, snapshot, 0, 100, [], [], "no_single_eligible_publication_pool_for_price_line", binding)
     try:
         return build_expected_artifact(root, manifest, pools[0])
     except (PublicationRuntimeError, ValueError, ImportError, KeyError, TypeError) as exc:

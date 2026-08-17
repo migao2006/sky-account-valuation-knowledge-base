@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/official-rights-source.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_id", "source_lineage_id", "verifier_id", "review_status"],
+  "properties": {
+    "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
+    "source_lineage_id": {"type": "string", "pattern": "^lineage_[a-z0-9_]+$"},
+    "verifier_id": {"const": "official_item_rights_v1"},
+    "review_status": {"const": "approved"}
+  }
+}

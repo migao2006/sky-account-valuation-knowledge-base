@@ -18,7 +18,7 @@ from release_check import (  # noqa: E402
     item_value_rows_release_valid,
     model_artifacts_release_valid,
 )
-from validate import formal_price_rebuild_errors  # noqa: E402
+from validate import formal_price_rebuild_errors, is_publication_train_only_elastic_artifact  # noqa: E402
 
 
 def publication_gate() -> dict[str, object]:
@@ -100,6 +100,33 @@ class ProgressionContractTests(unittest.TestCase):
             trained["prediction_contract"]["intercept"] = 9.0
             path.write_text(json.dumps(trained), encoding="utf-8")
             self.assertFalse(model_artifacts_release_valid(artifacts, passed, paths, True))
+
+    def test_dual_elastic_price_lines_require_two_exact_bindings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            shared = {key: "A" * 64 for key in ("dataset_sha256", "dataset_manifest_sha256", "split_sha256")}
+            artifacts, paths, bindings = [], {}, []
+            for price_line in ("normal_listing", "urgent_sale"):
+                artifact = {"status": "trained", "model_type": "elastic_net", "price_line": price_line,
+                            "prediction_contract": {"kind": "additive_log_price", "intercept": 8.0, "coefficients": {}}}
+                path = base / f"elastic-net-{price_line}.json"
+                path.write_text(json.dumps(artifact), encoding="utf-8")
+                artifacts.append(artifact); paths[("elastic_net", price_line)] = path
+                bindings.append({"price_line": price_line, "model_type": "elastic_net", **shared,
+                                 "model_sha256": _artifact_model_sha256(artifact, path), "artifact_sha256": sha256(path)})
+            report = {"status": "passed", "publication_ready": True, **shared, "artifact_bindings": bindings}
+            self.assertTrue(model_artifacts_release_valid(artifacts, report, paths, True))
+            self.assertFalse(model_artifacts_release_valid(artifacts, {**report, "artifact_bindings": bindings[:1]}, paths, True))
+
+    def test_validator_accepts_only_the_two_replayed_elastic_price_lines(self):
+        base = {"model_type": "elastic_net", "price_line": "urgent_sale",
+                "training": {"publication_train_only": True, "publication_holdout_rows_excluded_from_fit": True},
+                "publication_gate": {"status": "not_evaluated"}}
+        self.assertTrue(is_publication_train_only_elastic_artifact(base))
+        self.assertTrue(is_publication_train_only_elastic_artifact({**base, "price_line": "normal_listing"}))
+        self.assertFalse(is_publication_train_only_elastic_artifact({**base, "price_line": "verified_sale"}))
+        self.assertFalse(is_publication_train_only_elastic_artifact({**base, "model_type": "xgboost"}))
+        self.assertFalse(is_publication_train_only_elastic_artifact({**base, "publication_gate": {"status": "passed"}}))
 
     def test_mixed_or_unpassed_model_release_is_rejected(self):
         trained = {"status": "trained", "model_type": "elastic_net", "price_line": "normal_listing"}

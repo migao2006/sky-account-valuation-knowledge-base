@@ -6,6 +6,6 @@
   "properties": {
     "alias_id": {"type": "string", "pattern": "^alias_[a-z0-9_]+$"}, "alias_text": {"type": "string", "minLength": 1}, "normalized_alias": {"type": "string", "minLength": 1},
     "language": {"enum": ["zh_tw", "zh_cn", "en", "ja", "ko", "other", "unknown"]}, "target_type": {"enum": ["season", "event", "item", "set", "ancestor"]},
-    "target_id": {"type": "string", "pattern": "^(season|event|item|set|ancestor)_[a-z0-9_]+$"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+    "target_id": {"type": "string", "pattern": "^(season|event|item|set|ancestor)_[a-z0-9_]+$"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "last_verified_at": {"type": "string", "format": "date"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
   }
 }

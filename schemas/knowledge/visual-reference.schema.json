@@ -11,12 +11,13 @@
     "detection_ids": {"type": "array", "items": {"type": "string", "pattern": "^detection_[a-z0-9_]+$"}, "uniqueItems": true},
     "description": {"type": "string"},
     "unavailable_reason": {"enum": ["rights_not_granted_for_redistribution"]},
-    "rights_evidence": {"type": "object", "additionalProperties": false, "required": ["source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value"], "properties": {
+    "rights_evidence": {"type": "object", "additionalProperties": false, "required": ["source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value", "item_id"], "properties": {
       "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
       "snapshot_path": {"type": "string", "pattern": "^data/source/[A-Za-z0-9._/-]+\\.json$"},
       "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
       "claim_locator": {"type": "string", "pattern": "^/"},
-      "claim_value": {"const": "rights_not_granted_for_redistribution"}
+      "claim_value": {"const": "rights_not_granted_for_redistribution"},
+      "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}
     }},
     "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
   },
