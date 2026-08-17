@@ -33,7 +33,9 @@ python modeling/train_xgboost.py --input data/modeling/account-item-vectors.json
 python modeling/evaluate.py --artifact modeling/artifacts/elastic-net-normal_listing.json
 ```
 
-Formal P3.1 data has 0 externally authorized normal-listing rows, 0 urgent-sale rows, and 0
-model-eligible canonical items. Both trainers therefore publish only
+Formal P3.2 data has 0 externally authorized normal-listing rows, 0 urgent-sale rows, and 0
+model-eligible canonical items. The signed-intake v2 contract can bind future
+prices to exact PII-free vectors and dedup clusters, but the formal registry is
+empty. Both trainers therefore publish only
 `insufficient_training_data`; every canonical Item Value Table row is
 `insufficient_support` and contains no numerical item attribution.

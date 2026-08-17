@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0-p3.2",
+  "goal": "precise_account_valuation_and_complete_knowledge_base",
+  "status": "incomplete",
+  "complete": false,
+  "checks": [
+    {
+      "contract_id": "catalog.unresolved_zero",
+      "passed": false,
+      "actual": {
+        "review_scopes": 39,
+        "source_references": 1374
+      },
+      "requirement": "all in-scope catalog observations resolved or explicitly excluded with evidence",
+      "evidence_paths": [
+        "reports/coverage/unresolved-items.jsonl",
+        "reports/coverage/catalog-coverage.json"
+      ]
+    },
+    {
+      "contract_id": "catalog.unmapped_alias_zero",
+      "passed": false,
+      "actual": 14,
+      "requirement": "zero unresolved or conflicting aliases",
+      "evidence_paths": [
+        "reports/coverage/unmapped-aliases.jsonl"
+      ]
+    },
+    {
+      "contract_id": "catalog.model_eligible_positive",
+      "passed": false,
+      "actual": {
+        "verified": 30,
+        "model_eligible": 0
+      },
+      "requirement": "verified canonical items with independently approved observation tokens",
+      "evidence_paths": [
+        "knowledge/items/items.jsonl",
+        "reports/parser-knowledge-coverage.json"
+      ]
+    },
+    {
+      "contract_id": "parser.human_gold_200",
+      "passed": false,
+      "actual": {
+        "rows": 0,
+        "signed_audit_evaluator": "not_implemented"
+      },
+      "requirement": "at least 200 independently double-annotated parser claims with adjudication",
+      "evidence_paths": [
+        "docs/methodology/completion-contract.md"
+      ]
+    },
+    {
+      "contract_id": "parser.metrics_passed",
+      "passed": false,
+      "actual": {
+        "verified_alias_tokens": 0,
+        "heldout_evaluator": "not_implemented"
+      },
+      "requirement": "held-out precision >=98%, recall >=95%, and collision error rate 0",
+      "evidence_paths": [
+        "reports/parser-knowledge-coverage.json",
+        "docs/methodology/completion-contract.md"
+      ]
+    },
+    {
+      "contract_id": "market.human_gold_200",
+      "passed": false,
+      "actual": 0,
+      "requirement": "at least 200 independently double-annotated market claims",
+      "evidence_paths": [
+        "data/review/market-claim-gold.jsonl"
+      ]
+    },
+    {
+      "contract_id": "market.train_holdout_capacity",
+      "passed": false,
+      "actual": [],
+      "requirement": "each published pool has >=300 independent training clusters and >=100 later holdout clusters",
+      "evidence_paths": [
+        "reports/model-publication-readiness.json",
+        "reports/model-publication-split.json"
+      ]
+    },
+    {
+      "contract_id": "market.verified_sales_positive",
+      "passed": false,
+      "actual": 0,
+      "requirement": "verified completed-sale evidence available for claimed sale-price use",
+      "evidence_paths": [
+        "reports/model-publication-readiness.json"
+      ]
+    },
+    {
+      "contract_id": "model.replayable_publication_passed",
+      "passed": false,
+      "actual": "not_ready",
+      "requirement": "replayable untouched-holdout evaluator passes every accuracy, interval, subgroup and OOD threshold",
+      "evidence_paths": [
+        "reports/model-publication-evaluation.json",
+        "docs/methodology/completion-contract.md"
+      ]
+    }
+  ],
+  "blocking_contract_ids": [
+    "catalog.unresolved_zero",
+    "catalog.unmapped_alias_zero",
+    "catalog.model_eligible_positive",
+    "parser.human_gold_200",
+    "parser.metrics_passed",
+    "market.human_gold_200",
+    "market.train_holdout_capacity",
+    "market.verified_sales_positive",
+    "model.replayable_publication_passed"
+  ]
+}

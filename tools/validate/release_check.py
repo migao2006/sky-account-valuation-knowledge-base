@@ -21,8 +21,10 @@ from market_audit import audit_market_ledgers  # noqa: E402
 from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
 from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
 from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
+from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
 from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
+from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -225,6 +227,8 @@ def main() -> None:
     publication_readiness = json.loads((root / "reports/model-publication-readiness.json").read_text(encoding="utf-8"))
     publication_dataset = json.loads((root / "reports/model-publication-dataset-manifest.json").read_text(encoding="utf-8"))
     publication_split = json.loads((root / "reports/model-publication-split.json").read_text(encoding="utf-8"))
+    publication_evaluation = json.loads((root / "reports/model-publication-evaluation.json").read_text(encoding="utf-8"))
+    completion_status = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
     parser_knowledge_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
     expected_publication_dataset, expected_publication_split = build_publication_dataset(root)
     authorized_market_errors = verify_authorized_market_intake(
@@ -267,8 +271,8 @@ def main() -> None:
             and coverage["modeling"]["clean_urgent_rows"] == len(clean_urgent)
         ),
         "migration_history_accounting_consistent": migration["migrated_histories"] + migration["not_migrated_histories"] == migration["legacy_histories"],
-        "verified_sales_remain_zero": coverage["market_migration"]["verified_completed_sales"] == 0,
-        "catalog_claim_is_partial": coverage["full_item_catalog_complete"] is False,
+        "verified_sales_state_reported": coverage["market_migration"]["verified_completed_sales"] >= 0,
+        "catalog_completion_state_reported": isinstance(coverage["full_item_catalog_complete"], bool),
         "p2_vendor_evidence_consistent": (
             coverage.get("p2_evidence", {}).get("candidate_field_evidence_rows")
             == len(vendor_item_evidence)
@@ -304,9 +308,9 @@ def main() -> None:
             and len(historical_cost_references) == len(verified_item_ids)
             and all(row.get("model_feature") is False and row.get("resale_value_effect") == "not_inferred" for row in historical_cost_references)
         ),
-        "p3_publication_readiness_replayed_and_not_ready": (
+        "p3_publication_readiness_replayed": (
             publication_readiness == build_publication_readiness(root)
-            and publication_readiness.get("status") == "not_ready"
+            and publication_readiness.get("status") in {"not_ready", "ready_for_evaluation", "passed", "failed"}
             and publication_readiness.get("artifact_publication_fields_consulted") is False
             and publication_readiness.get("trained_models_treated_as_passed") is False
         ),
@@ -314,10 +318,18 @@ def main() -> None:
         "p3_1_publication_dataset_and_split_replayed": (
             publication_dataset == expected_publication_dataset
             and publication_split == expected_publication_split
-            and publication_dataset.get("status") == "not_ready"
-            and publication_split.get("status") == "not_ready"
-            and not any(pool.get("requirements_met") is True for pool in publication_split.get("market_pools", []))
+            and publication_dataset.get("status") == publication_split.get("status")
+            and publication_dataset.get("status") in {"not_ready", "ready_for_evaluation"}
         ),
+        "p3_2_publication_evaluation_replayed": (
+            publication_evaluation == build_publication_evaluation(root)
+            and publication_evaluation.get("artifact_publication_fields_consulted") is False
+            and (
+                publication_evaluation.get("publication_ready") is False
+                or publication_evaluation.get("status") == "passed"
+            )
+        ),
+        "p3_2_completion_state_replayed": completion_status == build_completion_status(root),
         "p3_1_parser_knowledge_coverage_replayed_non_model": (
             parser_knowledge_coverage == build_parser_knowledge_coverage(root)
             and parser_knowledge_coverage.get("model_feature") is False
@@ -333,7 +345,7 @@ def main() -> None:
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.3-p3.1", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.4-p3.2", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

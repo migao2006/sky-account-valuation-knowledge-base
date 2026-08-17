@@ -17,7 +17,7 @@ from typing import Any
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tools.market_authorization import make_authorization_evaluator, model_training_authorization_reasons
+from tools.market_authorization import AuthorizedMarketEvaluator, make_authorization_evaluator, model_training_authorization_reasons
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -115,21 +115,30 @@ def exclusion(row: dict[str, Any], line: str, reasons: list[str], disposition: s
     }
 
 
-def cleaned(row: dict[str, Any], line: str, rank: int) -> dict[str, Any]:
+def cleaned(row: dict[str, Any], line: str, rank: int, production_feature_lineage: bool = False) -> dict[str, Any]:
     price = float(row["selected_price_twd"])
-    return {
+    output = {
         "schema_version": "3.1-p1", "cleaned_price_id": "cleaned_price_" + row["history_id"].removeprefix("history_"),
-        "history_id": row["history_id"], "account_id": row["account_id"], "cluster_id": "cluster_" + row["account_id"].removeprefix("account_"),
+        "history_id": row["history_id"], "account_id": row["account_id"], "cluster_id": row["dedup_cluster_id"] if production_feature_lineage else "cluster_" + row["account_id"].removeprefix("account_"),
         "cluster_rank": rank, "selected_price_twd": price, "log_price_twd": math.log(price),
         "price_line": line, "normalized_price_type": line, "base_account_type": base_account_type(row),
         "post_date": row.get("post_date"), "date_verified": row.get("date_verified") is True,
         "observed_at": row["observed_at"], "currency": "TWD", "server": "international",
         "evidence_quality": row.get("market_evidence_quality", row.get("evidence_quality", "unknown")), "review_status": "accepted",
     }
+    if production_feature_lineage:
+        lineage=row["feature_lineage"]
+        output.update({key: lineage[key] for key in ("training_example_id", "training_example_digest", "feature_payload_sha256", "catalog_provenance_sha256", "dedup_cluster_digest")})
+    return output
 
 
-def clean(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return normal rows, urgent rows and a complete excluded/review ledger."""
+def _clean_verified(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Core cleaner; callers must obtain the evaluator from the replay factory."""
+    production_feature_lineage = (
+        isinstance(authorization_evaluator, AuthorizedMarketEvaluator)
+        and authorization_evaluator.factory_verified is True
+        and authorization_evaluator.feature_lineage_bound is True
+    )
     candidates: list[tuple[dict[str, Any], str]] = []
     ledger: list[dict[str, Any]] = []
     for row in rows:
@@ -144,7 +153,8 @@ def clean(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tu
     # same anonymous account being repeated in a training split.
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row, line in candidates:
-        grouped[(str(row["account_id"]), line)].append(row)
+        cluster = str(row["dedup_cluster_id"]) if production_feature_lineage else str(row["account_id"])
+        grouped[(cluster, line)].append(row)
     retained: list[tuple[dict[str, Any], str, int]] = []
     for (_, line), group in sorted(grouped.items()):
         ordered = sorted(group, key=cluster_sort_key, reverse=True)
@@ -168,19 +178,41 @@ def clean(rows: list[dict[str, Any]], authorization_evaluator: Any = None) -> tu
             elif z_score is not None and abs(z_score) > 3.5:
                 ledger.append(exclusion(row, line, ["log_price_outlier_insufficient_group"], "needs_review"))
             else:
-                accepted.append(cleaned(row, line, rank))
+                accepted.append(cleaned(row, line, rank, production_feature_lineage))
     normal = sorted((row for row in accepted if row["price_line"] == "normal_listing"), key=lambda row: row["history_id"])
     urgent = sorted((row for row in accepted if row["price_line"] == "urgent_sale"), key=lambda row: row["history_id"])
     return normal, urgent, sorted(ledger, key=lambda row: row["history_id"])
 
 
+def clean(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fail-closed public cleaner without externally verified authorization."""
+    return _clean_verified(rows)
+
+
+def clean_authorized(
+    rows: list[dict[str, Any]], root: Path,
+    authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+    statement: str | Path | None = None, statement_sha256: str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Replay external trust material internally, then clean exact bound rows."""
+    evaluator = make_authorization_evaluator(
+        root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+    )
+    if evaluator.errors:
+        raise ValueError("authorized market intake is invalid: " + "; ".join(evaluator.errors))
+    return _clean_verified(rows, evaluator)
+
+
 def build(
     root: Path, input_path: Path | None = None, output_dir: Path | None = None,
-    authorization_evaluator: Any = None,
+    authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+    statement: str | Path | None = None, statement_sha256: str | None = None,
 ) -> dict[str, int]:
     source = input_path or root / "data/comparables/accounts.jsonl"
     destination = output_dir or root / "data/modeling"
-    normal, urgent, exclusions = clean(read_jsonl(source), authorization_evaluator)
+    normal, urgent, exclusions = clean_authorized(
+        read_jsonl(source), root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+    )
     write_jsonl(destination / "price-cleaned-normal.jsonl", normal)
     write_jsonl(destination / "price-cleaned-urgent.jsonl", urgent)
     write_jsonl(destination / "model-exclusions.jsonl", exclusions)
@@ -198,14 +230,16 @@ def main() -> None:
     parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
-    evaluator = make_authorization_evaluator(
-        root, args.market_authorization_authority_bundle,
-        args.market_authorization_authority_bundle_sha256,
-        args.market_authorization_statement, args.market_authorization_statement_sha256,
-    )
-    if evaluator.errors:
-        parser.error("authorized market intake is invalid: " + "; ".join(evaluator.errors))
-    print(json.dumps(build(root, args.input, args.output_dir, evaluator), ensure_ascii=False))
+    try:
+        result = build(
+            root, args.input, args.output_dir,
+            args.market_authorization_authority_bundle,
+            args.market_authorization_authority_bundle_sha256,
+            args.market_authorization_statement, args.market_authorization_statement_sha256,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -2,12 +2,14 @@ import json
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "estimate"))
 sys.path.insert(0, str(ROOT / "tools" / "classify"))
 from estimate import WEIGHTS, adapt_profile, estimate as raw_estimate, hard_pool as raw_hard_pool, normalize_price_type, score
+import estimate as estimate_module
 from classify import classify
 
 
@@ -21,16 +23,14 @@ def authorized_market_data():
     }
 
 
-def fixture_authority(row):
-    return row.get("market_data_authorization") == authorized_market_data()
-
-
 def estimate(account, comparables):
-    return raw_estimate(account, comparables, authorization_evaluator=fixture_authority)
+    with patch.object(estimate_module, "model_training_authorization_reasons", return_value=[]):
+        return raw_estimate(account, comparables)
 
 
 def hard_pool(account, comparable):
-    return raw_hard_pool(account, comparable, authorization_evaluator=fixture_authority)
+    with patch.object(estimate_module, "model_training_authorization_reasons", return_value=[]):
+        return raw_hard_pool(account, comparable)
 
 
 class EstimatorRulesTest(unittest.TestCase):
@@ -369,9 +369,9 @@ class EstimatorRulesTest(unittest.TestCase):
             "currency": "TWD", "server": "international", "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "asking"},
             "evidence_quality": {"listing_text": "high"}, "valuation_date": "2026-08-16",
         }
-        hard = [row for row in rows if hard_pool(target, row)[0]]
+        hard = [row for row in rows if raw_hard_pool(target, row)[0]]
         self.assertEqual(len(hard), 0)
-        result = estimate(target, rows)
+        result = raw_estimate(target, rows)
         self.assertEqual(result["strict_candidate_count"], 0)
         self.assertFalse(result["eligible"])
         self.assertIn("fewer_than_three_hard_pool_compatible_comparables", result["insufficiency_reasons"])

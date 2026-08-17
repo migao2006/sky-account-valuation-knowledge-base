@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/completion-status.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "goal", "status", "complete", "checks", "blocking_contract_ids"],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.2"},
+    "goal": {"const": "precise_account_valuation_and_complete_knowledge_base"},
+    "status": {"enum": ["incomplete", "complete"]},
+    "complete": {"type": "boolean"},
+    "checks": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["contract_id", "passed", "actual", "requirement", "evidence_paths"], "properties": {"contract_id": {"type": "string"}, "passed": {"type": "boolean"}, "actual": {}, "requirement": {"type": "string"}, "evidence_paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}}}},
+    "blocking_contract_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  }
+}

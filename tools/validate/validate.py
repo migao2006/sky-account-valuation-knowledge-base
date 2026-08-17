@@ -16,6 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools" / "validate"))
 from tools.modeling.catalog_provenance import (  # noqa: E402
     CatalogProvenanceError,
     catalog_provenance,
@@ -40,9 +41,11 @@ from promote_items import evaluate as evaluate_item_promotions, verify_replayabl
 from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
 from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
 from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
+from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
-from tools.modeling.clean_prices import clean as clean_model_prices  # noqa: E402
-from tools.market_authorization import make_authorization_evaluator, verify_authorized_market_intake  # noqa: E402
+from tools.modeling.clean_prices import clean_authorized as clean_model_prices  # noqa: E402
+from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
+from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -108,7 +111,9 @@ JSON_SCHEMA_FILES = {
     "reports/model-publication-readiness.json": "schemas/modeling/publication-readiness.schema.json",
     "reports/model-publication-dataset-manifest.json": "schemas/modeling/publication-dataset-manifest.schema.json",
     "reports/model-publication-split.json": "schemas/modeling/publication-split.schema.json",
+    "reports/model-publication-evaluation.json": "schemas/modeling/publication-evaluation.schema.json",
     "reports/parser-knowledge-coverage.json": "schemas/modeling/parser-knowledge-coverage.schema.json",
+    "reports/completion-status.json": "schemas/reports/completion-status.schema.json",
     "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/xgboost-normal_listing.json": "schemas/modeling/xgboost-artifact.schema.json",
@@ -129,7 +134,40 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-879-kizuna-ai-2022.json": "schemas/knowledge/kizuna-ai-2022-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1330-skyfest-core-five.json": "schemas/knowledge/skyfest-faq-1330-core-five-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1330-tournament-of-triumph-core-four.json": "schemas/knowledge/tournament-of-triumph-faq-1330-core-four-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1323-days-of-color-core-three.json": "schemas/knowledge/days-of-color-faq-1323-core-three-fact-snapshot.schema.json",
 }
+
+
+def authorized_market_schema_files(root: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """Discover signed dataset files from the registry/manifest trust chain."""
+    jsonl_files: dict[str, str] = {}
+    json_files: dict[str, str] = {}
+    registry = root / "data/review/market-authorization/registry.jsonl"
+    if not registry.is_file():
+        return jsonl_files, json_files
+    try:
+        datasets = read_jsonl(registry)
+    except (ValueError, json.JSONDecodeError):
+        return jsonl_files, json_files
+    for dataset in datasets:
+        manifest_rel = dataset.get("manifest_path")
+        if not isinstance(manifest_rel, str):
+            continue
+        json_files[manifest_rel] = "schemas/market/authorized-market-manifest.schema.json"
+        manifest_path = root / manifest_rel
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        observations_rel = manifest.get("observations_path")
+        if isinstance(observations_rel, str):
+            jsonl_files[observations_rel] = "schemas/market/authorized-market-observation.schema.json"
+        training_rel = manifest.get("training_examples_path")
+        if isinstance(training_rel, str):
+            jsonl_files[training_rel] = "schemas/market/authorized-market-training-example.schema.json"
+    return jsonl_files, json_files
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
     "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
@@ -166,10 +204,14 @@ def formal_price_rebuild_errors(
     actual_normal: list[dict[str, Any]],
     actual_urgent: list[dict[str, Any]],
     actual_exclusions: list[dict[str, Any]],
-    authorization_evaluator: Any = None,
+    root: Path,
+    authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+    statement: str | Path | None = None, statement_sha256: str | None = None,
 ) -> list[str]:
     """Reject any formal model-price row not produced by the authorization gate."""
-    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(comparable_accounts, authorization_evaluator)
+    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(
+        comparable_accounts, root, authority_bundle, authority_bundle_sha256, statement, statement_sha256,
+    )
     problems: list[str] = []
     if actual_normal != expected_normal:
         problems.append("price-cleaned-normal differs from deterministic authorized rebuild")
@@ -327,11 +369,6 @@ def validate(
         market_authorization_statement, market_authorization_statement_sha256,
     )
     errors.extend(f"authorized-market-intake: {issue}" for issue in authorization_errors)
-    authorization_evaluator = make_authorization_evaluator(
-        root, market_authorization_authority_bundle,
-        market_authorization_authority_bundle_sha256,
-        market_authorization_statement, market_authorization_statement_sha256,
-    )
     ids: dict[str, set[str]] = {}
     records_by_path: dict[Path, list[dict[str, Any]]] = {}
     schema_validator = OfflineSchemaValidator(root / "schemas")
@@ -341,7 +378,9 @@ def validate(
         for row in load_registry(root)
         if isinstance(row.get("evidence_path"), str) and (root / row["evidence_path"]).is_file()
     }
-    schema_files = {**SCHEMA_FILES, **cohort_schema_files}
+    authorized_jsonl_files, authorized_json_files = authorized_market_schema_files(root)
+    schema_files = {**SCHEMA_FILES, **cohort_schema_files, **authorized_jsonl_files}
+    json_schema_files = {**JSON_SCHEMA_FILES, **authorized_json_files}
     actual_formal_json = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
@@ -352,7 +391,7 @@ def validate(
         and "fixtures" not in path.parts
         and "__pycache__" not in path.parts
     }
-    declared_formal_json = set(schema_files) | set(JSON_SCHEMA_FILES)
+    declared_formal_json = set(schema_files) | set(json_schema_files)
     for rel in sorted(actual_formal_json - declared_formal_json):
         errors.append(f"formal JSON/JSONL has no schema mapping: {rel}")
     for rel in sorted(declared_formal_json - actual_formal_json):
@@ -370,7 +409,7 @@ def validate(
             schema_checked += 1
             for issue in schema_validator.validate(row, root / schema_rel):
                 errors.append(f"{rel}:{index}:{issue}")
-    for rel, schema_rel in JSON_SCHEMA_FILES.items():
+    for rel, schema_rel in json_schema_files.items():
         path = root / rel
         if not path.exists():
             errors.append(f"required formal JSON missing: {rel}")
@@ -802,7 +841,8 @@ def validate(
     errors.extend(formal_price_rebuild_errors(
         read_jsonl(root / "data/comparables/accounts.jsonl"),
         actual_normal, actual_urgent, actual_exclusions,
-        authorization_evaluator,
+        root, market_authorization_authority_bundle, market_authorization_authority_bundle_sha256,
+        market_authorization_statement, market_authorization_statement_sha256,
     ))
     # Clean model prices must be a strict, reproducible subset of vectors.
     for relative, expected_line in (
@@ -996,11 +1036,23 @@ def validate(
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"model publication dataset: {exc}")
     try:
+        actual_evaluation = json.loads((root / "reports/model-publication-evaluation.json").read_text(encoding="utf-8"))
+        if actual_evaluation != build_publication_evaluation(root):
+            errors.append("model publication evaluation differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"model publication evaluation: {exc}")
+    try:
         actual_parser_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
         if actual_parser_coverage != build_parser_knowledge_coverage(root):
             errors.append("parser knowledge coverage differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"parser knowledge coverage: {exc}")
+    try:
+        actual_completion = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
+        if actual_completion != build_completion_status(root):
+            errors.append("completion status differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"completion status: {exc}")
     # Date invariant at every market stage.
     for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl", "data/review/market-near-miss-approved-evidence.jsonl"):
         path = root / rel
@@ -1051,7 +1103,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.3-p3.1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.4-p3.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
