@@ -44,7 +44,7 @@
     {
       "actual": {
         "review_scopes": 39,
-        "source_references": 1358
+        "source_references": 1347
       },
       "contract_id": "catalog.unresolved_zero",
       "evidence_paths": [
@@ -78,7 +78,7 @@
     },
     {
       "actual": {
-        "canonical_items": 133,
+        "canonical_items": 144,
         "non_verified_count": 79,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -171,7 +171,7 @@
     },
     {
       "actual": {
-        "items_missing_required_fields": 133,
+        "items_missing_required_fields": 144,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_as_of",
@@ -837,7 +837,67 @@
             "source_type",
             "ultimate_reward"
           ],
+          "item_days_of_color_dark_rainbow_loafers": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
           "item_days_of_color_dark_rainbow_mask": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_color_rainbow_face_paint_mask": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_color_rainbow_head_wrap": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_color_rainbow_ribbon_shawl": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_color_rainbow_smock": [
             "availability_as_of",
             "availability_status",
             "first_release_date",
@@ -922,6 +982,78 @@
             "ultimate_reward"
           ],
           "item_days_of_love_violet_crystal_prop": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_earth_cape": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_ocean_cape": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_ocean_manta_hair": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_ocean_necklace": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_ocean_waves_outfit": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_nature_sonorous_seashell": [
             "availability_as_of",
             "availability_status",
             "first_release_date",
@@ -2030,7 +2162,7 @@
           "item_regular_waving_bellmaker_mask"
         ],
         "items_missing_independent_identity": 97,
-        "official_identity_count": 36,
+        "official_identity_count": 47,
         "two_secondary_identity_count": 0
       },
       "contract_id": "catalog.independent_identity_evidence",
@@ -2094,7 +2226,12 @@
           "item_days_music_white_guitar",
           "item_days_of_color_color_bubble_machine",
           "item_days_of_color_color_glam_cut",
+          "item_days_of_color_dark_rainbow_loafers",
           "item_days_of_color_dark_rainbow_mask",
+          "item_days_of_color_rainbow_face_paint_mask",
+          "item_days_of_color_rainbow_head_wrap",
+          "item_days_of_color_rainbow_ribbon_shawl",
+          "item_days_of_color_rainbow_smock",
           "item_days_of_fortune_dragon_bangles",
           "item_days_of_fortune_dragon_stole",
           "item_days_of_fortune_dragon_vestment",
@@ -2102,6 +2239,12 @@
           "item_days_of_love_amethyst_tipped_tails",
           "item_days_of_love_braids",
           "item_days_of_love_violet_crystal_prop",
+          "item_days_of_nature_earth_cape",
+          "item_days_of_nature_ocean_cape",
+          "item_days_of_nature_ocean_manta_hair",
+          "item_days_of_nature_ocean_necklace",
+          "item_days_of_nature_ocean_waves_outfit",
+          "item_days_of_nature_sonorous_seashell",
           "item_days_of_sunlight_helios_hoops",
           "item_days_of_sunlight_manta_float",
           "item_days_of_sunlight_woven_wrap",
@@ -2178,7 +2321,7 @@
           "item_treasure_cavalier_boots",
           "item_treasure_shovel"
         ],
-        "items_without_complete_visual_state": 133,
+        "items_without_complete_visual_state": 144,
         "visual_input_error_count": 0
       },
       "contract_id": "catalog.visual_state_verified",
@@ -2955,14 +3098,14 @@
     "alias_conflicts": 1,
     "aliases": 320,
     "ancestors": 132,
-    "availability_events": 59,
+    "availability_events": 70,
     "candidates": 622,
-    "canonical_items": 133,
+    "canonical_items": 144,
     "events": 24,
     "scope_review": 3266,
     "seasons": 30,
     "sets": 10,
-    "source_scoped_unresolved": 1358,
+    "source_scoped_unresolved": 1347,
     "universe": 3266,
     "unmapped_aliases": 14,
     "unresolved_review_scopes": 39

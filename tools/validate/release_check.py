@@ -561,7 +561,7 @@ def main() -> None:
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "5.0-p3.8", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "5.1-p3.9", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,
