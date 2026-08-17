@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 REGISTRY_PATH = "data/review/canonical-evidence-cohorts.jsonl"
-ALLOWED_VERIFIER_IDS = frozenset({"nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack", "kizuna_ai_bundle", "skyfest_faq1330_core_five"})
+ALLOWED_VERIFIER_IDS = frozenset({"nintendo_starter_pack", "aurora_faq968", "journey_pack", "moomin_pack", "kizuna_ai_bundle", "skyfest_faq1330_core_five", "tournament_of_triumph_faq1330_core_four"})
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
@@ -57,6 +57,9 @@ def _verifier(verifier_id: str) -> tuple[Callable[[Path], list[str]], dict[str, 
         return verify, registry_contract()
     if verifier_id == "skyfest_faq1330_core_five":
         from tools.normalize.apply_skyfest_faq1330_core_five_cohort import registry_contract, verify
+        return verify, registry_contract()
+    if verifier_id == "tournament_of_triumph_faq1330_core_four":
+        from tools.normalize.apply_tournament_of_triumph_faq1330_core_four_cohort import registry_contract, verify
         return verify, registry_contract()
     # An allowlisted but not-yet-implemented verifier remains unavailable. If
     # made active, validate_registry fails closed instead of trusting a ledger.

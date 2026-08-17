@@ -11,10 +11,14 @@
     "source_snapshot": {"type": "object", "additionalProperties": false, "required": ["artifact_path", "sha256", "captured_at", "replayable"], "properties": {"artifact_path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "captured_at": {"type": "string", "format": "date"}, "replayable": {"type": "boolean"}}},
     "license_evidence": {"type": "object", "additionalProperties": false, "required": ["kind", "evidence_id", "verified"], "properties": {"kind": {"enum": ["legacy_anonymous_research", "explicit_data_license", "documented_data_consent"]}, "evidence_id": {"type": "string", "minLength": 1}, "verified": {"type": "boolean"}}},
     "replay_evidence": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["evidence_id", "source_locator", "content_sha256", "reviewed_at"], "properties": {"evidence_id": {"type": "string", "minLength": 1}, "source_locator": {"type": "string", "minLength": 1}, "content_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}, "reviewed_at": {"type": "string", "format": "date"}}}},
-    "authorization_record_id": {"type": "string", "minLength": 1}
+    "authorization_record_id": {"type": "string", "minLength": 1},
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "observation_id": {"type": "string", "pattern": "^observation_[a-z0-9_]+$"},
+    "row_digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}
   },
   "allOf": [
     {"if": {"properties": {"status": {"const": "legacy_research_only"}}}, "then": {"properties": {"allowed_uses": {"contains": {"const": "research"}, "not": {"contains": {"enum": ["model_training", "comparable_estimation"]}}}, "license_evidence": {"properties": {"kind": {"const": "legacy_anonymous_research"}, "verified": {"const": false}}}, "source_snapshot": {"properties": {"replayable": {"const": false}}}}}},
-    {"if": {"properties": {"status": {"const": "authorized_model_training"}}}, "then": {"required": ["authorization_record_id"], "properties": {"allowed_uses": {"allOf": [{"contains": {"const": "model_training"}}, {"contains": {"const": "comparable_estimation"}}]}, "source_snapshot": {"properties": {"replayable": {"const": true}}}, "license_evidence": {"properties": {"kind": {"enum": ["explicit_data_license", "documented_data_consent"]}, "verified": {"const": true}}}, "replay_evidence": {"minItems": 1}}}}
+    {"if": {"properties": {"status": {"const": "authorized_model_training"}}}, "then": {"required": ["authorization_record_id", "dataset_id", "observation_id", "row_digest", "manifest_sha256"], "properties": {"allowed_uses": {"allOf": [{"contains": {"const": "model_training"}}, {"contains": {"const": "comparable_estimation"}}]}, "source_snapshot": {"properties": {"replayable": {"const": true}}}, "license_evidence": {"properties": {"kind": {"enum": ["explicit_data_license", "documented_data_consent"]}, "verified": {"const": true}}}, "replay_evidence": {"minItems": 1}}}}
   ]
 }

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "market/authorized-market-dataset.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dataset_id", "authorization_record_id", "manifest_path", "manifest_sha256", "statement_sha256", "expires_at"],
+  "properties": {
+    "dataset_id": {"type": "string", "pattern": "^authorized_market_[a-z0-9_]+$"},
+    "authorization_record_id": {"type": "string", "pattern": "^authorization_record_[a-z0-9_]+$"},
+    "manifest_path": {"type": "string", "pattern": "^data/review/market-authorization/datasets/[a-z0-9_/-]+/manifest\\.json$"},
+    "manifest_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "statement_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "expires_at": {"type": "string", "format": "date"}
+  }
+}

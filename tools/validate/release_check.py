@@ -20,6 +20,9 @@ from canonical_evidence_registry import load_registry, validate_registry  # noqa
 from market_audit import audit_market_ledgers  # noqa: E402
 from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
 from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
+from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
+from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
+from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -66,7 +69,14 @@ def human_review_ledgers_release_valid(
     return (not market_claim_gold and not near_miss_approved_evidence) or (market_audit_errors == [])
 
 
-def verify_fresh_lf_checkout(root: Path, source_zip: Path, authority_bundle: Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, object]:
+def verify_fresh_lf_checkout(
+    root: Path, source_zip: Path, authority_bundle: Path | None = None,
+    authority_bundle_sha256: str | None = None,
+    market_authorization_authority_bundle: Path | None = None,
+    market_authorization_authority_bundle_sha256: str | None = None,
+    market_authorization_statement: Path | None = None,
+    market_authorization_statement_sha256: str | None = None,
+) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain"], text=True, capture_output=True, check=False
@@ -88,6 +98,14 @@ def verify_fresh_lf_checkout(root: Path, source_zip: Path, authority_bundle: Pat
             command.extend(["--market-audit-authority-bundle", str(authority_bundle)])
         if authority_bundle_sha256 is not None:
             command.extend(["--market-audit-authority-bundle-sha256", authority_bundle_sha256])
+        if market_authorization_authority_bundle is not None:
+            command.extend(["--market-authorization-authority-bundle", str(market_authorization_authority_bundle)])
+        if market_authorization_authority_bundle_sha256 is not None:
+            command.extend(["--market-authorization-authority-bundle-sha256", market_authorization_authority_bundle_sha256])
+        if market_authorization_statement is not None:
+            command.extend(["--market-authorization-statement", str(market_authorization_statement)])
+        if market_authorization_statement_sha256 is not None:
+            command.extend(["--market-authorization-statement-sha256", market_authorization_statement_sha256])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -106,9 +124,17 @@ def main() -> None:
     parser.add_argument("--verify-fresh-lf-checkout", action="store_true", help="also validate an actual clean Git LF checkout")
     parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
     parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
+    parser.add_argument("--market-authorization-authority-bundle", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle-sha256")
+    parser.add_argument("--market-authorization-statement", type=Path)
+    parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
-    integrity = validate(root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
+    integrity = validate(
+        root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+        args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
+        args.market_authorization_statement, args.market_authorization_statement_sha256,
+    )
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
     # discovery can shadow the top-level `modeling` package and make release
@@ -197,6 +223,15 @@ def main() -> None:
     account_catalog_resolution = [json.loads(line) for line in (root / "data/review/account-catalog-resolution.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     historical_cost_references = [json.loads(line) for line in (root / "data/derived/official-historical-cost-references.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     publication_readiness = json.loads((root / "reports/model-publication-readiness.json").read_text(encoding="utf-8"))
+    publication_dataset = json.loads((root / "reports/model-publication-dataset-manifest.json").read_text(encoding="utf-8"))
+    publication_split = json.loads((root / "reports/model-publication-split.json").read_text(encoding="utf-8"))
+    parser_knowledge_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
+    expected_publication_dataset, expected_publication_split = build_publication_dataset(root)
+    authorized_market_errors = verify_authorized_market_intake(
+        root, args.market_authorization_authority_bundle,
+        args.market_authorization_authority_bundle_sha256,
+        args.market_authorization_statement, args.market_authorization_statement_sha256,
+    )
     vendor_item_evidence = [json.loads(line) for line in (root / "data/review/skygame-data-1.3.4-item-evidence.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     fandom_crosswalk = [json.loads(line) for line in (root / "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     canonical_item_ids = {row["item_id"] for row in items}
@@ -275,13 +310,30 @@ def main() -> None:
             and publication_readiness.get("artifact_publication_fields_consulted") is False
             and publication_readiness.get("trained_models_treated_as_passed") is False
         ),
+        "p3_1_authorized_market_intake_replayed": not authorized_market_errors,
+        "p3_1_publication_dataset_and_split_replayed": (
+            publication_dataset == expected_publication_dataset
+            and publication_split == expected_publication_split
+            and publication_dataset.get("status") == "not_ready"
+            and publication_split.get("status") == "not_ready"
+            and not any(pool.get("requirements_met") is True for pool in publication_split.get("market_pools", []))
+        ),
+        "p3_1_parser_knowledge_coverage_replayed_non_model": (
+            parser_knowledge_coverage == build_parser_knowledge_coverage(root)
+            and parser_knowledge_coverage.get("model_feature") is False
+            and all(row.get("model_feature") is False for row in parser_knowledge_coverage.get("items", []))
+        ),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
-        fresh_checkout = verify_fresh_lf_checkout(root, source_zip, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
+        fresh_checkout = verify_fresh_lf_checkout(
+            root, source_zip, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+            args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
+            args.market_authorization_statement, args.market_authorization_statement_sha256,
+        )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.2-p3.0", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.3-p3.1", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

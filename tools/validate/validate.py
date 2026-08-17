@@ -39,7 +39,10 @@ from market_audit import audit_market_ledgers  # noqa: E402
 from promote_items import evaluate as evaluate_item_promotions, verify_replayable_sources  # noqa: E402
 from tools.normalize.build_historical_cost_references import build as build_historical_cost_references  # noqa: E402
 from tools.modeling.publication_readiness import build as build_publication_readiness  # noqa: E402
+from tools.modeling.publication_dataset import build as build_publication_dataset  # noqa: E402
+from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
 from tools.modeling.clean_prices import clean as clean_model_prices  # noqa: E402
+from tools.market_authorization import make_authorization_evaluator, verify_authorized_market_intake  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -86,6 +89,8 @@ SCHEMA_FILES = {
     "data/review/market-near-miss-field-review.jsonl": "schemas/review/market-near-miss-field-review.schema.json",
     "data/review/market-near-miss-approved-evidence.jsonl": "schemas/review/market-near-miss-approved-evidence.schema.json",
     "data/review/market-audit/attestations.jsonl": "schemas/review/market-audit-attestation.schema.json",
+    "data/review/market-authorization/registry.jsonl": "schemas/market/authorized-market-dataset.schema.json",
+    "data/review/market-authorization/attestations.jsonl": "schemas/market/authorized-market-attestation.schema.json",
     "data/review/account-catalog-resolution.jsonl": "schemas/review/account-catalog-resolution.schema.json",
     "data/review/fandom-seasonal-cosmetics-r107991-crosswalk.jsonl": "schemas/review/fandom-seasonal-cosmetics-crosswalk.schema.json",
     "data/normalized/source-scoped-item-identities.jsonl": "schemas/normalized/source-scoped-item-identity.schema.json",
@@ -101,6 +106,9 @@ JSON_SCHEMA_FILES = {
     "reports/migration/file-inventory.json": "schemas/reports/file-inventory.schema.json",
     "reports/validation/p0-validation.json": "schemas/reports/validation.schema.json",
     "reports/model-publication-readiness.json": "schemas/modeling/publication-readiness.schema.json",
+    "reports/model-publication-dataset-manifest.json": "schemas/modeling/publication-dataset-manifest.schema.json",
+    "reports/model-publication-split.json": "schemas/modeling/publication-split.schema.json",
+    "reports/parser-knowledge-coverage.json": "schemas/modeling/parser-knowledge-coverage.schema.json",
     "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/xgboost-normal_listing.json": "schemas/modeling/xgboost-artifact.schema.json",
@@ -120,6 +128,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1356-moomintroll-accessory-set.json": "schemas/knowledge/moomintroll-accessory-set-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-879-kizuna-ai-2022.json": "schemas/knowledge/kizuna-ai-2022-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1330-skyfest-core-five.json": "schemas/knowledge/skyfest-faq-1330-core-five-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1330-tournament-of-triumph-core-four.json": "schemas/knowledge/tournament-of-triumph-faq-1330-core-four-fact-snapshot.schema.json",
 }
 REQUIRED_FORMAL_JSONL = {
     "data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl",
@@ -157,9 +166,10 @@ def formal_price_rebuild_errors(
     actual_normal: list[dict[str, Any]],
     actual_urgent: list[dict[str, Any]],
     actual_exclusions: list[dict[str, Any]],
+    authorization_evaluator: Any = None,
 ) -> list[str]:
     """Reject any formal model-price row not produced by the authorization gate."""
-    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(comparable_accounts)
+    expected_normal, expected_urgent, expected_exclusions = clean_model_prices(comparable_accounts, authorization_evaluator)
     problems: list[str] = []
     if actual_normal != expected_normal:
         problems.append("price-cleaned-normal differs from deterministic authorized rebuild")
@@ -180,7 +190,7 @@ def validate_canonical_field_evidence(
     problems: list[str] = []
     seen: set[str] = set()
     item_fields = {
-        "canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_type", "source_type",
+        "canonical_name_en", "identity_description", "item_category", "vendor_item_name", "vendor_item_type", "vendor_item_guid", "source_type",
         "set_membership", "availability_status", "availability_history", "original_cost",
         "original_currency", "first_release_date", "free_or_premium",
         "permanent_account_item", "collaboration", "visual_reference",
@@ -304,9 +314,24 @@ def validate_vendor_evidence_links(vendor_metadata: dict[str, Any], vendor_snaps
 def validate(
     root: Path = ROOT, market_audit_authority_bundle: str | Path | None = None,
     market_audit_authority_bundle_sha256: str | None = None,
+    market_authorization_authority_bundle: str | Path | None = None,
+    market_authorization_authority_bundle_sha256: str | None = None,
+    market_authorization_statement: str | Path | None = None,
+    market_authorization_statement_sha256: str | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
+    authorization_errors = verify_authorized_market_intake(
+        root, market_authorization_authority_bundle,
+        market_authorization_authority_bundle_sha256,
+        market_authorization_statement, market_authorization_statement_sha256,
+    )
+    errors.extend(f"authorized-market-intake: {issue}" for issue in authorization_errors)
+    authorization_evaluator = make_authorization_evaluator(
+        root, market_authorization_authority_bundle,
+        market_authorization_authority_bundle_sha256,
+        market_authorization_statement, market_authorization_statement_sha256,
+    )
     ids: dict[str, set[str]] = {}
     records_by_path: dict[Path, list[dict[str, Any]]] = {}
     schema_validator = OfflineSchemaValidator(root / "schemas")
@@ -777,6 +802,7 @@ def validate(
     errors.extend(formal_price_rebuild_errors(
         read_jsonl(root / "data/comparables/accounts.jsonl"),
         actual_normal, actual_urgent, actual_exclusions,
+        authorization_evaluator,
     ))
     # Clean model prices must be a strict, reproducible subset of vectors.
     for relative, expected_line in (
@@ -959,6 +985,22 @@ def validate(
             errors.append("model publication readiness differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"model publication readiness: {exc}")
+    try:
+        actual_dataset = json.loads((root / "reports/model-publication-dataset-manifest.json").read_text(encoding="utf-8"))
+        actual_split = json.loads((root / "reports/model-publication-split.json").read_text(encoding="utf-8"))
+        expected_dataset, expected_split = build_publication_dataset(root)
+        if actual_dataset != expected_dataset:
+            errors.append("model publication dataset manifest differs from deterministic rebuild")
+        if actual_split != expected_split:
+            errors.append("model publication split differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"model publication dataset: {exc}")
+    try:
+        actual_parser_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
+        if actual_parser_coverage != build_parser_knowledge_coverage(root):
+            errors.append("parser knowledge coverage differs from deterministic rebuild")
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"parser knowledge coverage: {exc}")
     # Date invariant at every market stage.
     for rel in ("data/source/listings.jsonl", "data/normalized/listings.jsonl", "data/normalized/account-profiles.jsonl", "data/curated/histories.jsonl", "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl", "data/review/market-near-miss-approved-evidence.jsonl"):
         path = root / rel
@@ -1009,7 +1051,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.2-p3.0", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.3-p3.1", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1022,8 +1064,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--market-audit-authority-bundle", type=Path, help="external authority-bundle JSON; required only for nonempty market review ledgers")
     parser.add_argument("--market-audit-authority-bundle-sha256", help="expected SHA-256 for the injected external authority bundle")
+    parser.add_argument("--market-authorization-authority-bundle", type=Path)
+    parser.add_argument("--market-authorization-authority-bundle-sha256")
+    parser.add_argument("--market-authorization-statement", type=Path)
+    parser.add_argument("--market-authorization-statement-sha256")
     args = parser.parse_args()
-    result = validate(args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
+    result = validate(
+        args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+        args.market_authorization_authority_bundle, args.market_authorization_authority_bundle_sha256,
+        args.market_authorization_statement, args.market_authorization_statement_sha256,
+    )
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.write_text(text, encoding="utf-8")

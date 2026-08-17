@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0-p3.1",
+  "status": "not_ready",
+  "dataset_path": "reports/model-publication-dataset-manifest.json#dataset_rows",
+  "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
+  "requirements": {
+    "training_clusters": 300,
+    "holdout_clusters": 100
+  },
+  "market_pools": []
+}

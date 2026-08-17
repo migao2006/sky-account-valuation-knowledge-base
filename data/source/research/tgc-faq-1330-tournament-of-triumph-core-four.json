@@ -1,0 +1,24 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1330_tournament_of_triumph_core_four_2026_08_17",
+  "source_id":"source_tgc_faq_1330_tournament_of_triumph_core_four",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1330-patch-notes---july-2-2024---0-26-0-272243-android-huawei-ios-playstation-steam-272595-switch/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1330's four named Tournament of Triumph new-item entries, their stated historical costs, and its 2024 event window. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2024-07-29",
+    "historical_window_end_date":"2024-08-18",
+    "new_items":[
+      {"item_id":"item_tournament_of_triumph_curls","official_name_en":"Tournament Curls","original_currency":"event_currency","original_cost":25},
+      {"item_id":"item_tournament_of_triumph_torch","official_name_en":"Tournament Torch","original_currency":"event_currency","original_cost":37},
+      {"item_id":"item_tournament_of_triumph_golden_garland","official_name_en":"Tournament Golden Garland","original_currency":"USD","original_cost":4.99},
+      {"item_id":"item_tournament_of_triumph_tunic","official_name_en":"Tournament Tunic","original_currency":"USD","original_cost":9.99}
+    ]
+  },
+  "non_claims":[
+    "Tournament Headband is deliberately outside this four-item cohort.",
+    "This historical FAQ does not establish current availability, a return policy, current storefront state, or permanent-account property for any item.",
+    "The FAQ does not provide formal Traditional Chinese names or image assets, and its text does not establish a visual match.",
+    "This bounded FAQ slice is not a complete Tournament of Triumph set and no bundle or set membership is asserted."
+  ]
+}
