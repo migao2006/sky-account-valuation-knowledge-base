@@ -1,10 +1,10 @@
-# Sky 光遇知識庫與授權估價框架 v5.0 P3.8
+# Sky 光遇知識庫與授權估價框架 v5.1 P3.9
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v5.0 P3.8 把 keyed parser review 補成可驗證的 200-row A/B 標註、分歧裁決、custodian finalization 與不可公開連結 split 的正式 gold 流程；公開 ledger 只保存 keyed commitment。`reduced` 市場觀測現在以單一契約進入 `urgent_sale`，normal 與 urgent Elastic runtime 可各自訓練、評估與精確綁定。Catalog completion 同時驗 items、seasons、events、ancestors、sets、availability 與 aliases，並要求完整欄位、新鮮 lineage 與 item-bound rights evidence；受雙獨立外部 OpenSSH 審核的 restricted declarative cohort 可在不新增任意程式碼的情況下重播。上述能力仍只接受 release root 外、SHA-256 固定且可重播的資料；正式市場 registry、外部 mapping／receipt、真人 gold、完整 catalog evidence 與圖片資產仍為空，所以 production training／估價保持 not ready。所有正式工具只處理本機檔案，不主動連網。
+v5.1 P3.9 新增 thatgamecompany FAQ 1391 的 Days of Nature／Days of Color 2025 bounded core-eleven：七件逐項 USD 歷史價格與四件僅能確認 event-ticket 來源的 identity-only 物品，全部以固定官方事實、vendor ID／GUID／type 與逐欄 locator 離線重播。沒有逐項票數的四件成本維持 `unknown`；Ocean Waves Mask、packs 與 bundles 明確排除。P3.8 的 keyed parser review、normal／urgent runtime、完整 completion gate 與受外部審核的 declarative cohort 契約保持不變。正式市場 registry、外部 mapping／receipt、真人 gold、完整 catalog evidence 與圖片資產仍為空，所以 production training／估價保持 not ready。所有正式工具只處理本機檔案，不主動連網。
 
-目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。133 個 canonical item 中 54 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
+目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。144 個 canonical item 中 65 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
 P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.5 的 relation、成本參考、parser coverage、lexical sidecar 與 visual locator 都只是來源／文字覆核關係，不會自動提升 ownership 或轉售價。新增的 provider／parser onboarding 只會產生 repo 外候選包與簽署 payload，不會伪造正式資料。固定 publication dataset／split／evaluation 報告目前為空且 `not_ready`；[`reports/completion-status.json`](reports/completion-status.json) 逐條公開尚未完成的契約。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 

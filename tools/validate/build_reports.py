@@ -246,7 +246,7 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "5.0-p3.8",
+        "schema_version": "5.1-p3.9",
         "as_of_date": "2026-08-17",
         "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
         "full_item_catalog_complete": catalog_completion["complete"],
@@ -511,13 +511,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "5.0-p3.8"
+    previous_validation["schema_version"] = "5.1-p3.9"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v5-p38"
-    manifest["package_version"] = "5.0.0-p3.8"
+    manifest["package_id"] = "sky-valuation-v5-p39"
+    manifest["package_version"] = "5.1.0-p3.9"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),

@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 5.1.0-p3.9 — 2026-08-17
+
+- 新增 FAQ 1391 Days of Nature／Days of Color 2025 bounded core-eleven，將 11 個官方命名且 vendor identity 可精確重播的物品納入 canonical catalog。
+- 七件單品保存官方逐項 USD 歷史價格；四件 event-ticket 解鎖物品只保存 identity 與 currency basis，逐項成本維持 `unknown`。
+- 官方窗口僅保存明示的開始日與週數，availability end date 維持 `null`，不把推導日期冒充官方事實。
+- 明確排除名稱不一致的 Ocean Waves Mask、所有 packs／bundles 與不可拆分價格；不提升 current availability、permanence、visual、set 或模型資格。
+- 重建 vendor crosswalk、source-scoped identities、catalog query/universe、item vectors、模型 artifacts、歷史成本參考、completion reports 與 manifest。
+
 ## 5.0.0-p3.8 — 2026-08-17
 
 - 完成 keyed parser review 的 A/B 獨立簽章、分歧裁決、custodian finalization、200-row commitment 雙射與 100/100 split 重播；公開 gold 不保存可連回原文的 hash 或逐列 split。
