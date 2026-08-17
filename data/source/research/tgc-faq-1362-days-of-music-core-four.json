@@ -1,0 +1,25 @@
+{
+  "snapshot_format": "fact_limited_official_support_snapshot_v1",
+  "snapshot_id": "tgc_faq_1362_days_of_music_core_four_2026_08_17",
+  "source_id": "source_tgc_faq_1362_days_of_music_core_four",
+  "source_url": "https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1362-patch-notes---november-21-2024---0-27-5-302936-android-huawei-ios-playstation-304181-steam-303477-switch/",
+  "retrieved_at": "2026-08-17",
+  "capture_policy": "Fact-limited transcription of FAQ 1362's Days of Music 2024 Pacific window, four named item costs, and its explicitly stated post-event permanent Harmony Hall availability for Jam Station and Fledgling Upright Piano. Wonderland Pinafore Set and all bundles are excluded. Vendor title reconciliation is limited to the one enumerated suffix pair in the apply contract.",
+  "facts": {
+    "historical_window_start_date": "2024-11-25",
+    "historical_window_end_date": "2024-12-08",
+    "items": [
+      {"item_id":"item_days_of_music_marching_band_cape","official_name_en":"Marching Band Cape","original_currency":"event_currency","original_cost":50,"availability_kind":"historical_event_only"},
+      {"item_id":"item_days_of_music_music_marching_uniform","official_name_en":"Music Marching Uniform outfit","original_currency":"USD","original_cost":9.99,"availability_kind":"historical_event_only"},
+      {"item_id":"item_permanent_jam_station","official_name_en":"Jam Station","original_currency":"Candles","original_cost":250,"availability_kind":"historical_event_and_post_event_permanent"},
+      {"item_id":"item_permanent_fledgling_upright_piano","official_name_en":"Fledgling Upright Piano","original_currency":"USD","original_cost":4.99,"availability_kind":"historical_event_and_post_event_permanent"}
+    ],
+    "post_event_permanent_item_ids": ["item_permanent_jam_station","item_permanent_fledgling_upright_piano"]
+  },
+  "non_claims": [
+    "The FAQ establishes a 2024 historical event window, not a currently verified storefront state.",
+    "For Jam Station and Fledgling Upright Piano, the FAQ states intended post-event permanent Harmony Hall availability; this does not establish their current availability on the retrieval date.",
+    "The FAQ does not establish formal Traditional Chinese names, images, visual matches, resale prices, first release dates, account ownership properties, or bundle membership.",
+    "Wonderland Pinafore Set and all packs or bundles are excluded from this bounded cohort."
+  ]
+}

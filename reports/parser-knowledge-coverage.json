@@ -2,8 +2,8 @@
   "schema_version": "1.0-p3.1",
   "model_feature": false,
   "summary": {
-    "canonical_item_count": 144,
-    "verified_canonical_item_count": 65,
+    "canonical_item_count": 147,
+    "verified_canonical_item_count": 69,
     "model_eligible_item_count": 19,
     "verified_alias_item_count": 0,
     "known_owned_count": 161,
@@ -12,7 +12,7 @@
     "review_only_positive_count": 157,
     "review_only_negative_count": 3,
     "review_only_conflict_count": 0,
-    "historical_cost_reference_count": 65
+    "historical_cost_reference_count": 69
   },
   "items": [
     {
@@ -1087,6 +1087,40 @@
       "model_feature": false
     },
     {
+      "item_id": "item_days_of_music_marching_band_cape",
+      "canonical_verification_status": "verified",
+      "canonical_model_feature_status": "excluded_pending_verification",
+      "verified_observation_token_available": false,
+      "alias_count": 0,
+      "verified_alias_count": 0,
+      "alias_verification_gap_count": 0,
+      "known_owned_count": 0,
+      "known_missing_count": 0,
+      "unknown_state_count": 1022,
+      "review_only_positive_count": 0,
+      "review_only_negative_count": 0,
+      "review_only_conflict_count": 0,
+      "historical_cost_reference_kind": "in_game_currency",
+      "model_feature": false
+    },
+    {
+      "item_id": "item_days_of_music_music_marching_uniform",
+      "canonical_verification_status": "verified",
+      "canonical_model_feature_status": "excluded_pending_verification",
+      "verified_observation_token_available": false,
+      "alias_count": 0,
+      "verified_alias_count": 0,
+      "alias_verification_gap_count": 0,
+      "known_owned_count": 0,
+      "known_missing_count": 0,
+      "unknown_state_count": 1022,
+      "review_only_positive_count": 0,
+      "review_only_negative_count": 0,
+      "review_only_conflict_count": 0,
+      "historical_cost_reference_kind": "exact_historical_item_price",
+      "model_feature": false
+    },
+    {
       "item_id": "item_days_of_nature_earth_cape",
       "canonical_verification_status": "verified",
       "canonical_model_feature_status": "excluded_pending_verification",
@@ -1700,7 +1734,7 @@
     },
     {
       "item_id": "item_permanent_fledgling_upright_piano",
-      "canonical_verification_status": "needs_review",
+      "canonical_verification_status": "verified",
       "canonical_model_feature_status": "excluded_pending_verification",
       "verified_observation_token_available": false,
       "alias_count": 1,
@@ -1712,7 +1746,24 @@
       "review_only_positive_count": 0,
       "review_only_negative_count": 0,
       "review_only_conflict_count": 0,
-      "historical_cost_reference_kind": null,
+      "historical_cost_reference_kind": "exact_historical_item_price",
+      "model_feature": false
+    },
+    {
+      "item_id": "item_permanent_jam_station",
+      "canonical_verification_status": "verified",
+      "canonical_model_feature_status": "excluded_pending_verification",
+      "verified_observation_token_available": false,
+      "alias_count": 0,
+      "verified_alias_count": 0,
+      "alias_verification_gap_count": 0,
+      "known_owned_count": 0,
+      "known_missing_count": 0,
+      "unknown_state_count": 1022,
+      "review_only_positive_count": 0,
+      "review_only_negative_count": 0,
+      "review_only_conflict_count": 0,
+      "historical_cost_reference_kind": "in_game_currency",
       "model_feature": false
     },
     {

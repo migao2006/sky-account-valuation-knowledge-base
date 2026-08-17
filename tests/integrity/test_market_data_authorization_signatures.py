@@ -147,6 +147,118 @@ class AuthorizedMarketIntakeTest(unittest.TestCase):
         self.assertFalse(_valid_iso_date("not-a-date"))
         self.assertFalse(_valid_iso_date("2026-02-30"))
 
+    def _write_two_dataset_statement_bundle(self):
+        """Build two independently claimed, detached-signed temporary datasets."""
+        first_id = self.dataset["dataset_id"]
+        first_dir = self.root / "data/review/market-authorization/datasets" / first_id
+        first_manifest = json.loads((first_dir / "manifest.json").read_text(encoding="utf-8"))
+        first_observations = first_dir / "observations.jsonl"
+        second_id = "authorized_market_fixture_two"
+        second_dir = self.root / "data/review/market-authorization/datasets" / second_id
+        second_dir.mkdir(parents=True, exist_ok=True)
+        observation = {
+            "observation_id": "observation_fixture_0002", "source_snapshot_sha256": "B" * 64,
+            "dedup_cluster_id": "cluster_fixture_0002", "post_date": "2026-08-02",
+            "date_verified": True, "currency": "TWD", "currency_verified": True,
+            "server": "international", "server_verified": True, "offer_kind": "seller_listing",
+            "entity_kind": "single_account", "price_line": "reduced", "price_twd": 2000,
+        }
+        second_observations = second_dir / "observations.jsonl"
+        second_observations.write_bytes(canonical_bytes(observation))
+        second_manifest = {
+            "schema_version": "authorized-market-manifest-v1", "dataset_id": second_id,
+            "observations_path": f"data/review/market-authorization/datasets/{second_id}/observations.jsonl",
+            "observations_sha256": self._sha(second_observations),
+            "observation_digests": [{"observation_id": observation["observation_id"],
+                "row_digest": sha256_bytes(canonical_bytes(observation)),
+                "dedup_cluster_digest": sha256_bytes(canonical_bytes(observation["dedup_cluster_id"]))}],
+        }
+        second_manifest_path = second_dir / "manifest.json"
+        self._write(second_manifest_path, second_manifest)
+        expiry = (date.today() + timedelta(days=30)).isoformat()
+        records = [
+            (first_id, first_dir, first_manifest, first_observations),
+            (second_id, second_dir, second_manifest, second_observations),
+        ]
+        claims = [{"schema_version": "authorized-market-statement-v1", "dataset_id": dataset_id,
+            "manifest_sha256": self._sha(directory / "manifest.json"), "observations_sha256": self._sha(observations),
+            "expires_at": expiry} for dataset_id, directory, _manifest, observations in records]
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": claims})
+        self.dataset.update({"manifest_sha256": self._sha(first_dir / "manifest.json"),
+            "statement_sha256": sha256_bytes(canonical_bytes(claims[0])), "expires_at": expiry})
+        second_dataset = {"dataset_id": second_id, "authorization_record_id": "authorization_record_fixture_two",
+            "manifest_path": f"data/review/market-authorization/datasets/{second_id}/manifest.json",
+            "manifest_sha256": self._sha(second_manifest_path), "statement_sha256": sha256_bytes(canonical_bytes(claims[1])),
+            "expires_at": expiry}
+        datasets = [dict(self.dataset), second_dataset]
+        (self.root / "data/review/market-authorization/registry.jsonl").write_bytes(
+            b"".join(canonical_bytes(value) for value in datasets))
+        authorities = json.loads(self.bundle_path.read_text(encoding="utf-8"))["authorities"]
+        attestations = []
+        for dataset, claim, (_dataset_id, directory, manifest, observations) in zip(datasets, claims, records):
+            for number, role in enumerate(("data_steward", "privacy_reviewer", "method_reviewer")):
+                authority = next(value for value in authorities if role in value["roles"])
+                rel = f"data/review/market-authorization/signatures/{dataset['dataset_id']}-{role}.sig"
+                entry = {"attestation_id": f"authorized_market_attestation_{dataset['dataset_id']}_{number:04d}",
+                    "dataset_id": dataset["dataset_id"], "role": role, "authority_id": authority["authority_id"],
+                    "fingerprint": authority["fingerprint"], "statement_sha256": dataset["statement_sha256"],
+                    "manifest_sha256": self._sha(directory / "manifest.json"), "observations_sha256": self._sha(observations),
+                    "signature_file": rel}
+                payload = attestation_payload(dataset, manifest, claim, entry)
+                entry["payload_sha256"] = sha256_bytes(payload)
+                payload_path = self.external / f"bundle-{dataset['dataset_id']}-{number}.payload"
+                payload_path.write_bytes(payload)
+                Path(str(payload_path) + ".sig").unlink(missing_ok=True)
+                subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", str(self.external / f"key{number}"), "-n", NAMESPACE, str(payload_path)], check=True)
+                shutil.copyfile(str(payload_path) + ".sig", self.root / rel)
+                attestations.append(entry)
+        (self.root / "data/review/market-authorization/attestations.jsonl").write_bytes(
+            b"".join(canonical_bytes(value) for value in attestations))
+        return datasets, claims
+
+    def test_v2_statement_bundle_two_signed_datasets_and_replay_rejections(self):
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        self.assertEqual([], self.errors())
+
+        # Exact registry coverage is a contract: neither omission nor an
+        # unrelated signed-looking statement can be admitted.
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": claims[:1]})
+        self.assertTrue(any("coverage" in error for error in self.errors()))
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        extra = dict(claims[0], dataset_id="authorized_market_extra")
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": [*claims, extra]})
+        self.assertTrue(any("coverage" in error for error in self.errors()))
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": [*claims, dict(claims[0])]})
+        self.assertTrue(any("duplicate" in error for error in self.errors()))
+
+        # A claim cannot be swapped or reused: the canonical per-dataset
+        # digest in both registry and attestations is checked independently.
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        swapped = [dict(claims[0]), dict(claims[1])]
+        swapped[0]["manifest_sha256"], swapped[1]["manifest_sha256"] = swapped[1]["manifest_sha256"], swapped[0]["manifest_sha256"]
+        swapped[0]["observations_sha256"], swapped[1]["observations_sha256"] = swapped[1]["observations_sha256"], swapped[0]["observations_sha256"]
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": swapped})
+        self.assertTrue(any("does not bind dataset bytes" in error or "binding mismatch" in error for error in self.errors()))
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        registry = [json.loads(line) for line in (self.root / "data/review/market-authorization/registry.jsonl").read_text(encoding="utf-8").splitlines()]
+        registry[1]["statement_sha256"] = registry[0]["statement_sha256"]
+        (self.root / "data/review/market-authorization/registry.jsonl").write_bytes(b"".join(canonical_bytes(value) for value in registry))
+        attestations = [json.loads(line) for line in (self.root / "data/review/market-authorization/attestations.jsonl").read_text(encoding="utf-8").splitlines()]
+        for entry in attestations:
+            if entry["dataset_id"] == registry[1]["dataset_id"]:
+                entry["statement_sha256"] = registry[0]["statement_sha256"]
+        (self.root / "data/review/market-authorization/attestations.jsonl").write_bytes(b"".join(canonical_bytes(value) for value in attestations))
+        self.assertTrue(any("does not bind dataset bytes" in error for error in self.errors()))
+
+        # Mutating an embedded claim and recomputing only the outer injection
+        # digest still invalidates its recorded canonical claim digest/signature.
+        datasets, claims = self._write_two_dataset_statement_bundle()
+        tampered = [dict(value) for value in claims]
+        tampered[1]["expires_at"] = (date.today() + timedelta(days=29)).isoformat()
+        self._write(self.statement_path, {"schema_version": "authorized-market-statement-bundle-v2", "statements": tampered})
+        self.assertTrue(any("does not bind dataset bytes" in error or "expiry does not bind" in error for error in self.errors()))
+
 
 class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
     """v2 binds each signed sale to exactly one anonymous model input."""

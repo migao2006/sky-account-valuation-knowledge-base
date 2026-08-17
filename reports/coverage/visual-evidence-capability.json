@@ -11,7 +11,7 @@
       "approved_detections": 0,
       "asset_backed_refs": 0,
       "catalog_identity_locators": 10,
-      "catalog_items": 144,
+      "catalog_items": 147,
       "source_description_only_refs": 10
     },
     "eligible": {
@@ -27,7 +27,7 @@
       "approved_detections": 0,
       "asset_backed_refs": 0,
       "catalog_identity_locators": 10,
-      "catalog_items": 65,
+      "catalog_items": 69,
       "source_description_only_refs": 10
     }
   },

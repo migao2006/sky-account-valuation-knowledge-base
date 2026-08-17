@@ -110,6 +110,64 @@ def attestation_payload(dataset: dict[str,Any], manifest: dict[str,Any], stateme
     return canonical_bytes({"contract":NAMESPACE,"dataset":dataset,"manifest":manifest,"statement":statement,"attestation":{k:v for k,v in attestation.items() if k!="payload_sha256"}})
 
 
+def _statement_claims(
+    external_statement: dict[str, Any], datasets: list[dict[str, Any]],
+    external_digest: str,
+) -> tuple[dict[str, tuple[dict[str, Any], str]], list[str]]:
+    """Return the independently signed statement and digest for every dataset.
+
+    v1 remains a single external file whose *file* digest is committed.  v2 is
+    an external transport bundle: each embedded v1-shaped statement instead
+    commits its canonical JSON bytes.  This prevents one statement (or its
+    attestations) being replayed for another dataset while preserving the v1
+    wire contract exactly.
+    """
+    version = external_statement.get("schema_version")
+    if version == "authorized-market-statement-v1":
+        return {
+            str(dataset.get("dataset_id")): (external_statement, external_digest)
+            for dataset in datasets if isinstance(dataset.get("dataset_id"), str)
+        }, []
+    if version != "authorized-market-statement-bundle-v2":
+        return {}, ["external authorization statement has unsupported schema_version"]
+    if set(external_statement) != {"schema_version", "statements"}:
+        return {}, ["external authorization statement bundle has unexpected fields"]
+    statements = external_statement.get("statements")
+    if not isinstance(statements, list) or not statements:
+        return {}, ["external authorization statement bundle has no statements array"]
+    claims: dict[str, tuple[dict[str, Any], str]] = {}
+    errors: list[str] = []
+    for claim in statements:
+        if not isinstance(claim, dict):
+            errors.append("external authorization statement bundle contains a non-object statement")
+            continue
+        dataset_id = claim.get("dataset_id")
+        if claim.get("schema_version") != "authorized-market-statement-v1" or not isinstance(dataset_id, str):
+            errors.append("external authorization statement bundle contains an invalid dataset statement")
+            continue
+        if dataset_id in claims:
+            errors.append("external authorization statement bundle has duplicate dataset statements")
+            continue
+        # Claims are deliberately strict so unknown data cannot become part of
+        # the signed payload unnoticed.
+        if (
+            set(claim) != {"schema_version", "dataset_id", "manifest_sha256", "observations_sha256", "expires_at"}
+            or not _sha256(claim.get("manifest_sha256")) or not _sha256(claim.get("observations_sha256"))
+            or not _valid_iso_date(claim.get("expires_at"))
+        ):
+            errors.append(f"{dataset_id}: external bundle statement has unexpected fields")
+            continue
+        claims[dataset_id] = (claim, sha256_bytes(canonical_bytes(claim)))
+    registry_ids = [dataset.get("dataset_id") for dataset in datasets]
+    if any(not isinstance(dataset_id, str) for dataset_id in registry_ids) or len(registry_ids) != len(set(registry_ids)):
+        # The normal registry loop emits the primary diagnostic; don't allow
+        # ambiguity to turn into a bundle coverage success.
+        errors.append("external authorization statement bundle cannot cover duplicated or invalid registry dataset IDs")
+    elif set(claims) != set(registry_ids):
+        errors.append("external authorization statement bundle dataset coverage does not exactly match registry")
+    return claims, errors
+
+
 def training_example_commitment(row: dict[str, Any]) -> dict[str, Any]:
     """The signed, PII-free join between one sale and one model input."""
     commitment = {
@@ -152,7 +210,9 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
     st,se=_external(statement or os.environ.get(STATEMENT_ENV),statement_sha256 or os.environ.get(STATEMENT_SHA_ENV),root,"external authorization statement"); errors.extend(se)
     if not bundle or not st: return errors
     if bundle.get("schema_version")!="authorized-market-authority-bundle-v1": errors.append("external authority bundle has unsupported schema_version")
-    if st.get("schema_version")!="authorized-market-statement-v1": errors.append("external authorization statement has unsupported schema_version")
+    statement_digest = sha256_bytes(Path(statement or os.environ.get(STATEMENT_ENV)).expanduser().resolve().read_bytes())
+    statements, statement_errors = _statement_claims(st, datasets, statement_digest)
+    errors.extend(statement_errors)
     auth={}; revoked=set(bundle.get("revoked_fingerprints",[]))
     for x in bundle.get("authorities",[]) if isinstance(bundle.get("authorities"),list) else []:
         if not isinstance(x,dict): errors.append("external authority record is not an object"); continue
@@ -163,13 +223,14 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
     if not isinstance(bundle.get("authorities"),list): errors.append("external authority bundle has no authorities array")
     by={}
     for x in attestations: by.setdefault(str(x.get("dataset_id")),[]).append(x)
-    seen=set(); statement_digest=sha256_bytes(Path(statement or os.environ.get(STATEMENT_ENV)).expanduser().resolve().read_bytes())
+    seen=set()
     mappings: dict[str, set[tuple[str,str,str,str]]] = {}
     committed_training_clusters: set[str] = set()
     for ds in datasets:
         did=ds.get("dataset_id")
         if not isinstance(did,str) or did in seen: errors.append("authorized market dataset_id is missing or duplicated"); continue
         seen.add(did)
+        dataset_statement, dataset_statement_digest = statements.get(did, ({}, ""))
         if not isinstance(ds.get("authorization_record_id"), str) or not str(ds["authorization_record_id"]).startswith("authorization_record_"):
             errors.append(f"{did}: authorization record ID is invalid")
         if _pii(ds): errors.append(f"{did}: PII-like data in registry")
@@ -271,10 +332,10 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
                     errors.append(f"{did}: training examples have stale catalog provenance")
                 if reused_across_datasets:
                     errors.append(f"{did}: dedup cluster commitment is reused across datasets")
-        if ds.get("statement_sha256","").upper()!=statement_digest or st.get("dataset_id")!=did or st.get("manifest_sha256","").upper()!=msh or st.get("observations_sha256","").upper()!=osh: errors.append(f"{did}: external statement does not bind dataset bytes")
+        if ds.get("statement_sha256","").upper()!=dataset_statement_digest or dataset_statement.get("dataset_id")!=did or dataset_statement.get("manifest_sha256","").upper()!=msh or dataset_statement.get("observations_sha256","").upper()!=osh: errors.append(f"{did}: external statement does not bind dataset bytes")
         try:
             expiry=str(ds.get("expires_at",""))
-            if date.fromisoformat(expiry)<date.today() or st.get("expires_at")!=expiry: errors.append(f"{did}: authorization is expired or expiry does not bind")
+            if date.fromisoformat(expiry)<date.today() or dataset_statement.get("expires_at")!=expiry: errors.append(f"{did}: authorization is expired or expiry does not bind")
         except ValueError: errors.append(f"{did}: authorization expiry is invalid")
         es=by.get(did,[])
         if len(es)!=3 or {x.get("role") for x in es}!=set(ROLES): errors.append(f"{did}: requires exactly one attestation for each role"); continue
@@ -283,8 +344,8 @@ def verify_authorized_market_intake(root: Path, authority_bundle: str|Path|None=
             a=auth.get(x.get("authority_id")); role=x.get("role")
             if not a or role not in a.get("roles",[]) or a.get("fingerprint")!=x.get("fingerprint"): errors.append(f"{did}:{role}: authority does not hold role or fingerprint"); continue
             fps.add(str(x.get("fingerprint")))
-            if x.get("statement_sha256","").upper()!=statement_digest or x.get("manifest_sha256","").upper()!=msh or x.get("observations_sha256","").upper()!=osh: errors.append(f"{did}:{role}: attestation bytes binding mismatch"); continue
-            payload=attestation_payload(ds,m,st,x)
+            if x.get("statement_sha256","").upper()!=dataset_statement_digest or x.get("manifest_sha256","").upper()!=msh or x.get("observations_sha256","").upper()!=osh: errors.append(f"{did}:{role}: attestation bytes binding mismatch"); continue
+            payload=attestation_payload(ds,m,dataset_statement,x)
             if x.get("payload_sha256")!=sha256_bytes(payload) or not _verify_sig(a,x,payload,root): errors.append(f"{did}:{role}: detached signature does not verify")
         if len(fps)!=3: errors.append(f"{did}: three roles require distinct authority fingerprints")
         if not any(error.startswith(f"{did}:") for error in errors):

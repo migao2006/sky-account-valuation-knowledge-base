@@ -1,5 +1,14 @@
 # 變更紀錄
 
+## 5.2.0-p4.0 — 2026-08-17
+
+- 新增 FAQ 1362 Days of Music 2024 bounded core-four，離線重播四件物品的官方歷史價格、活動時窗及兩件明示的 post-event Harmony Hall availability；目前 storefront 狀態仍為 `unknown`。
+- 新增不持有私鑰的 external market finalizer：候選、statement、authority bundle、handoff 與三角色 detached signatures 全部以外部路徑及 SHA-256 注入，正式 verifier 拒絕或中斷時回滾，禁止覆寫與部分 signature 殘留。
+- 授權 statement 新增向後相容的多 dataset bundle，每筆 dataset claim 與 registry、manifest、observations、attestation payload 精確一對一綁定。
+- 新增 market identity／receipt trust preflight；只有真正可投影的 signed training rows 才回報 ready，legacy v1 authorization 不會誤報為模型可用。
+- 新增 market human-review 外部 handoff foundation；公開 queue 尚可連結時拒絕 blind issuance 與 formal-gold import，不自動產生標籤、簽章或金鑰。
+- 重建 vendor crosswalk、source-scoped identities、catalog query/universe、item vectors、模型 fail-closed artifacts、歷史成本參考、completion reports 與 manifest。
+
 ## 5.1.0-p3.9 — 2026-08-17
 
 - 新增 FAQ 1391 Days of Nature／Days of Color 2025 bounded core-eleven，將 11 個官方命名且 vendor identity 可精確重播的物品納入 canonical catalog。

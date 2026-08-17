@@ -6,7 +6,9 @@
 
 資料集會失敗關閉，除非呼叫端同時注入四個 repository 外部值：authority bundle 路徑與 SHA-256，以及 authorization statement 路徑與 SHA-256。兩份檔案位於 release root 內、摘要不符、已撤銷 fingerprint、過期聲明或未綁定 manifest/observation bytes 都會拒絕資料。
 
-authority bundle 的 `schema_version` 為 `authorized-market-authority-bundle-v1`，每個 authority 有 OpenSSH public key、與該 key 相符的 SHA256 fingerprint、可擔任的角色，以及撤銷 fingerprint 清單。statement 的 `schema_version` 為 `authorized-market-statement-v1`，並精確綁定 `dataset_id`、`manifest_sha256`、`observations_sha256` 和 `expires_at`。
+authority bundle 的 `schema_version` 為 `authorized-market-authority-bundle-v1`，每個 authority 有 OpenSSH public key、與該 key 相符的 SHA256 fingerprint、可擔任的角色，以及撤銷 fingerprint 清單。單一 dataset 仍可使用完全相容的 `authorized-market-statement-v1`，並精確綁定 `dataset_id`、`manifest_sha256`、`observations_sha256` 和 `expires_at`。
+
+一個外部檔案要攜帶多個 dataset 時，使用 `authorized-market-statement-bundle-v2`；其 `statements` 必須逐筆含上述 v1 claim，並且 dataset ID 與 registry **精確一對一覆蓋**：不得缺漏、額外或重複。bundle 檔案本身仍由呼叫端以 repository 外路徑與實際 SHA-256 注入；每個 registry 的 `statement_sha256` 和三個 attestation 的 `statement_sha256` 則是該 dataset v1 claim 的 canonical JSON bytes SHA-256。每份 detached signature 的 payload 只含它所屬 dataset 的 claim，不含整份 bundle，因此 claim、digest 或 signature 均不可跨 dataset 重用。
 
 每個 dataset 要有 `data_steward`、`privacy_reviewer`、`method_reviewer` 三個角色各一份 OpenSSH detached signature。三份簽章需使用不同 fingerprint，並覆蓋完整 registry row、manifest、外部 statement 及 attestation metadata。簽章僅能在 `data/review/market-authorization/signatures/`。
 
@@ -46,3 +48,19 @@ verified-sale cleaner pool. A positive receipt is provenance evidence for a
 completed transaction; it does not by itself publish a completed-sale price
 model. The pool remains separate from normal asking and urgent listings, and
 the committed repository currently contains no formal sale rows.
+
+## External trust preflight (P4.0)
+
+`tools/market_intake/preflight.py` is an external-only readiness gate before a
+formal market registry can be used. It accepts the primary authority bundle and
+statement, identity authority/mapping/statement, and (only when v3 is present)
+receipt archive and authority bundle, each with its injected SHA-256. It reuses
+the authorization evaluator to require whole-registry coverage: every v2/v3
+example must have an independently bound identity/cluster mapping, and every
+v3 verified sale must additionally have exactly one valid receipt binding.
+
+The report must be written outside the release root and exposes only byte
+digests, counts, readiness statuses, and reason codes. It never writes formal
+data or serializes mappings, identity commitments, receipt assertions, or sale
+details. An empty formal registry is explicitly `not_ready`; v2 does not
+require a receipt archive.
