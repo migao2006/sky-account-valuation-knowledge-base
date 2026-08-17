@@ -42,7 +42,7 @@
     {
       "actual": {
         "review_scopes": 39,
-        "source_references": 1364
+        "source_references": 1358
       },
       "contract_id": "catalog.unresolved_zero",
       "evidence_paths": [
@@ -76,7 +76,7 @@
     },
     {
       "actual": {
-        "canonical_items": 127,
+        "canonical_items": 133,
         "non_verified_count": 79,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -169,7 +169,7 @@
     },
     {
       "actual": {
-        "items_missing_required_fields": 127,
+        "items_missing_required_fields": 133,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_status",
@@ -372,6 +372,34 @@
           "item_aurora_wings": [
             "availability_status",
             "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_braided_hair": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_embroidered_cape": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_jar_prop": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_petal_mask": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
             "permanent_account_item",
             "source_type"
           ],
@@ -1131,6 +1159,20 @@
             "item_category",
             "permanent_account_item",
             "source_type"
+          ],
+          "item_treasure_cavalier_boots": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_treasure_shovel": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
           ]
         },
         "registry_replay_error_count": 0
@@ -1243,14 +1285,17 @@
           "item_regular_waving_bellmaker_hair",
           "item_regular_waving_bellmaker_mask"
         ],
-        "items_missing_official_identity": 97
+        "items_missing_independent_identity": 97,
+        "official_identity_count": 36,
+        "two_secondary_identity_count": 0
       },
       "contract_id": "catalog.independent_identity_evidence",
       "evidence_paths": [
-        "data/review/canonical-evidence-cohorts.jsonl"
+        "data/review/canonical-evidence-cohorts.jsonl",
+        "knowledge/sources/sources.jsonl"
       ],
       "passed": false,
-      "requirement": "every canonical item has approved official item-specific independent identity evidence"
+      "requirement": "every canonical item has official item-specific identity evidence or two independent, current, cross-checked secondary sources"
     },
     {
       "actual": {
@@ -1282,6 +1327,10 @@
           "item_aurora_warrior_of_love_hair",
           "item_aurora_warrior_of_love_mask",
           "item_aurora_wings",
+          "item_bloom_rose_braided_hair",
+          "item_bloom_rose_embroidered_cape",
+          "item_bloom_rose_jar_prop",
+          "item_bloom_rose_petal_mask",
           "item_cinnamoroll_bowtie",
           "item_cinnamoroll_cloud_cape",
           "item_cinnamoroll_cozy_cafe_table",
@@ -1381,9 +1430,11 @@
           "item_tournament_of_triumph_curls",
           "item_tournament_of_triumph_golden_garland",
           "item_tournament_of_triumph_torch",
-          "item_tournament_of_triumph_tunic"
+          "item_tournament_of_triumph_tunic",
+          "item_treasure_cavalier_boots",
+          "item_treasure_shovel"
         ],
-        "items_without_actual_visual_evidence": 127,
+        "items_without_complete_visual_state": 133,
         "visual_input_error_count": 0
       },
       "contract_id": "catalog.visual_state_verified",
@@ -1393,19 +1444,19 @@
         "data/curated/image-evidence.jsonl"
       ],
       "passed": false,
-      "requirement": "every canonical item has a verified registered image asset or approved registry-backed detection; descriptions never satisfy this gate"
+      "requirement": "every canonical item has actual registered visual evidence or a verified source-backed rights-unavailable state; descriptions alone never satisfy this gate"
     }
   ],
   "complete": false,
   "counts": {
     "alias_conflicts": 1,
     "candidates": 622,
-    "canonical_items": 127,
+    "canonical_items": 133,
     "scope_review": 3266,
-    "source_scoped_unresolved": 1364,
+    "source_scoped_unresolved": 1358,
     "universe": 3266,
     "unmapped_aliases": 14,
     "unresolved_review_scopes": 39
   },
-  "schema_version": "1.0-p3.4"
+  "schema_version": "1.1-p3.7"
 }

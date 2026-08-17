@@ -152,6 +152,17 @@ claim.
 python tools/normalize/apply_days_of_love_faq1374_core_four_cohort.py --root .
 ```
 
+`apply_days_of_treasure_bloom_faq1381_core_six_cohort.py` replays the six FAQ
+1381 Days of Treasure + Days of Bloom 2025 offers with an exact individual
+price. It deliberately excludes Treasure Seeker's Bounty and every other
+non-individually-priced entry, while retaining the historical windows and
+per-item FAQ/vendor identity allowlist without asserting current availability,
+ownership, visual identity, or model eligibility.
+
+```powershell
+python tools/normalize/apply_days_of_treasure_bloom_faq1381_core_six_cohort.py --root .
+```
+
 `build_historical_cost_references.py` discovers every active, replayable
 canonical-evidence cohort through the formal registry and writes one conservative
 reference per verified target item. It separates an exact historical item cost,

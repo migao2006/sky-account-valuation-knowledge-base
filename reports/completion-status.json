@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2-p3.4",
+  "schema_version": "1.3-p3.7",
   "goal": "precise_account_valuation_and_complete_knowledge_base",
   "status": "incomplete",
   "complete": false,
@@ -37,7 +37,7 @@
       "passed": false,
       "actual": {
         "review_scopes": 39,
-        "source_references": 1364
+        "source_references": 1358
       },
       "requirement": "no catalog review scope or source-scoped reference remains unresolved",
       "evidence_paths": [
@@ -71,7 +71,7 @@
       "contract_id": "catalog.all_canonical_verified",
       "passed": false,
       "actual": {
-        "canonical_items": 127,
+        "canonical_items": 133,
         "non_verified_count": 79,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -164,7 +164,7 @@
       "contract_id": "catalog.required_field_evidence",
       "passed": false,
       "actual": {
-        "items_missing_required_fields": 127,
+        "items_missing_required_fields": 133,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_status",
@@ -1126,6 +1126,48 @@
             "item_category",
             "permanent_account_item",
             "source_type"
+          ],
+          "item_treasure_cavalier_boots": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_treasure_shovel": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_jar_prop": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_braided_hair": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_petal_mask": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_bloom_rose_embroidered_cape": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
           ]
         },
         "registry_replay_error_count": 0
@@ -1139,7 +1181,9 @@
       "contract_id": "catalog.independent_identity_evidence",
       "passed": false,
       "actual": {
-        "items_missing_official_identity": 97,
+        "items_missing_independent_identity": 97,
+        "official_identity_count": 36,
+        "two_secondary_identity_count": 0,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -1240,16 +1284,17 @@
           "item_regular_waving_bellmaker_mask"
         ]
       },
-      "requirement": "every canonical item has approved official item-specific independent identity evidence",
+      "requirement": "every canonical item has official item-specific identity evidence or two independent, current, cross-checked secondary sources",
       "evidence_paths": [
-        "data/review/canonical-evidence-cohorts.jsonl"
+        "data/review/canonical-evidence-cohorts.jsonl",
+        "knowledge/sources/sources.jsonl"
       ]
     },
     {
       "contract_id": "catalog.visual_state_verified",
       "passed": false,
       "actual": {
-        "items_without_actual_visual_evidence": 127,
+        "items_without_complete_visual_state": 133,
         "item_ids": [
           "item_anniversary_bass",
           "item_anniversary_fifth_stripe_cape",
@@ -1278,6 +1323,10 @@
           "item_aurora_warrior_of_love_hair",
           "item_aurora_warrior_of_love_mask",
           "item_aurora_wings",
+          "item_bloom_rose_braided_hair",
+          "item_bloom_rose_embroidered_cape",
+          "item_bloom_rose_jar_prop",
+          "item_bloom_rose_petal_mask",
           "item_cinnamoroll_bowtie",
           "item_cinnamoroll_cloud_cape",
           "item_cinnamoroll_cozy_cafe_table",
@@ -1377,11 +1426,13 @@
           "item_tournament_of_triumph_curls",
           "item_tournament_of_triumph_golden_garland",
           "item_tournament_of_triumph_torch",
-          "item_tournament_of_triumph_tunic"
+          "item_tournament_of_triumph_tunic",
+          "item_treasure_cavalier_boots",
+          "item_treasure_shovel"
         ],
         "visual_input_error_count": 0
       },
-      "requirement": "every canonical item has a verified registered image asset or approved registry-backed detection; descriptions never satisfy this gate",
+      "requirement": "every canonical item has actual registered visual evidence or a verified source-backed rights-unavailable state; descriptions alone never satisfy this gate",
       "evidence_paths": [
         "knowledge/visual-references/manifest.jsonl",
         "data/curated/visual-assets.jsonl",
@@ -1392,7 +1443,7 @@
       "contract_id": "catalog.model_eligible_positive",
       "passed": true,
       "actual": {
-        "verified": 48,
+        "verified": 54,
         "model_eligible": 19
       },
       "requirement": "verified canonical items with independently approved observation tokens",
@@ -1478,7 +1529,8 @@
       "requirement": "each published pool has >=300 independent training clusters and >=100 later holdout clusters",
       "evidence_paths": [
         "reports/model-publication-readiness.json",
-        "reports/model-publication-split.json"
+        "reports/model-publication-split.json",
+        "reports/model-publication-evaluation.json"
       ]
     },
     {

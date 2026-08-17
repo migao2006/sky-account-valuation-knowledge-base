@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import date, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlparse
 
 try:
     from .canonical_evidence_registry import load_registry, validate_registry
 except ImportError:  # direct script execution
     from canonical_evidence_registry import load_registry, validate_registry
-from tools.modeling.visual_evidence_coverage import DEFAULT_ASSET_REGISTRY, actual_visual_item_ids
+from tools.modeling.visual_evidence_coverage import DEFAULT_ASSET_REGISTRY, complete_visual_state_item_ids
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_ITEM_EVIDENCE = frozenset({
@@ -82,6 +84,8 @@ def build(root: Path) -> dict[str, Any]:
     alias_conflicts = _jsonl(root / "data/review/alias-conflicts.jsonl")
     source_summary = _json(root / "data/normalized/source-scoped-item-identities-summary.json", {})
     visual_rows = _jsonl(root / "knowledge/visual-references/manifest.jsonl")
+    sources = {row.get("source_id"): row for row in _jsonl(root / "knowledge/sources/sources.jsonl") if isinstance(row.get("source_id"), str)}
+    package_manifest = _json(root / "manifest.json", {})
     evidence, invalid_evidence_paths = _evidence_rows(root, items)
 
     universe_ids = [row.get("universe_id") for row in universe]
@@ -105,7 +109,8 @@ def build(root: Path) -> dict[str, Any]:
     all_canonical_verified = bool(items) and len(canonical_ids) == len(set(canonical_ids)) and not non_verified
 
     evidence_by_item: dict[str, set[str]] = {}
-    identity_by_item: set[str] = set()
+    official_identity_by_item: set[str] = set()
+    secondary_identity: dict[str, list[dict[str, Any]]] = {}
     for row in evidence:
         if row.get("target_type") != "item" or row.get("review_status") != "approved":
             continue
@@ -113,16 +118,42 @@ def build(root: Path) -> dict[str, Any]:
         if isinstance(item_id, str) and isinstance(field, str):
             evidence_by_item.setdefault(item_id, set()).add(field)
             if field == "canonical_name_en" and row.get("evidence_role") == "independent_identity" and row.get("source_tier") == "official_item_specific":
-                identity_by_item.add(item_id)
+                official_identity_by_item.add(item_id)
+            elif field == "canonical_name_en" and row.get("evidence_role") == "independent_identity" and row.get("source_tier") == "secondary_reference":
+                secondary_identity.setdefault(item_id, []).append(row)
     missing_fields = {
         str(row.get("item_id")): sorted(REQUIRED_ITEM_EVIDENCE - evidence_by_item.get(str(row.get("item_id")), set()))
         for row in items
         if REQUIRED_ITEM_EVIDENCE - evidence_by_item.get(str(row.get("item_id")), set())
     }
+    secondary_identity_by_item: set[str] = set()
+    try:
+        cutoff = date.fromisoformat(str(package_manifest.get("research_cutoff_date")))
+    except ValueError:
+        cutoff = date.min
+    for item_id, rows in secondary_identity.items():
+        qualifying: dict[str, tuple[str, str]] = {}
+        for row in rows:
+            source = sources.get(row.get("source_id"))
+            try:
+                retrieved = date.fromisoformat(str(source.get("retrieved_at"))) if isinstance(source, dict) else date.min
+            except ValueError:
+                continue
+            lineage = row.get("source_lineage_id")
+            source_url = source.get("url") if isinstance(source, dict) else None
+            host = urlparse(source_url).hostname.casefold() if isinstance(source_url, str) and urlparse(source_url).hostname else ""
+            if (isinstance(lineage, str) and isinstance(row.get("source_id"), str) and isinstance(source, dict)
+                    and source.get("source_lineage_id") == lineage and host
+                    and source.get("evidence_level") == "community_cross_checked"
+                    and cutoff - timedelta(days=366) <= retrieved <= cutoff):
+                qualifying[lineage] = (row["source_id"], host)
+        if len(qualifying) >= 2 and len({value[0] for value in qualifying.values()}) >= 2 and len({value[1] for value in qualifying.values()}) >= 2:
+            secondary_identity_by_item.add(item_id)
+    identity_by_item = official_identity_by_item | secondary_identity_by_item
     missing_identity = sorted(str(row.get("item_id")) for row in items if row.get("item_id") not in identity_by_item)
 
     try:
-        visual_verified_ids = actual_visual_item_ids(
+        visual_verified_ids = complete_visual_state_item_ids(
             items, visual_rows, _jsonl(root / "data/curated/image-evidence.jsonl"),
             _jsonl(root / DEFAULT_ASSET_REGISTRY), root=root,
         )
@@ -153,14 +184,14 @@ def build(root: Path) -> dict[str, Any]:
                {"items_missing_required_fields": len(missing_fields), "missing_fields_by_item": missing_fields, "registry_replay_error_count": invalid_evidence_paths},
                "every canonical item has approved evidence from a release-required cohort whose verifier replays successfully", "data/review/canonical-evidence-cohorts.jsonl"),
         _check("catalog.independent_identity_evidence", not missing_identity,
-               {"items_missing_official_identity": len(missing_identity), "item_ids": missing_identity},
-               "every canonical item has approved official item-specific independent identity evidence", "data/review/canonical-evidence-cohorts.jsonl"),
+               {"items_missing_independent_identity": len(missing_identity), "official_identity_count": len(official_identity_by_item), "two_secondary_identity_count": len(secondary_identity_by_item), "item_ids": missing_identity},
+               "every canonical item has official item-specific identity evidence or two independent, current, cross-checked secondary sources", "data/review/canonical-evidence-cohorts.jsonl", "knowledge/sources/sources.jsonl"),
         _check("catalog.visual_state_verified", not visual_failures,
-               {"items_without_actual_visual_evidence": len(visual_failures), "item_ids": visual_failures, "visual_input_error_count": visual_input_errors},
-               "every canonical item has a verified registered image asset or approved registry-backed detection; descriptions never satisfy this gate", "knowledge/visual-references/manifest.jsonl", "data/curated/visual-assets.jsonl", "data/curated/image-evidence.jsonl"),
+               {"items_without_complete_visual_state": len(visual_failures), "item_ids": visual_failures, "visual_input_error_count": visual_input_errors},
+               "every canonical item has actual registered visual evidence or a verified source-backed rights-unavailable state; descriptions alone never satisfy this gate", "knowledge/visual-references/manifest.jsonl", "data/curated/visual-assets.jsonl", "data/curated/image-evidence.jsonl"),
     ]
     return {
-        "schema_version": "1.0-p3.4",
+        "schema_version": "1.1-p3.7",
         "catalog_status": "complete" if all(check["passed"] for check in checks) else "partial",
         "complete": all(check["passed"] for check in checks),
         "counts": {"universe": len(universe), "canonical_items": len(items), "candidates": len(candidates), "unresolved_review_scopes": len(unresolved), "unmapped_aliases": len(unmapped), "alias_conflicts": len(alias_conflicts), "source_scoped_unresolved": source_unresolved, "scope_review": scope_review},

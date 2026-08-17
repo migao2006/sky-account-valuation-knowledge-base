@@ -20,6 +20,14 @@ manifest 與 gold row；因此移動一筆 gold、替換規則開發 hash、或�
 config 都會使簽章失效。replay input 也必須由 release root 外注入並給定 SHA-256。
 報告只輸出匿名 hash aggregate 與 metrics，不回寫 raw input。
 
+P3.7 起，非空 formal gold 還必須回放外部 keyed custodian binding：同時注入 SHA-256
+固定的 custodian authority bundle、已簽署 contract 與 replay-binding bundle。contract
+只含 authority ID 與 fingerprint，不得自帶驗證 public key；authority bundle 會驗證角色
+`keyed_custodian_contract` 並拒絕 revoked fingerprint。binding 必須由同一 authority
+簽署、重建 200 筆 opaque commitment 的 Merkle root，並逐列精確綁定 gold 的
+`input_sha256` 與 split。這些逐列資料只存在 release root 外，公開 queue manifest
+始終只保留 aggregate commitment。
+
 達成 completion contract 仍需要至少 200 個已簽章的分層 gold rows，development 和
 held-out 各至少 100 筆；每筆必須覆蓋 account type、era、season、collaboration、set
 context，且每個 strata 至少兩種值。held-out 必須達 owned/known-state precision >=

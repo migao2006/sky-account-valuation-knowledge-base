@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import hashlib
+import json
 import unittest
 from pathlib import Path
 
@@ -49,6 +51,18 @@ class PublicationReadinessTests(unittest.TestCase):
         self.assertEqual(pool["holdout_cluster_gap"], 0)
         self.assertEqual(pool["verified_date_count"], 2)
         self.assertEqual(report["status"], "ready_for_evaluation")
+
+    def test_registered_signed_external_features_do_not_require_local_account_vectors(self):
+        provenance = {"catalog": "current"}
+        provenance_sha = hashlib.sha256((json.dumps(provenance, sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest().upper()
+        rows = [clean(n, 1 if n <= 300 else 2) for n in range(1, 401)]
+        examples = []
+        for n, row in enumerate(rows, 1):
+            row.update({"training_example_id": f"training_example_{n:04d}", "feature_payload_sha256": "A" * 64, "catalog_provenance_sha256": provenance_sha})
+            examples.append({"training_example_id": row["training_example_id"], "account_id": row["account_id"], "feature_payload_sha256": "A" * 64, "catalog_provenance_sha256": provenance_sha, "catalog_provenance": provenance})
+        report = audit(rows, [], [{"verification_status": "verified", "model_feature_status": "eligible"}], [{"sale_outcome": {"verified": True}}], provenance, examples)
+        self.assertEqual("ready_for_evaluation", report["status"])
+        self.assertEqual(400, report["valid_vector_accounts"])
 
     def test_cluster_with_dates_on_both_sides_is_never_split(self):
         rows = [clean(n, 1 if n <= 300 else 2) for n in range(1, 400)]

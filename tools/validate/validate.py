@@ -155,6 +155,8 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1308-cinnamoroll-popup-cafe.json": "schemas/knowledge/cinnamoroll-popup-cafe-faq-1308-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1264-days-of-fortune-core-five.json": "schemas/knowledge/days-of-fortune-faq-1264-core-five-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1374-days-of-love-core-four.json": "schemas/knowledge/days-of-love-faq-1374-core-four-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1381-days-of-treasure-bloom-core-six.json": "schemas/knowledge/days-of-treasure-bloom-faq-1381-core-six-fact-snapshot.schema.json",
+    "data/review/shadow/days-of-love-faq1374-core-four.declaration.json": "schemas/review/canonical-evidence-declaration.schema.json",
 }
 
 
@@ -408,6 +410,12 @@ def validate(
     parser_gold_authority_bundle_sha256: str | None = None,
     parser_gold_replay_inputs: Path | None = None,
     parser_gold_replay_inputs_sha256: str | None = None,
+    parser_keyed_custodian_authority_bundle: str | Path | None = None,
+    parser_keyed_custodian_authority_bundle_sha256: str | None = None,
+    parser_keyed_custodian_contract: str | Path | None = None,
+    parser_keyed_custodian_contract_sha256: str | None = None,
+    parser_keyed_replay_binding: str | Path | None = None,
+    parser_keyed_replay_binding_sha256: str | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -797,7 +805,7 @@ def validate(
             market_audit_authority_bundle, market_audit_authority_bundle_sha256,
         )
     )
-    errors.extend(f"parser-gold: {issue}" for issue in audit_parser_gold(root, read_jsonl(root / "data/review/parser-gold/claims.jsonl"), parser_gold_authority_bundle, parser_gold_authority_bundle_sha256))
+    errors.extend(f"parser-gold: {issue}" for issue in audit_parser_gold(root, read_jsonl(root / "data/review/parser-gold/claims.jsonl"), parser_gold_authority_bundle, parser_gold_authority_bundle_sha256, parser_keyed_custodian_authority_bundle, parser_keyed_custodian_authority_bundle_sha256, parser_keyed_custodian_contract, parser_keyed_custodian_contract_sha256, parser_keyed_replay_binding, parser_keyed_replay_binding_sha256))
     for iid, row in items.items():
         eligible = row.get("model_feature_status") == "eligible"
         if eligible and (row.get("verification_status") != "verified" or row.get("evidence_tier") not in {"official_item_specific", "official_with_secondary"}):
@@ -884,7 +892,13 @@ def validate(
             item = items.get(state.get("item_id"))
             if not item:
                 continue
-            eligible = item.get("model_feature_status") == "eligible" and item.get("verification_status") == "verified"
+            eligible = (
+                item.get("model_feature_status") == "eligible"
+                and item.get("verification_status") == "verified"
+                and state.get("state") in {"owned", "confirmed_missing"}
+                and state.get("evidence_state") in {"profile_claim", "text_claim"}
+                and state.get("conflict") is False
+            )
             if state.get("model_feature") != eligible:
                 errors.append(f"item-vector:{account_id}:{state.get('item_id')}: model feature policy mismatch")
             if state.get("state") == "confirmed_missing" and state.get("evidence_state") == "unknown":
@@ -1120,7 +1134,7 @@ def validate(
         errors.append(f"parser knowledge coverage: {exc}")
     try:
         actual_parser_gold = json.loads((root / "reports/parser-gold-evaluation.json").read_text(encoding="utf-8"))
-        expected_parser_gold = build_parser_gold_evaluation(root, parser_gold_replay_inputs, parser_gold_replay_inputs_sha256, parser_gold_authority_bundle, parser_gold_authority_bundle_sha256)
+        expected_parser_gold = build_parser_gold_evaluation(root, parser_gold_replay_inputs, parser_gold_replay_inputs_sha256, parser_gold_authority_bundle, parser_gold_authority_bundle_sha256, parser_keyed_custodian_authority_bundle, parser_keyed_custodian_authority_bundle_sha256, parser_keyed_custodian_contract, parser_keyed_custodian_contract_sha256, parser_keyed_replay_binding, parser_keyed_replay_binding_sha256)
         if actual_parser_gold != expected_parser_gold:
             errors.append("parser gold evaluation differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
@@ -1201,7 +1215,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.8-p3.6", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.9-p3.7", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
@@ -1232,6 +1246,12 @@ def main() -> None:
     parser.add_argument("--parser-gold-authority-bundle-sha256")
     parser.add_argument("--parser-gold-replay-inputs", type=Path)
     parser.add_argument("--parser-gold-replay-inputs-sha256")
+    parser.add_argument("--parser-keyed-custodian-authority-bundle", type=Path)
+    parser.add_argument("--parser-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--parser-keyed-custodian-contract", type=Path)
+    parser.add_argument("--parser-keyed-custodian-contract-sha256")
+    parser.add_argument("--parser-keyed-replay-binding", type=Path)
+    parser.add_argument("--parser-keyed-replay-binding-sha256")
     args = parser.parse_args()
     result = validate(
         args.root.resolve(), args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
@@ -1244,6 +1264,9 @@ def main() -> None:
         args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
         args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
         args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
+        args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
+        args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
+        args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
     )
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:

@@ -86,7 +86,7 @@ def flatten_vector(record: dict[str, Any], eligible_item_ids: set[str] | None = 
             values[name], groups[name] = 1.0, group
     if isinstance(states, list):
         for state in states:
-            if not isinstance(state, dict) or state.get("model_feature") is not True or state.get("review_status") != "approved":
+            if not isinstance(state, dict) or state.get("model_feature") is not True or state.get("review_status") != "approved" or state.get("state") not in {"owned", "confirmed_missing"} or state.get("evidence_state") not in {"profile_claim", "text_claim"} or state.get("conflict") is not False:
                 continue
             item_id = state.get("item_id")
             if not isinstance(item_id, str):

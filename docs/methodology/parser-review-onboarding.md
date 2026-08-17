@@ -16,9 +16,9 @@ python tools/parser_review/onboarding.py build-queue --source D:\restricted\pars
 
 目前不得發出 A/B 盲化封包。公開 manifest 含 unsalted `input_sha256` 與 split，reviewer 能由 profile/listing 重算 hash 並連回 held-out mapping；`build-blind-packages` 與 preflight 因此 fail-closed。必須先完成 release root 外的 keyed commitment 與 split mapping 協定，才能安全恢復發放。
 
-## P3.6 keyed custodian protocol
+## P3.7 keyed custodian protocol
 
-P3.6 replaces that unsafe cohort format.  A separate external custodian keeps
+P3.7 replaces that unsafe cohort format.  A separate external custodian keeps
 the raw input-to-split mapping and non-exportable HMAC key in its restricted
 environment.  It signs a contract before reviewers receive data.  The contract
 contains only a commitment Merkle root, a keyed split commitment, 200/100
@@ -33,6 +33,8 @@ safe public surface:
 ```powershell
 python tools/parser_review/onboarding.py publish-keyed-manifest `
   --custodian-contract D:\restricted\custodian-contract.json `
+  --custodian-authority-bundle D:\restricted\custodian-authorities.json `
+  --custodian-authority-bundle-sha256 <SHA256> `
   --manifest-out data\review\parser-gold\review-queue-manifest.json
 ```
 
@@ -47,6 +49,8 @@ same signed contract and ledger verify:
 ```powershell
 python tools/parser_review/onboarding.py issue-keyed-blind-packages `
   --custodian-contract D:\restricted\custodian-contract.json `
+  --custodian-authority-bundle D:\restricted\custodian-authorities.json `
+  --custodian-authority-bundle-sha256 <SHA256> `
   --assignment-ledger D:\restricted\assignments.jsonl `
   --packet-dir D:\restricted\issued-by-custodian `
   --output-dir D:\restricted\for-reviewers
@@ -58,6 +62,16 @@ integration must require a custodian-signed external replay-binding bundle to
 prove raw replay input → keyed commitment → frozen split.  That bundle and the
 HMAC key never enter the release root.  A repository gold row will use the
 keyed commitment rather than an unsalted input SHA-256.
+
+The contract never carries its verification public key. It identifies an
+`authority_id` and fingerprint; the verifier injects a SHA-256-pinned external
+authority bundle, rejects revoked fingerprints, and requires the dedicated
+`keyed_custodian_contract` role. For nonempty formal gold, evaluator invocation
+also requires the external signed replay-binding bundle plus its SHA-256, the
+signed external contract plus its SHA-256, and the external authority bundle.
+The binding must reproduce the 200 opaque commitment Merkle root and exactly
+bind every formal gold row's input hash and split. None of those per-row values
+are added to the public queue manifest.
 
 ```powershell
 python tools/parser_review/onboarding.py build-blind-packages --manifest data\review\parser-gold\review-queue-manifest.json --packet-dir D:\restricted\packets --output-dir D:\restricted\issued --blind-secret <external-secret>

@@ -1,0 +1,377 @@
+{
+  "declaration_format": "canonical_evidence_declaration_v1",
+  "cohort_id": "canonical_cohort_days_of_love_faq1374_core_four",
+  "mode": "shadow_only",
+  "reviewed_at": "2026-08-17",
+  "sources": {
+    "official": {
+      "path": "data/source/research/tgc-faq-1374-days-of-love-core-four.json",
+      "sha256": "99577363EA4425B809AA5D623D6E3E583BB09CE161BADC42B1304A5FD0601863",
+      "source_id": "source_tgc_faq_1374_days_of_love_core_four",
+      "source_lineage_id": "lineage_tgc_support_faq_1374",
+      "source_tier": "official_item_specific"
+    },
+    "vendor": {
+      "path": "data/source/vendor/skygame-data-1.3.4-items.json",
+      "sha256": "21CCAD77006C425B27EE9314870BB5BB77E8436459C6DA214ABCB2B0D8329BBB",
+      "source_id": "source_skygame_data_1_3_4",
+      "source_lineage_id": "lineage_skygame_data_1_3_4",
+      "source_tier": "secondary_reference"
+    }
+  },
+  "rules": [
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "canonical_name_en",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/0",
+      "source_item_id_exact": "item_days_of_love_violet_crystal_prop",
+      "claim_locator": "/facts/new_items/0/official_name_en",
+      "evidence_role": "independent_identity",
+      "notes": "FAQ exact title; only this explicit FAQ/vendor title pair is allowed."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "original_currency",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/0",
+      "source_item_id_exact": "item_days_of_love_violet_crystal_prop",
+      "claim_locator": "/facts/new_items/0/original_currency",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "original_cost",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/0",
+      "source_item_id_exact": "item_days_of_love_violet_crystal_prop",
+      "claim_locator": "/facts/new_items/0/original_cost",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/0",
+      "source_item_id_exact": "item_days_of_love_violet_crystal_prop",
+      "claim_locator": "/facts/historical_window_start_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/0",
+      "source_item_id_exact": "item_days_of_love_violet_crystal_prop",
+      "claim_locator": "/facts/historical_window_end_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "vendor_item_name",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2508",
+      "source_item_id_exact": 2518,
+      "claim_locator": "/items/2508/name",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor spelling; title reconciliation is limited by this apply contract."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "vendor_item_type",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2508",
+      "source_item_id_exact": 2518,
+      "claim_locator": "/items/2508/type",
+      "evidence_role": "secondary_field",
+      "notes": "Apply contract maps vendor type to canonical category prop."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_violet_crystal_prop",
+      "field_path": "vendor_item_guid",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2508",
+      "source_item_id_exact": 2518,
+      "claim_locator": "/items/2508/guid",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor GUID is an identity guard, not a model feature."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "canonical_name_en",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/1",
+      "source_item_id_exact": "item_days_of_love_braids",
+      "claim_locator": "/facts/new_items/1/official_name_en",
+      "evidence_role": "independent_identity",
+      "notes": "FAQ exact title; only this explicit FAQ/vendor title pair is allowed."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "original_currency",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/1",
+      "source_item_id_exact": "item_days_of_love_braids",
+      "claim_locator": "/facts/new_items/1/original_currency",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "original_cost",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/1",
+      "source_item_id_exact": "item_days_of_love_braids",
+      "claim_locator": "/facts/new_items/1/original_cost",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/1",
+      "source_item_id_exact": "item_days_of_love_braids",
+      "claim_locator": "/facts/historical_window_start_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/1",
+      "source_item_id_exact": "item_days_of_love_braids",
+      "claim_locator": "/facts/historical_window_end_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "vendor_item_name",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2509",
+      "source_item_id_exact": 2519,
+      "claim_locator": "/items/2509/name",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor spelling; title reconciliation is limited by this apply contract."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "vendor_item_type",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2509",
+      "source_item_id_exact": 2519,
+      "claim_locator": "/items/2509/type",
+      "evidence_role": "secondary_field",
+      "notes": "Apply contract maps vendor type to canonical category hair."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_braids",
+      "field_path": "vendor_item_guid",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2509",
+      "source_item_id_exact": 2519,
+      "claim_locator": "/items/2509/guid",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor GUID is an identity guard, not a model feature."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "canonical_name_en",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/2",
+      "source_item_id_exact": "item_days_of_love_amethyst_accessory",
+      "claim_locator": "/facts/new_items/2/official_name_en",
+      "evidence_role": "independent_identity",
+      "notes": "FAQ exact title; only this explicit FAQ/vendor title pair is allowed."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "original_currency",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/2",
+      "source_item_id_exact": "item_days_of_love_amethyst_accessory",
+      "claim_locator": "/facts/new_items/2/original_currency",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "original_cost",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/2",
+      "source_item_id_exact": "item_days_of_love_amethyst_accessory",
+      "claim_locator": "/facts/new_items/2/original_cost",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/2",
+      "source_item_id_exact": "item_days_of_love_amethyst_accessory",
+      "claim_locator": "/facts/historical_window_start_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/2",
+      "source_item_id_exact": "item_days_of_love_amethyst_accessory",
+      "claim_locator": "/facts/historical_window_end_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "vendor_item_name",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2507",
+      "source_item_id_exact": 2517,
+      "claim_locator": "/items/2507/name",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor spelling; title reconciliation is limited by this apply contract."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "vendor_item_type",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2507",
+      "source_item_id_exact": 2517,
+      "claim_locator": "/items/2507/type",
+      "evidence_role": "secondary_field",
+      "notes": "Apply contract maps vendor type to canonical category accessory."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_accessory",
+      "field_path": "vendor_item_guid",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2507",
+      "source_item_id_exact": 2517,
+      "claim_locator": "/items/2507/guid",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor GUID is an identity guard, not a model feature."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "canonical_name_en",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/3",
+      "source_item_id_exact": "item_days_of_love_amethyst_tipped_tails",
+      "claim_locator": "/facts/new_items/3/official_name_en",
+      "evidence_role": "independent_identity",
+      "notes": "FAQ exact title; only this explicit FAQ/vendor title pair is allowed."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "original_currency",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/3",
+      "source_item_id_exact": "item_days_of_love_amethyst_tipped_tails",
+      "claim_locator": "/facts/new_items/3/original_currency",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "original_cost",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/3",
+      "source_item_id_exact": "item_days_of_love_amethyst_tipped_tails",
+      "claim_locator": "/facts/new_items/3/original_cost",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/3",
+      "source_item_id_exact": "item_days_of_love_amethyst_tipped_tails",
+      "claim_locator": "/facts/historical_window_start_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "availability_history",
+      "source_key": "official",
+      "source_item_pointer": "/facts/new_items/3",
+      "source_item_id_exact": "item_days_of_love_amethyst_tipped_tails",
+      "claim_locator": "/facts/historical_window_end_date",
+      "evidence_role": "independent_field",
+      "notes": "Historical FAQ cost/window only; no current availability, permanence, or model eligibility is inferred."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "vendor_item_name",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2506",
+      "source_item_id_exact": 2516,
+      "claim_locator": "/items/2506/name",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor spelling; title reconciliation is limited by this apply contract."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "vendor_item_type",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2506",
+      "source_item_id_exact": 2516,
+      "claim_locator": "/items/2506/type",
+      "evidence_role": "secondary_field",
+      "notes": "Apply contract maps vendor type to canonical category hair."
+    },
+    {
+      "target_type": "item",
+      "target_id": "item_days_of_love_amethyst_tipped_tails",
+      "field_path": "vendor_item_guid",
+      "source_key": "vendor",
+      "source_item_pointer": "/items/2506",
+      "source_item_id_exact": 2516,
+      "claim_locator": "/items/2506/guid",
+      "evidence_role": "secondary_field",
+      "notes": "Pinned vendor GUID is an identity guard, not a model feature."
+    }
+  ]
+}
+

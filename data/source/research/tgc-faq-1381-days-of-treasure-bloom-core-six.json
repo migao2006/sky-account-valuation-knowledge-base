@@ -1,0 +1,27 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1381_days_of_treasure_bloom_core_six_2026_08_17",
+  "source_id":"source_tgc_faq_1381_days_of_treasure_bloom_core_six",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1381-patch-notes---february-27-2025---0-28-5-313329-android-huawei-ios-playstation-steam-switch/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1381's Days of Treasure and Days of Bloom 2025 windows and six named, exact-price single-item offers. The Treasure Seeker's Bounty bundle and every item without an exact individual price are deliberately excluded.",
+  "facts":{
+    "days_of_treasure_window_start_date":"2025-03-03",
+    "days_of_treasure_window_end_date":"2025-03-16",
+    "days_of_bloom_window_start_date":"2025-03-24",
+    "days_of_bloom_window_end_date":"2025-04-13",
+    "new_items":[
+      {"item_id":"item_treasure_cavalier_boots","official_name_en":"Treasure Cavalier Boots","original_currency":"event_currency","original_cost":30},
+      {"item_id":"item_treasure_shovel","official_name_en":"Treasure Shovel","original_currency":"event_currency","original_cost":30},
+      {"item_id":"item_bloom_rose_jar_prop","official_name_en":"Bloom Rose Jar Prop","original_currency":"event_currency","original_cost":16},
+      {"item_id":"item_bloom_rose_braided_hair","official_name_en":"Bloom Rose Braided Hair","original_currency":"event_currency","original_cost":28},
+      {"item_id":"item_bloom_rose_petal_mask","official_name_en":"Bloom Rose Petal Mask","original_currency":"event_currency","original_cost":36},
+      {"item_id":"item_bloom_rose_embroidered_cape","official_name_en":"Bloom Rose-Embroidered Cape","original_currency":"USD","original_cost":14.99}
+    ]
+  },
+  "non_claims":[
+    "This historical FAQ does not establish current availability, a return policy, permanent-account property, or current storefront state.",
+    "The FAQ does not provide formal Traditional Chinese names, image assets, a visual match, or first release dates.",
+    "This bounded core-six cohort is not a complete Days of Treasure or Days of Bloom catalog and asserts no bundle or set membership."
+  ]
+}

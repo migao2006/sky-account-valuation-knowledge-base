@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 DATASET_PATH = "reports/model-publication-dataset-manifest.json#dataset_rows"
-DATASET_SCHEMA_VERSION = "1.2-p3.4"
-SPLIT_SCHEMA_VERSION = "1.2-p3.4"
+DATASET_SCHEMA_VERSION = "1.3-p3.7"
+SPLIT_SCHEMA_VERSION = "1.3-p3.7"
 LINEAGE_FIELDS = (
     "training_example_id", "training_example_digest", "feature_payload_sha256",
     "catalog_provenance_sha256", "dedup_cluster_digest",
@@ -217,7 +217,14 @@ def _assert_signed_lineage(
     ):
         raise PublicationDatasetError(f"signed_observation_price_or_date_mismatch:{payload['training_example_id']}")
     if payload["price_line"] == "verified_sale":
-        if any(payload.get(field) != example.get(field) for field in ("completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence_digest", "independent_evidence_ids", "observation_row_digest")):
+        # ``completed_sale_date`` is an observation fact, deliberately not an
+        # unbound duplicate inside the training-example commitment.  Bind it
+        # to the signed observation instead of making every valid v3 sale
+        # impossible to freeze.
+        if (
+            any(payload.get(field) != example.get(field) for field in ("completed_sale_verified", "sale_verified", "completion_evidence_digest", "independent_evidence_ids", "observation_row_digest"))
+            or observation.get("completed_sale_date") != payload.get("completed_sale_date")
+        ):
             raise PublicationDatasetError(f"signed_verified_sale_commitment_mismatch:{payload['training_example_id']}")
     return signed_feature_payload
 

@@ -146,10 +146,10 @@ def _item_state(item_id: str, item: dict[str, Any], owned: set[str], missing: se
     # Names are aliases by design; report canonical-name separately only when exact.
     canonical_tokens = {normalize_text(str(item.get(key, ""))) for key in ("canonical_name_zh_tw", "canonical_name_en")}
     if canonical_tokens.intersection(found["aliases"]): match_types.append("canonical_name")
-    # Catalog policy may additionally exclude a verified non-valuation item.
-    # ``model_feature`` denotes catalog eligibility; the state above still
-    # stays unknown unless its observation token is independently approved.
-    model_feature = catalog_model_eligible
+    # Catalog eligibility is necessary but cannot manufacture ownership from
+    # a missing or conflicted observation.  Only a known, independently
+    # supported, non-conflicting state may become an item model feature.
+    model_feature = catalog_model_eligible and state in {"owned", "confirmed_missing"} and evidence in {"profile_claim", "text_claim"} and not conflict
     return {"item_id": item_id, "state": state, "evidence_state": evidence,
             "match_types": sorted(set(match_types)), "matched_aliases": sorted(found["aliases"]),
             "matched_sources": sorted(found["sources"]),

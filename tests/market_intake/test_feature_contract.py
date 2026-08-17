@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def payload():
-    states = [{"item_id": row["item_id"], "state": "owned" if index == 0 else "unknown", "evidence_state": "profile_claim", "conflict": False} for index, row in enumerate(read_jsonl(ROOT / "knowledge/items/items.jsonl"))]
+    catalog = read_jsonl(ROOT / "knowledge/items/items.jsonl")
+    eligible = next(row["item_id"] for row in catalog if row["verification_status"] == "verified" and row["model_feature_status"] == "eligible")
+    states = [{"item_id": row["item_id"], "state": "owned" if row["item_id"] == eligible else "unknown", "evidence_state": "profile_claim", "conflict": False} for row in catalog]
     return {"feature_contract_version": VERSION, "feature_groups": {
         "base_account": {"account_type": "wingless", "wing_state": "wingless", "special_appearance": []},
         "season_profiles": [], "item_sets": [], "collection": {"bundle_claim_level": "unknown"},
@@ -56,6 +58,33 @@ class AuthorizedMarketFeatureContractTest(unittest.TestCase):
         first, second = canonicalize(value, ROOT), canonicalize(reversed_value, ROOT)
         self.assertEqual(first, second)
         self.assertTrue(first["feature_groups"]["item_sets"])
+
+    def test_signed_payload_with_estimator_metadata_keeps_exact_feature_surface(self):
+        value = payload()
+        canonical = canonicalize(value, ROOT)
+        # A signed training payload is replayed at estimate time alongside
+        # market/evidence metadata.  Those fields are not model inputs.
+        replay = {**canonical, "currency": "TWD", "server": "international",
+                  "trade_conditions": {"price_type": "normal_listing"},
+                  "evidence_quality": {"listing_text": "high"}}
+        self.assertEqual(feature_mapping_for_payload(canonical, ROOT), feature_mapping_for_payload(replay, ROOT))
+
+    def test_unknown_conflicting_or_forged_derived_item_cannot_enter_model(self):
+        value = payload()
+        item = next(row for row in read_jsonl(ROOT / "knowledge/items/items.jsonl")
+                    if row["verification_status"] == "verified" and row["model_feature_status"] == "eligible")
+        state = next(row for row in value["item_states"] if row["item_id"] == item["item_id"])
+        state.update({"state": "owned", "evidence_state": "profile_claim", "conflict": False})
+        trusted = canonicalize(value, ROOT)
+        self.assertTrue(next(row for row in trusted["item_states"] if row["item_id"] == item["item_id"])["model_feature"])
+        unknown = copy.deepcopy(value)
+        next(row for row in unknown["item_states"] if row["item_id"] == item["item_id"])["state"] = "unknown"
+        self.assertFalse(next(row for row in canonicalize(unknown, ROOT)["item_states"] if row["item_id"] == item["item_id"])["model_feature"])
+        forged = copy.deepcopy(unknown)
+        forged_state = next(row for row in canonicalize(forged, ROOT)["item_states"] if row["item_id"] == item["item_id"])
+        forged_state["model_feature"] = True
+        with self.assertRaisesRegex(MarketFeatureContractError, "model_feature_not_catalog_and_evidence_eligible"):
+            canonicalize({**canonicalize(forged, ROOT), "item_states": [forged_state if row["item_id"] == item["item_id"] else row for row in canonicalize(forged, ROOT)["item_states"]]}, ROOT)
 
 
 if __name__ == "__main__":

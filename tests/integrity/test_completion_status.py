@@ -5,10 +5,17 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from tools.validate.build_completion_status import build  # noqa: E402
+from tools.validate.build_completion_status import build, _published_capacity_ready  # noqa: E402
 
 
 class CompletionStatusTests(unittest.TestCase):
+    def test_capacity_requires_every_published_pool_not_any_ready_pool(self):
+        ready_normal = {"market_pool": "TWD:international:normal_listing", "time_forward_split": {"available": True, "training_clusters": 300, "holdout_clusters": 100, "cluster_overlap": False}}
+        readiness = {"market_pools": [ready_normal]}
+        self.assertTrue(_published_capacity_ready(readiness, [{"price_line": "normal_listing"}]))
+        self.assertFalse(_published_capacity_ready(readiness, [{"price_line": "normal_listing"}, {"price_line": "urgent_sale"}]))
+        self.assertFalse(_published_capacity_ready(readiness, []))
+
     def test_formal_goal_state_is_explicit_and_evidence_backed(self):
         report = build(ROOT)
         self.assertEqual(report["status"], "incomplete")

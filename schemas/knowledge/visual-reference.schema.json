@@ -9,7 +9,16 @@
     "asset_sha256": {"type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$"},
     "asset_registry_id": {"type": ["string", "null"], "pattern": "^asset_[a-z0-9_]+$"},
     "detection_ids": {"type": "array", "items": {"type": "string", "pattern": "^detection_[a-z0-9_]+$"}, "uniqueItems": true},
-    "description": {"type": "string"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+    "description": {"type": "string"},
+    "unavailable_reason": {"enum": ["rights_not_granted_for_redistribution"]},
+    "rights_evidence": {"type": "object", "additionalProperties": false, "required": ["source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value"], "properties": {
+      "source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
+      "snapshot_path": {"type": "string", "pattern": "^data/source/[A-Za-z0-9._/-]+\\.json$"},
+      "snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+      "claim_locator": {"type": "string", "pattern": "^/"},
+      "claim_value": {"const": "rights_not_granted_for_redistribution"}
+    }},
+    "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
   },
   "allOf": [
     {
@@ -36,10 +45,13 @@
     {
       "if": {"required": ["reference_mode"], "properties": {"reference_mode": {"const": "unavailable"}}},
       "then": {
+        "required": ["asset_sha256", "asset_registry_id", "detection_ids", "description", "unavailable_reason", "rights_evidence"],
         "properties": {
           "asset_sha256": {"const": null},
           "asset_registry_id": {"const": null},
-          "detection_ids": {"const": []}
+          "detection_ids": {"const": []},
+          "description": {"type": "string", "minLength": 1},
+          "unavailable_reason": {"const": "rights_not_granted_for_redistribution"}
         }
       }
     }

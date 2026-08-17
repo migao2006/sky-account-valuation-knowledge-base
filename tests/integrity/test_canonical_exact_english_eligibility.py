@@ -79,7 +79,7 @@ class CanonicalExactEnglishEligibilityTests(unittest.TestCase):
             vector = build_vector(self._profile(), {"listing_text": text, "offer_kind": offer_kind, "entity_kind": entity_kind}, items, aliases, root)
             state = next(row for row in vector["item_states"] if row["item_id"] == "item_aurora_wings")
             self.assertEqual(state["state"], expected, (text, offer_kind, entity_kind))
-            self.assertTrue(state["model_feature"])
+            self.assertEqual(state["model_feature"], expected == "owned")
 
     def test_stale_catalog_provenance_is_rejected(self):
         root, items, aliases = self._eligible_catalog()

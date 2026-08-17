@@ -1,3 +1,4 @@
+import math
 import sys
 import unittest
 from copy import deepcopy
@@ -7,10 +8,14 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools" / "estimate"))
 
 from tools.modeling.publication_dataset import freeze_synthetic_for_test, split_synthetic_for_test  # noqa: E402
 from tools.modeling.publication_evaluator import _gate_reasons, _runtime_replay_metrics, _sha256, build, evaluate, evaluate_synthetic_for_test  # noqa: E402
 from tools.modeling.publication_runtime import PublicationRuntimeError, build_expected_artifact  # noqa: E402
+from tools.modeling.catalog_provenance import catalog_provenance, read_jsonl  # noqa: E402
+from tools.modeling.market_feature_contract import VERSION  # noqa: E402
+from tools.estimate.model_estimator import _predict_elastic_net  # noqa: E402
 from modeling.train_elastic_net import train_publication_runtime  # noqa: E402
 from tools.validate.schema_validator import OfflineSchemaValidator  # noqa: E402
 
@@ -32,6 +37,29 @@ class PublicationEvaluatorTests(unittest.TestCase):
             })
             vectors.append({"account_id": account, "catalog_provenance": {}, "feature_groups": {"synthetic": {"signal": number}}})
         return freeze_synthetic_for_test(rows, vectors, {}, [])
+
+    def signed_v1_fixture(self):
+        manifest = self.frozen_fixture(trend=True)
+        states = [{"item_id": item["item_id"], "state": "unknown", "evidence_state": "unknown", "conflict": False}
+                  for item in read_jsonl(ROOT / "knowledge/items/items.jsonl")]
+        platforms = [{"platform": name, "status": "unknown"} for name in
+                     ("google", "apple", "game_center", "facebook", "nintendo", "playstation", "steam", "huawei", "twitter")]
+        for number, row in enumerate(manifest["dataset_rows"]):
+            row["feature_payload"] = {
+                "account_id": row["account_id"], "catalog_provenance": catalog_provenance(ROOT),
+                "feature_contract_version": VERSION,
+                "feature_groups": {
+                    "base_account": {"account_type": "winged" if number % 2 else "wingless", "wing_state": "winged", "special_appearance": []},
+                    "season_profiles": [], "item_sets": [], "collection": {"bundle_claim_level": "unknown"},
+                    "resources": {"values": {"white_candles": number, "hearts": None, "red_candles": None, "season_candles": None}},
+                    "map_completion": {"standard_maps": "unknown", "second_tier_capes": "unknown"},
+                    "bindings": {"risk_state": "low", "platforms": platforms}, "ownership_history": "unknown",
+                }, "item_states": states,
+            }
+            row["row_sha256"] = _sha256({key: value for key, value in row.items() if key != "row_sha256"})
+        manifest["lineage_mode"] = "production_signed"
+        manifest["dataset_sha256"] = _sha256(manifest["dataset_rows"])
+        return manifest
 
     def test_formal_report_is_replayed_and_fail_closed(self):
         report = build(ROOT)
@@ -216,6 +244,35 @@ class PublicationEvaluatorTests(unittest.TestCase):
         artifact = build_expected_artifact(ROOT, manifest, pool)
         self.assertIn("item_sets.set_example.completion_ratio", artifact["prediction_contract"]["continuous"]["columns"])
 
+    def test_signed_v1_train_evaluator_and_estimator_predict_same_contract(self):
+        manifest = self.signed_v1_fixture()
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        holdout_ids = set(pool["holdout_cluster_ids"])
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in holdout_ids:
+                row["feature_payload"]["feature_groups"]["resources"]["values"]["white_candles"] %= 300
+                row["row_sha256"] = _sha256({key: value for key, value in row.items() if key != "row_sha256"})
+        manifest["dataset_sha256"] = _sha256(manifest["dataset_rows"])
+        metric, artifact = _runtime_replay_metrics(ROOT, manifest, manifest["dataset_rows"], pool)
+        self.assertEqual(metric["runtime_supported_row_case_share"], 1.0)
+        row = next(row for row in manifest["dataset_rows"] if row["cluster_id"] in holdout_ids)
+        from tools.modeling.publication_runtime import predict_log
+        runtime_log = predict_log(artifact["prediction_contract"], row, artifact["feature_schema"]["runtime_domain"], ROOT)
+        account = {**row["feature_payload"], "currency": "TWD", "server": "international", "review_status": "approved",
+                   "trade_conditions": {"offer_kind": "seller_listing", "entity_kind": "single_account", "price_type": "normal_listing"},
+                   "evidence_quality": {"listing_text": "high"}}
+        estimator_contract = {**artifact["prediction_contract"], "runtime_domain": artifact["feature_schema"]["runtime_domain"]}
+        estimator_log, _, reasons = _predict_elastic_net(estimator_contract, account, {}, root=ROOT)
+        self.assertEqual(reasons, [])
+        self.assertTrue(math.isclose(runtime_log, estimator_log, rel_tol=0, abs_tol=1e-10))
+        bad = deepcopy(account)
+        bad["feature_groups"]["base_account"]["account_type"] = "unknown"
+        with self.assertRaisesRegex(PublicationRuntimeError, "out_of_distribution:base_account.account_type"):
+            predict_log(artifact["prediction_contract"], {"feature_payload": bad}, artifact["feature_schema"]["runtime_domain"], ROOT)
+        rejected, _, reasons = _predict_elastic_net(estimator_contract, bad, {}, root=ROOT)
+        self.assertIsNone(rejected)
+        self.assertEqual(reasons, ["out_of_distribution:base_account.account_type"])
+
     def test_runtime_ood_subgroup_cannot_disappear_from_gate(self):
         manifest = self.frozen_fixture(trend=True)
         manifest["lineage_mode"] = "production_signed"
@@ -252,6 +309,26 @@ class PublicationEvaluatorTests(unittest.TestCase):
         self.assertEqual(metric["holdout_total_case_count"], 1100)  # admission remains row-level diagnostic
         self.assertEqual(metric["runtime_supported_case_share"], 1.0)  # publication gate is cluster-weighted
         self.assertEqual(metric["coverage_qualified_share"], 1.0)
+
+    def test_runtime_row_admission_gate_rejects_ood_duplicates_inside_supported_cluster(self):
+        manifest = self.frozen_fixture(trend=True)
+        manifest["lineage_mode"] = "production_signed"
+        pool = split_synthetic_for_test(manifest)["market_pools"][0]
+        holdout_ids = set(pool["holdout_cluster_ids"])
+        for row in manifest["dataset_rows"]:
+            if row["cluster_id"] in holdout_ids:
+                row["feature_payload"]["feature_groups"]["synthetic"]["signal"] %= 300
+        base = next(row for row in manifest["dataset_rows"] if row["cluster_id"] in holdout_ids)
+        # The original row keeps this cluster runtime-supported.  Most extra
+        # signed rows are deliberately outside the trained numeric domain.
+        for _ in range(1000):
+            duplicate = deepcopy(base)
+            duplicate["feature_payload"]["feature_groups"]["synthetic"]["signal"] = 10**9
+            manifest["dataset_rows"].append(duplicate)
+        metric, _ = _runtime_replay_metrics(ROOT, manifest, manifest["dataset_rows"], pool)
+        self.assertEqual(metric["runtime_supported_case_share"], 1.0)
+        self.assertLess(metric["runtime_supported_row_case_share"], .80)
+        self.assertIn("runtime_supported_holdout_row_share_below_80_percent", _gate_reasons(metric))
 
 
 if __name__ == "__main__":

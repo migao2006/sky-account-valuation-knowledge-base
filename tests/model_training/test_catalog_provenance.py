@@ -33,8 +33,8 @@ class CatalogProvenanceTests(unittest.TestCase):
             "feature_groups": {"resources": {"white": 1}, "item_sets": []},
             "catalog_provenance": catalog_provenance(root),
             "item_states": [
-                {"item_id": "item_verified", "state": "owned", "model_feature": True, "review_status": "approved"},
-                {"item_id": "item_review", "state": "unknown", "model_feature": False, "review_status": "needs_review"},
+                {"item_id": "item_verified", "state": "owned", "evidence_state": "profile_claim", "conflict": False, "model_feature": True, "review_status": "approved"},
+                {"item_id": "item_review", "state": "unknown", "evidence_state": "unknown", "conflict": False, "model_feature": False, "review_status": "needs_review"},
             ],
         }
 

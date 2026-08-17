@@ -27,6 +27,13 @@ ATTESTATIONS_REL = Path("data/review/parser-gold/attestations.jsonl")
 SIGNATURES_REL = Path("data/review/parser-gold/signatures")
 AUTHORITY_ENV = "SKY_PARSER_GOLD_AUTHORITY_BUNDLE"
 AUTHORITY_SHA_ENV = "SKY_PARSER_GOLD_AUTHORITY_BUNDLE_SHA256"
+KEYED_AUTHORITY_ENV = "SKY_PARSER_KEYED_CUSTODIAN_AUTHORITY_BUNDLE"
+KEYED_AUTHORITY_SHA_ENV = "SKY_PARSER_KEYED_CUSTODIAN_AUTHORITY_BUNDLE_SHA256"
+KEYED_CONTRACT_ENV = "SKY_PARSER_KEYED_CUSTODIAN_CONTRACT"
+KEYED_CONTRACT_SHA_ENV = "SKY_PARSER_KEYED_CUSTODIAN_CONTRACT_SHA256"
+KEYED_BINDING_ENV = "SKY_PARSER_KEYED_REPLAY_BINDING"
+KEYED_BINDING_SHA_ENV = "SKY_PARSER_KEYED_REPLAY_BINDING_SHA256"
+KEYED_BINDING_NAMESPACE = "sky-parser-keyed-replay-binding-v1"
 ROLES = ("annotator_a", "annotator_b", "adjudicator")
 POLARITIES = frozenset({"owned", "confirmed_missing", "unknown"})
 SPLITS = frozenset({"development", "heldout"})
@@ -86,6 +93,120 @@ def manifest_payload(manifest: dict[str, Any]) -> bytes:
 def attestation_payload(gold_row: dict[str, Any], manifest: dict[str, Any], attestation: dict[str, Any]) -> bytes:
     signed = {key: value for key, value in attestation.items() if key != "payload_sha256"}
     return canonical_bytes({"contract": NAMESPACE, "gold": gold_row, "rule_development_manifest": manifest, "attestation": signed})
+
+
+def _outside_root(path_value: str | Path | None, root: Path, purpose: str) -> Path:
+    if path_value is None:
+        raise ValueError(f"{purpose} path must be injected")
+    path = Path(path_value).expanduser().resolve()
+    try:
+        path.relative_to(root.resolve())
+    except ValueError:
+        return path
+    raise ValueError(f"{purpose} must be outside the release root")
+
+
+def _keyed_binding_payload(binding: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in binding.items() if key not in {"signature_file", "binding_sha256"}}
+
+
+def _validate_keyed_binding_coverage(gold: list[dict[str, Any]], rows: list[dict[str, Any]], cohort_commitments: list[str]) -> None:
+    """Require an injective gold-to-cohort mapping and exact coverage at threshold."""
+    if len(gold) > 200:
+        raise ValueError("formal parser gold cannot exceed the fixed 200-row keyed cohort")
+    row_commitments = [row.get("keyed_commitment") for row in rows if isinstance(row, dict)]
+    if len(row_commitments) != len(set(row_commitments)):
+        raise ValueError("external keyed replay binding reuses a cohort commitment")
+    if len(gold) == 200:
+        if len(rows) != 200 or set(row_commitments) != set(cohort_commitments):
+            raise ValueError("complete parser gold must bijectively cover all 200 keyed cohort commitments")
+        split_counts = Counter(str(row.get("split")) for row in rows)
+        if split_counts != {"development": 100, "heldout": 100}:
+            raise ValueError("complete parser gold must preserve the fixed 100/100 keyed split")
+
+
+def _verify_keyed_binding(root: Path, gold: list[dict[str, Any]], authority_bundle: str | Path | None, authority_bundle_sha256: str | None, contract_path: str | Path | None, contract_sha256: str | None, binding_path: str | Path | None, binding_sha256: str | None) -> list[str]:
+    """Replay the private keyed mapping for every formal gold row.
+
+    The mapping is injected outside the release.  Its signed rows prove that
+    each public gold hash and split is an entry in the custodian's committed
+    cohort, while the release manifest stays aggregate-only.
+    """
+    from tools.parser_review.onboarding import (
+        KEYED_CUSTODIAN_ROLE, keyed_commitment_merkle_root,
+        load_keyed_custodian_authorities,
+        validate_keyed_custodian_contract,
+    )
+    try:
+        authorities = load_keyed_custodian_authorities(authority_bundle or os.environ.get(KEYED_AUTHORITY_ENV), authority_bundle_sha256 or os.environ.get(KEYED_AUTHORITY_SHA_ENV), root)
+        contract_file = _outside_root(contract_path or os.environ.get(KEYED_CONTRACT_ENV), root, "external keyed custodian contract")
+        expected_contract_sha = contract_sha256 or os.environ.get(KEYED_CONTRACT_SHA_ENV)
+        if not expected_contract_sha or not contract_file.is_file() or sha256_bytes(contract_file.read_bytes()) != str(expected_contract_sha).upper():
+            raise ValueError("external keyed custodian contract SHA-256 does not match injected digest")
+        contract = json.loads(contract_file.read_text(encoding="utf-8"))
+        validate_keyed_custodian_contract(contract, contract_file, root, authority_bundle or os.environ.get(KEYED_AUTHORITY_ENV), authority_bundle_sha256 or os.environ.get(KEYED_AUTHORITY_SHA_ENV))
+        manifest = json.loads((root / "data/review/parser-gold/review-queue-manifest.json").read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.0-p3.7" or manifest.get("status") != "keyed_frozen_pending_external_decisions":
+            raise ValueError("nonempty parser gold requires a P3.7 keyed public manifest")
+        for key in ("cohort_id", "commitment_merkle_root", "split_commitment", "custodian_id", "custodian_authority_id", "custodian_fingerprint", "custodian_contract_sha256"):
+            contract_key = {"custodian_authority_id": "authority_id", "custodian_fingerprint": "fingerprint", "custodian_contract_sha256": "contract_sha256"}.get(key, key)
+            if manifest.get(key) != contract.get(contract_key):
+                raise ValueError("keyed public manifest does not match verified custodian contract")
+        binding_file = _outside_root(binding_path or os.environ.get(KEYED_BINDING_ENV), root, "external keyed replay binding")
+        expected_binding_sha = binding_sha256 or os.environ.get(KEYED_BINDING_SHA_ENV)
+        if not expected_binding_sha or not binding_file.is_file() or sha256_bytes(binding_file.read_bytes()) != str(expected_binding_sha).upper():
+            raise ValueError("external keyed replay binding SHA-256 does not match injected digest")
+        binding = json.loads(binding_file.read_text(encoding="utf-8"))
+        required = {"schema_version", "contract_type", "cohort_id", "custodian_contract_sha256", "commitment_merkle_root", "split_commitment", "authority_id", "fingerprint", "cohort_keyed_commitments", "binding_rows", "signature_file", "binding_sha256"}
+        if not isinstance(binding, dict) or set(binding) != required or binding.get("schema_version") != "1.0-p3.7" or binding.get("contract_type") != "parser_review_keyed_replay_binding":
+            raise ValueError("external keyed replay binding has unsupported schema")
+        for key in ("cohort_id", "custodian_contract_sha256", "commitment_merkle_root", "split_commitment"):
+            if binding.get(key) != manifest.get(key):
+                raise ValueError("external keyed replay binding does not bind the public keyed cohort")
+        if binding.get("authority_id") != contract.get("authority_id") or binding.get("fingerprint") != contract.get("fingerprint"):
+            raise ValueError("external keyed replay binding is not signed by the contracted custodian authority")
+        authority = authorities.get(binding.get("authority_id"))
+        if not authority or authority.get("fingerprint") != binding.get("fingerprint") or KEYED_CUSTODIAN_ROLE not in authority.get("roles", []):
+            raise ValueError("external keyed replay binding authority is missing, revoked, or unauthorized")
+        if binding.get("binding_sha256") != sha256_bytes(canonical_bytes(_keyed_binding_payload(binding))):
+            raise ValueError("external keyed replay binding digest does not bind its payload")
+        signature_name = binding.get("signature_file")
+        if not isinstance(signature_name, str) or Path(signature_name).name != signature_name:
+            raise ValueError("external keyed replay binding signature path is invalid")
+        signature = binding_file.parent / signature_name
+        if not signature.is_file():
+            raise ValueError("external keyed replay binding detached signature is missing")
+        with tempfile.TemporaryDirectory(prefix="sky-parser-keyed-binding-") as temporary:
+            allowed = Path(temporary) / "allowed_signers"; allowed.write_text(f"{binding['authority_id']} {authority['public_key'].strip()}\n", encoding="utf-8", newline="\n")
+            signed = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", str(allowed), "-I", str(binding["authority_id"]), "-n", KEYED_BINDING_NAMESPACE, "-s", str(signature)], input=canonical_bytes(_keyed_binding_payload(binding)), capture_output=True, check=False)
+        if signed.returncode:
+            raise ValueError("external keyed replay binding detached signature verification failed")
+        cohort_commitments = binding.get("cohort_keyed_commitments")
+        if not isinstance(cohort_commitments, list) or len(cohort_commitments) != 200:
+            raise ValueError("external keyed replay binding must provide exactly 200 opaque cohort commitments")
+        if keyed_commitment_merkle_root(cohort_commitments) != manifest["commitment_merkle_root"]:
+            raise ValueError("external keyed replay binding commitments do not reproduce custodian Merkle root")
+        rows = binding.get("binding_rows")
+        if not isinstance(rows, list) or len(rows) != len(gold):
+            raise ValueError("external keyed replay binding rows do not cover formal gold")
+        _validate_keyed_binding_coverage(gold, rows, cohort_commitments)
+        gold_by_id = {str(row["gold_id"]): row for row in gold}; seen: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"gold_id", "input_sha256", "keyed_commitment", "split"}:
+                raise ValueError("external keyed replay binding row has unsupported fields")
+            gold_id = row.get("gold_id"); gold_row = gold_by_id.get(gold_id)
+            if gold_row is None or gold_id in seen or row.get("input_sha256") != gold_row.get("input_sha256") or row.get("split") != gold_row.get("split"):
+                raise ValueError("external keyed replay binding row does not exactly bind a gold row")
+            if not isinstance(row.get("keyed_commitment"), str) or len(str(row["keyed_commitment"])) != 64 or any(char not in "0123456789ABCDEF" for char in str(row["keyed_commitment"])):
+                raise ValueError("external keyed replay binding commitment is invalid")
+            if row["keyed_commitment"] not in cohort_commitments:
+                raise ValueError("external keyed replay binding row commitment is absent from custodian cohort")
+            seen.add(str(gold_id))
+        if seen != set(gold_by_id):
+            raise ValueError("external keyed replay binding omits or duplicates gold rows")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [str(exc)]
+    return []
 
 
 def _external_bundle(path_value: str | Path | None, expected_sha: str | None, root: Path) -> tuple[dict[str, dict[str, Any]] | None, list[str]]:
@@ -179,7 +300,7 @@ def load_rule_manifest(root: Path, gold: list[dict[str, Any]]) -> tuple[dict[str
     return manifest, errors
 
 
-def audit_gold(root: Path, gold: list[dict[str, Any]], authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None) -> list[str]:
+def audit_gold(root: Path, gold: list[dict[str, Any]], authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None, keyed_authority_bundle: str | Path | None = None, keyed_authority_bundle_sha256: str | None = None, keyed_contract: str | Path | None = None, keyed_contract_sha256: str | None = None, keyed_replay_binding: str | Path | None = None, keyed_replay_binding_sha256: str | None = None) -> list[str]:
     errors = validate_gold_rows(gold)
     manifest, manifest_errors = load_rule_manifest(root, gold)
     errors.extend(manifest_errors)
@@ -188,6 +309,7 @@ def audit_gold(root: Path, gold: list[dict[str, Any]], authority_bundle: str | P
             if read_jsonl(root / ATTESTATIONS_REL): errors.append("parser-gold attestations exist without parser gold")
         except (OSError, ValueError, json.JSONDecodeError) as exc: errors.append(f"parser-gold attestation ledger is unreadable: {exc}")
         return errors
+    errors.extend(_verify_keyed_binding(root, gold, keyed_authority_bundle, keyed_authority_bundle_sha256, keyed_contract, keyed_contract_sha256, keyed_replay_binding, keyed_replay_binding_sha256))
     authorities, authority_errors = _external_bundle(authority_bundle, authority_bundle_sha256, root)
     errors.extend(authority_errors)
     if authorities is None: return errors
@@ -281,8 +403,8 @@ def evaluate(root: Path, gold: list[dict[str, Any]], replay_inputs: list[dict[st
     return {"schema_version": "1.0-p3.3", "model_feature": False, "status": "not_ready" if not gold else "evaluated" if threshold else "threshold_not_met", "publication_ready": passed, "gold_row_count": len(gold), "gold_input_hashes_sha256": sha256_bytes(canonical_bytes(sorted(gold_by_hash))), "rule_development_manifest_sha256": manifest.get("manifest_sha256"), "heldout_excluded_from_rule_configuration": True, "strata_distinct_value_counts": strata_coverage, "development": development, "heldout": heldout, "thresholds": {"minimum_gold_rows": 200, "minimum_development_rows": 100, "minimum_heldout_rows": 100, "required_strata": list(REQUIRED_STRATA), "minimum_distinct_values_per_required_stratum": MINIMUM_DISTINCT_STRATA_VALUES, "heldout_precision_minimum": .98, "heldout_recall_minimum": .95, "collision_rows_maximum": 0, "unknown_to_missing_rows_maximum": 0}}
 
 
-def build(root: Path = ROOT, replay_inputs_path: Path | None = None, replay_inputs_sha256: str | None = None, authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, Any]:
-    gold = read_jsonl(root / GOLD_REL); audit_errors = audit_gold(root, gold, authority_bundle, authority_bundle_sha256)
+def build(root: Path = ROOT, replay_inputs_path: Path | None = None, replay_inputs_sha256: str | None = None, authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None, keyed_authority_bundle: str | Path | None = None, keyed_authority_bundle_sha256: str | None = None, keyed_contract: str | Path | None = None, keyed_contract_sha256: str | None = None, keyed_replay_binding: str | Path | None = None, keyed_replay_binding_sha256: str | None = None) -> dict[str, Any]:
+    gold = read_jsonl(root / GOLD_REL); audit_errors = audit_gold(root, gold, authority_bundle, authority_bundle_sha256, keyed_authority_bundle, keyed_authority_bundle_sha256, keyed_contract, keyed_contract_sha256, keyed_replay_binding, keyed_replay_binding_sha256)
     if audit_errors: raise ValueError("parser gold audit failed: " + "; ".join(audit_errors))
     if not gold: return evaluate(root, [], [])
     return evaluate(root, gold, external_replay_inputs(replay_inputs_path, replay_inputs_sha256, root))
@@ -293,7 +415,10 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=ROOT); parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--replay-inputs", type=Path); parser.add_argument("--replay-inputs-sha256")
     parser.add_argument("--authority-bundle", type=Path); parser.add_argument("--authority-bundle-sha256")
-    args = parser.parse_args(); root = args.root.resolve(); report = build(root, args.replay_inputs, args.replay_inputs_sha256, args.authority_bundle, args.authority_bundle_sha256)
+    parser.add_argument("--keyed-custodian-authority-bundle", type=Path); parser.add_argument("--keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--keyed-custodian-contract", type=Path); parser.add_argument("--keyed-custodian-contract-sha256")
+    parser.add_argument("--keyed-replay-binding", type=Path); parser.add_argument("--keyed-replay-binding-sha256")
+    args = parser.parse_args(); root = args.root.resolve(); report = build(root, args.replay_inputs, args.replay_inputs_sha256, args.authority_bundle, args.authority_bundle_sha256, args.keyed_custodian_authority_bundle, args.keyed_custodian_authority_bundle_sha256, args.keyed_custodian_contract, args.keyed_custodian_contract_sha256, args.keyed_replay_binding, args.keyed_replay_binding_sha256)
     output = args.output or root / "reports/parser-gold-evaluation.json"; output.parent.mkdir(parents=True, exist_ok=True); output.write_bytes(canonical_bytes(report))
 
 
