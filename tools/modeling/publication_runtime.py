@@ -44,25 +44,9 @@ def runtime_features(feature_groups: Any, runtime_domain: dict[str, Any]) -> tup
         features = feature_mapping({"features": feature_groups})
     except (ValueError, TypeError, OverflowError) as exc:
         return None, [f"runtime_feature_mapping_failed:{type(exc).__name__}"]
-    numeric = runtime_domain.get("numeric", {}) if isinstance(runtime_domain, dict) else {}
-    categorical = runtime_domain.get("categorical", {}) if isinstance(runtime_domain, dict) else {}
-    for name, bounds in numeric.items() if isinstance(numeric, dict) else []:
-        raw = features.get(name)
-        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
-            if isinstance(bounds, dict) and bounds.get("missing_observed") is False:
-                return None, [f"out_of_distribution:missing_unobserved:{name}"]
-            continue
-        try:
-            value = float(raw)
-        except (OverflowError, ValueError):
-            return None, [f"out_of_distribution:nonfinite:{name}"]
-        if not math.isfinite(value) or not isinstance(bounds, dict) or value < float(bounds.get("min", value)) or value > float(bounds.get("max", value)):
-            return None, [f"out_of_distribution:{name}"]
-    for name, allowed in categorical.items() if isinstance(categorical, dict) else []:
-        token = "__unknown__" if features.get(name) in (None, "unknown") else str(features[name])
-        if isinstance(allowed, list) and token not in allowed:
-            return None, [f"out_of_distribution:{name}"]
-    return features, []
+    from tools.modeling.market_feature_contract import runtime_domain_errors
+    reasons = runtime_domain_errors(features, runtime_domain)
+    return (features, []) if not reasons else (None, reasons)
 
 
 def _percentile(values: list[float], fraction: float) -> float:
@@ -187,13 +171,13 @@ def predict_log(contract: dict[str, Any], row: dict[str, Any], runtime_domain: d
             features = _payload_features(payload, root)
         except Exception as exc:
             raise PublicationRuntimeError(f"runtime_feature_mapping_failed:{type(exc).__name__}") from exc
-        # Runtime domains are declared against flattened features, so validate
-        # them directly rather than flattening the structured payload twice.
-        for name, bounds in (runtime_domain or {}).get("numeric", {}).items():
-            value = features.get(name)
-            if not isinstance(value, (int, float)) or isinstance(value, bool):
-                if isinstance(bounds, dict) and bounds.get("missing_observed") is False: raise PublicationRuntimeError(f"out_of_distribution:missing_unobserved:{name}")
-            elif value < bounds.get("min", value) or value > bounds.get("max", value): raise PublicationRuntimeError(f"out_of_distribution:{name}")
+        # Runtime domains are declared against the canonical flattened vector.
+        # Use the same numeric and categorical admission function as evaluator
+        # replay and estimator inference.
+        from tools.modeling.market_feature_contract import runtime_domain_errors
+        reasons = runtime_domain_errors(features, runtime_domain)
+        if reasons:
+            raise PublicationRuntimeError(reasons[0])
         return portable_predict_log(contract, features)
     features, reasons = runtime_features(payload.get("feature_groups", {}), runtime_domain or {})
     if features is None: raise PublicationRuntimeError(reasons[0])

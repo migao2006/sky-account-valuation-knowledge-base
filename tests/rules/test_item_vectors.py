@@ -163,7 +163,7 @@ class ItemVectorTests(unittest.TestCase):
             vector = self._vector(player_term, items=items, aliases=aliases, root=root)
             state = next(row for row in vector["item_states"] if row["item_id"] == "item_aurora_wings")
             self.assertEqual(state["state"], "unknown", player_term)
-            self.assertTrue(state["model_feature"], player_term)
+            self.assertFalse(state["model_feature"], player_term)
             self.assertEqual(state["evidence_state"], "unknown", player_term)
             self.assertEqual(state["matched_aliases"], [player_term], player_term)
 
@@ -177,7 +177,7 @@ class ItemVectorTests(unittest.TestCase):
         )
         state = next(row for row in vector["item_states"] if row["item_id"] == "item_verified_cape")
         self.assertEqual(state["state"], "unknown")
-        self.assertTrue(state["model_feature"])
+        self.assertFalse(state["model_feature"])
         self.assertEqual(state["evidence_state"], "unknown")
 
     def test_feature_summary_is_a_separate_item_provenance_source(self):

@@ -45,7 +45,10 @@ zlib-compressed pixel stream are replayed before it counts.  Arbitrary files
 never be registered as an image.
 `source_description` requires `asset_sha256: null`, cannot bind a registry
 asset, and may not carry detection IDs.  `unavailable` has the same no-asset,
-no-detection boundary.  The existing source-description rows omit the optional
+no-detection boundary and additionally requires a registered source plus an
+in-repository JSON snapshot whose SHA-256 and RFC6901 locator replay the exact
+`rights_not_granted_for_redistribution` claim.  A description or status string
+alone never completes the catalog visual state.  The existing source-description rows omit the optional
 registry and detection fields, so they remain valid without adding any visual
 row.
 

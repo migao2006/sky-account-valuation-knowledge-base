@@ -25,6 +25,42 @@ ASSET_DIRECTORY = Path("data/curated/visual-assets")
 SHA256_RE = re.compile(r"^[A-Fa-f0-9]{64}$")
 
 
+def _json_pointer(document: Any, pointer: object) -> Any:
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValueError("rights evidence claim locator must be an RFC6901 pointer")
+    current = document
+    for encoded in pointer[1:].split("/"):
+        part = encoded.replace("~1", "/").replace("~0", "~")
+        try:
+            current = current[int(part)] if isinstance(current, list) else current[part]
+        except (KeyError, IndexError, ValueError, TypeError) as exc:
+            raise ValueError("rights evidence claim locator does not resolve") from exc
+    return current
+
+
+def _validate_rights_evidence(row: dict[str, Any], root: Path) -> None:
+    evidence = row.get("rights_evidence")
+    required = {"source_id", "snapshot_path", "snapshot_sha256", "claim_locator", "claim_value"}
+    if not isinstance(evidence, dict) or set(evidence) != required:
+        raise ValueError("unavailable visual reference lacks replayable rights evidence")
+    if evidence.get("source_id") not in row.get("source_ids", []):
+        raise ValueError("rights evidence source is not bound by the visual reference")
+    registered = {entry.get("source_id") for entry in read_jsonl(root / "knowledge/sources/sources.jsonl")}
+    if evidence.get("source_id") not in registered:
+        raise ValueError("rights evidence source is not registered")
+    relative = evidence.get("snapshot_path")
+    if not isinstance(relative, str) or "\\" in relative or not relative.startswith("data/source/") or not relative.endswith(".json") or ".." in Path(relative).parts:
+        raise ValueError("rights evidence snapshot path is invalid")
+    snapshot = (root / relative).resolve()
+    if root.resolve() not in snapshot.parents or not snapshot.is_file():
+        raise ValueError("rights evidence snapshot is missing")
+    if not isinstance(evidence.get("snapshot_sha256"), str) or _sha256(snapshot).upper() != evidence["snapshot_sha256"].upper():
+        raise ValueError("rights evidence snapshot SHA-256 mismatch")
+    document = json.loads(snapshot.read_text(encoding="utf-8"))
+    if _json_pointer(document, evidence.get("claim_locator")) != evidence.get("claim_value") or evidence.get("claim_value") != "rights_not_granted_for_redistribution":
+        raise ValueError("rights evidence claim does not establish redistribution unavailability")
+
+
 def _validate_png(path: Path) -> None:
     """Accept only structurally decodable PNG assets without a GUI dependency."""
     data = path.read_bytes()
@@ -139,6 +175,7 @@ def _validate_inputs(
     visual_references: list[dict[str, Any]],
     image_evidence: list[dict[str, Any]],
     assets: dict[str, dict[str, Any]],
+    root: Path,
 ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
     _require_unique(items, "item_id", "canonical items")
     item_by_id = {row["item_id"]: row for row in items}
@@ -155,6 +192,10 @@ def _validate_inputs(
         mode = row.get("reference_mode")
         if item_id not in item_by_id:
             raise ValueError(f"visual reference has dangling item: {visual_id}")
+        if mode != "unavailable" and row.get("unavailable_reason") is not None:
+            raise ValueError(f"only unavailable visual references may carry an unavailable reason: {visual_id}")
+        if mode != "unavailable" and row.get("rights_evidence") is not None:
+            raise ValueError(f"only unavailable visual references may carry rights evidence: {visual_id}")
         if mode == "offline_asset":
             registry_id = row.get("asset_registry_id")
             digest = row.get("asset_sha256")
@@ -176,6 +217,9 @@ def _validate_inputs(
                 raise ValueError(f"unavailable visual reference cannot carry an asset: {visual_id}")
             if row.get("detection_ids"):
                 raise ValueError(f"unavailable visual reference cannot be a detection: {visual_id}")
+            if row.get("unavailable_reason") != "rights_not_granted_for_redistribution" or not isinstance(row.get("description"), str) or not row["description"].strip() or not isinstance(row.get("source_ids"), list) or not row["source_ids"]:
+                raise ValueError(f"unavailable visual reference lacks a verified rights/source explanation: {visual_id}")
+            _validate_rights_evidence(row, root)
         else:
             raise ValueError(f"visual reference has invalid reference_mode: {visual_id}")
 
@@ -213,7 +257,7 @@ def actual_visual_item_ids(
     approved, registry-backed detection is the minimum usable visual evidence.
     """
     assets = _validate_asset_registry(asset_registry, root.resolve())
-    _item_by_id, approved = _validate_inputs(items, visual_references, image_evidence, assets)
+    _item_by_id, approved = _validate_inputs(items, visual_references, image_evidence, assets, root)
     approved_items = {str(row["detected_item_id"]) for row in approved}
     asset_items = {
         str(row["item_id"])
@@ -224,6 +268,28 @@ def actual_visual_item_ids(
         and str(row.get("asset_sha256", "")).casefold() == assets[row["asset_registry_id"]]["asset_sha256"]
     }
     return approved_items | asset_items
+
+
+def complete_visual_state_item_ids(
+    items: list[dict[str, Any]], visual_references: list[dict[str, Any]],
+    image_evidence: list[dict[str, Any]], asset_registry: list[dict[str, Any]], *, root: Path,
+) -> set[str]:
+    """Return items whose visual state is complete without inventing an image.
+
+    Asset-backed facts remain the only actual visual evidence.  A separately
+    verified ``unavailable`` record satisfies catalog state coverage only when
+    redistribution rights are explicitly absent and a source-backed textual
+    locator is retained, as required by the completion contract.
+    """
+    assets = _validate_asset_registry(asset_registry, root.resolve())
+    _validate_inputs(items, visual_references, image_evidence, assets, root)
+    return actual_visual_item_ids(items, visual_references, image_evidence, asset_registry, root=root) | {
+        str(row["item_id"])
+        for row in visual_references
+        if row.get("reference_mode") == "unavailable"
+        and row.get("verification_status") == "verified"
+        and row.get("unavailable_reason") == "rights_not_granted_for_redistribution"
+    }
 
 
 def _as_of_date(items: list[dict[str, Any]]) -> str:
@@ -249,7 +315,7 @@ def audit(
     """Return visual evidence coverage without creating or inferring evidence."""
     root = root.resolve()
     assets = _validate_asset_registry(asset_registry, root)
-    item_by_id, approved_detections = _validate_inputs(items, visual_references, image_evidence, assets)
+    item_by_id, approved_detections = _validate_inputs(items, visual_references, image_evidence, assets, root)
     approved_ids = {row["detection_id"] for row in approved_detections}
     approved_by_item: dict[str, set[str]] = {}
     for row in approved_detections:
@@ -304,7 +370,7 @@ def audit(
         "asset_registry": DEFAULT_ASSET_REGISTRY.as_posix(),
     }
     return {
-        "schema_version": "1.0-p3.4",
+        "schema_version": "1.1-p3.7",
         "as_of_date": as_of_date or _as_of_date(items),
         "offline_only": True,
         "inputs": {

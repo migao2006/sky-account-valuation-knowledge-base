@@ -104,6 +104,59 @@ class CatalogCompletionTests(unittest.TestCase):
             report = build(root)
             self.assertIn("catalog.visual_state_verified", report["blocking_contract_ids"])
 
+    def test_verified_rights_unavailable_state_satisfies_visual_coverage_without_claiming_an_asset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_jsonl(root / "knowledge/items/items.jsonl", [{"item_id": "item_unavailable", "verification_status": "verified"}])
+            for relative in ("data/review/catalog-universe.jsonl", "data/review/item-candidates.jsonl", "reports/coverage/unresolved-items.jsonl", "reports/coverage/unmapped-aliases.jsonl", "data/review/alias-conflicts.jsonl", "data/review/canonical-evidence-cohorts.jsonl", "data/curated/image-evidence.jsonl", "data/curated/visual-assets.jsonl"):
+                write_jsonl(root / relative, [])
+            write_json(root / "data/review/catalog-universe-summary.json", {"expected_count": 0, "vendor_item_count": 0, "reconciliation_status": "reconciled"})
+            write_json(root / "data/normalized/source-scoped-item-identities-summary.json", {"unresolved_count": 0})
+            write_jsonl(root / "knowledge/sources/sources.jsonl", [{"source_id": "source_rights_record"}])
+            snapshot = root / "data/source/research/rights-record.json"
+            write_json(snapshot, {"rights": {"redistribution": "rights_not_granted_for_redistribution"}})
+            rights = {"source_id": "source_rights_record", "snapshot_path": "data/source/research/rights-record.json", "snapshot_sha256": hashlib.sha256(snapshot.read_bytes()).hexdigest().upper(), "claim_locator": "/rights/redistribution", "claim_value": "rights_not_granted_for_redistribution"}
+            reference = {"visual_reference_id": "visual_unavailable", "item_id": "item_unavailable", "reference_mode": "unavailable", "asset_sha256": None, "asset_registry_id": None, "detection_ids": [], "description": "The licensed source identifies the item, but redistribution rights for its image were not granted.", "unavailable_reason": "rights_not_granted_for_redistribution", "rights_evidence": rights, "source_ids": ["source_rights_record"], "verification_status": "verified"}
+            write_jsonl(root / "knowledge/visual-references/manifest.jsonl", [reference])
+            report = build(root)
+            self.assertNotIn("catalog.visual_state_verified", report["blocking_contract_ids"])
+            self.assertEqual([], OfflineSchemaValidator(ROOT / "schemas").validate(reference, ROOT / "schemas/knowledge/visual-reference.schema.json"))
+            snapshot.unlink()
+            self.assertIn("catalog.visual_state_verified", build(root)["blocking_contract_ids"])
+
+    def test_two_current_independent_secondary_sources_satisfy_identity_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            item = {"item_id": "item_secondary", "verification_status": "verified"}
+            write_jsonl(root / "knowledge/items/items.jsonl", [item])
+            for relative in ("data/review/catalog-universe.jsonl", "data/review/item-candidates.jsonl", "reports/coverage/unresolved-items.jsonl", "reports/coverage/unmapped-aliases.jsonl", "data/review/alias-conflicts.jsonl", "data/curated/image-evidence.jsonl", "data/curated/visual-assets.jsonl", "knowledge/visual-references/manifest.jsonl"):
+                write_jsonl(root / relative, [])
+            write_json(root / "data/review/catalog-universe-summary.json", {"expected_count": 0, "vendor_item_count": 0, "reconciliation_status": "reconciled"})
+            write_json(root / "data/normalized/source-scoped-item-identities-summary.json", {"unresolved_count": 0})
+            write_json(root / "manifest.json", {"research_cutoff_date": "2026-08-17"})
+            sources = [
+                {"source_id": "source_secondary_a", "source_lineage_id": "lineage_secondary_a", "url": "https://one.example/items", "evidence_level": "community_cross_checked", "retrieved_at": "2026-08-01"},
+                {"source_id": "source_secondary_b", "source_lineage_id": "lineage_secondary_b", "url": "https://two.example/items", "evidence_level": "community_cross_checked", "retrieved_at": "2026-08-02"},
+            ]
+            write_jsonl(root / "knowledge/sources/sources.jsonl", sources)
+            evidence = [
+                {"target_type": "item", "target_id": "item_secondary", "field_path": "canonical_name_en", "review_status": "approved", "evidence_role": "independent_identity", "source_tier": "secondary_reference", "source_id": "source_secondary_a", "source_lineage_id": "lineage_secondary_a"},
+                {"target_type": "item", "target_id": "item_secondary", "field_path": "canonical_name_en", "review_status": "approved", "evidence_role": "independent_identity", "source_tier": "secondary_reference", "source_id": "source_secondary_b", "source_lineage_id": "lineage_secondary_b"},
+            ]
+            cohort = {"cohort_id": "canonical_cohort_secondary", "review_status": "approved", "release_required": True}
+            write_jsonl(root / "data/review/canonical-evidence-cohorts.jsonl", [cohort])
+            with patch("tools.validate.catalog_completion.validate_registry", return_value=([], {"canonical_cohort_secondary": evidence})), patch("tools.validate.catalog_completion.load_registry", return_value=[cohort]):
+                report = build(root)
+            identity = next(row for row in report["checks"] if row["contract_id"] == "catalog.independent_identity_evidence")
+            self.assertTrue(identity["passed"])
+            self.assertEqual(1, identity["actual"]["two_secondary_identity_count"])
+            sources[1].pop("source_lineage_id")
+            write_jsonl(root / "knowledge/sources/sources.jsonl", sources)
+            with patch("tools.validate.catalog_completion.validate_registry", return_value=([], {"canonical_cohort_secondary": evidence})), patch("tools.validate.catalog_completion.load_registry", return_value=[cohort]):
+                missing_lineage = build(root)
+            identity = next(row for row in missing_lineage["checks"] if row["contract_id"] == "catalog.independent_identity_evidence")
+            self.assertFalse(identity["passed"])
+
     def test_missing_visual_state_blocks_otherwise_complete_catalog(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

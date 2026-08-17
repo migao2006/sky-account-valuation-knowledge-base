@@ -11,8 +11,8 @@ from modeling.train_xgboost import flatten_vector, grouped_fold_indices, train
 
 class XGBoostAndItemTableTests(unittest.TestCase):
     def test_unknown_item_is_not_encoded_as_confirmed_missing(self):
-        values, _ = flatten_vector({"item_states": [{"item_id": "item_example", "state": "unknown", "model_feature": True, "review_status": "approved"}]}, {"item_example"})
-        self.assertEqual(values["item:item_example:known"], 0.0)
+        values, _ = flatten_vector({"item_states": [{"item_id": "item_example", "state": "unknown", "evidence_state": "unknown", "conflict": False, "model_feature": True, "review_status": "approved"}]}, {"item_example"})
+        self.assertNotIn("item:item_example:known", values)
         self.assertNotIn("item:item_example:owned", values)
 
     def test_xgboost_item_features_require_canonical_whitelist(self):
@@ -40,7 +40,7 @@ class XGBoostAndItemTableTests(unittest.TestCase):
             vectors, prices, artifact = root / "vectors.jsonl", root / "prices.jsonl", root / "artifact.json"
             vectors.write_text(json.dumps({
                 "account_id": "account_a", "feature_groups": {"resources": {"white": 3}},
-                "item_states": [{"item_id": "item_approved", "state": "owned", "model_feature": True, "review_status": "approved"}],
+                "item_states": [{"item_id": "item_approved", "state": "owned", "evidence_state": "profile_claim", "conflict": False, "model_feature": True, "review_status": "approved"}],
             }) + "\n", encoding="utf-8")
             prices.write_text(json.dumps({"account_id": "account_a", "selected_price_twd": 1000, "price_line": "normal_listing", "cluster_id": "cluster_a"}) + "\n", encoding="utf-8")
             actual = train(vectors, artifact, "normal_listing", prices_path=prices)

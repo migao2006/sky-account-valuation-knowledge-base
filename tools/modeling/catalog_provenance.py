@@ -101,7 +101,13 @@ def validate_vector_catalog_provenance(vector: dict[str, Any], root: Path) -> No
     for state in states:
         item_id = state["item_id"]
         item = items[item_id]
-        expected_feature = item.get("verification_status") == "verified" and item.get("model_feature_status") == "eligible"
+        expected_feature = (
+            item.get("verification_status") == "verified"
+            and item.get("model_feature_status") == "eligible"
+            and state.get("state") in {"owned", "confirmed_missing"}
+            and state.get("evidence_state") in {"profile_claim", "text_claim"}
+            and state.get("conflict") is False
+        )
         if state.get("model_feature") is not expected_feature:
             raise CatalogProvenanceError(f"item_model_eligibility_mismatch:{account_id}:{item_id}")
         expected_review = "approved" if item.get("verification_status") == "verified" else "needs_review" if item.get("verification_status") == "needs_review" else "unknown"

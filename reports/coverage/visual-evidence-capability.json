@@ -11,7 +11,7 @@
       "approved_detections": 0,
       "asset_backed_refs": 0,
       "catalog_identity_locators": 10,
-      "catalog_items": 127,
+      "catalog_items": 133,
       "source_description_only_refs": 10
     },
     "eligible": {
@@ -27,7 +27,7 @@
       "approved_detections": 0,
       "asset_backed_refs": 0,
       "catalog_identity_locators": 10,
-      "catalog_items": 48,
+      "catalog_items": 54,
       "source_description_only_refs": 10
     }
   },
@@ -59,7 +59,7 @@
     "source_description_only_refs": "Count of visual-reference rows in source_description mode; these remain non-visual text locators."
   },
   "offline_only": true,
-  "schema_version": "1.0-p3.4",
+  "schema_version": "1.1-p3.7",
   "scope_definitions": {
     "all": "All canonical item rows in knowledge/items/items.jsonl.",
     "eligible": "Canonical items with model_feature_status=eligible.",

@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.8-p3.6",
+  "schema_version": "4.9-p3.7",
   "as_of_date": "2026-08-17",
   "catalog_claim": "partial_verified_catalog",
   "full_item_catalog_complete": false,
@@ -7,11 +7,11 @@
     "seasons": 30,
     "events": 24,
     "ancestors": 132,
-    "items": 127,
+    "items": 133,
     "sets": 10,
     "aliases": 320,
-    "availability_events": 53,
-    "sources": 38,
+    "availability_events": 59,
+    "sources": 39,
     "visual_references": 10,
     "unresolved": 39,
     "unmapped": 14,
@@ -37,20 +37,20 @@
   "item_coverage": {
     "by_category": {
       "accessory": 20,
-      "cape": 24,
+      "cape": 25,
       "furniture": 2,
-      "hair": 32,
+      "hair": 33,
       "instrument": 13,
-      "mask": 10,
+      "mask": 11,
       "music_sheet": 3,
       "other": 1,
-      "outfit": 10,
-      "prop": 12
+      "outfit": 11,
+      "prop": 14
     },
     "by_source_type": {
       "collaboration": 24,
       "constellation": 32,
-      "event": 37,
+      "event": 43,
       "map_completion": 3,
       "other": 1,
       "platform": 7,
@@ -60,15 +60,15 @@
     },
     "by_verification_status": {
       "needs_review": 79,
-      "verified": 48
+      "verified": 54
     },
     "by_evidence_tier": {
-      "official_with_secondary": 48,
+      "official_with_secondary": 54,
       "unverified_seed": 79
     },
     "by_model_feature_status": {
       "eligible": 19,
-      "excluded_pending_verification": 108
+      "excluded_pending_verification": 114
     },
     "model_eligible_items": 19,
     "by_availability_status": {
@@ -76,7 +76,7 @@
       "recurring_event": 13,
       "temporarily_unavailable": 10,
       "traveling_spirit_rotation": 16,
-      "unknown": 49
+      "unknown": 55
     },
     "with_visual_reference": 10,
     "with_canonical_zh_tw_name_confirmed": 0
@@ -118,10 +118,10 @@
       "community_database": 1,
       "community_wiki": 17,
       "official_news": 4,
-      "official_support": 13,
+      "official_support": 14,
       "thatgamecompany": 3
     },
-    "official_source_records": 20,
+    "official_source_records": 21,
     "community_or_other_source_records": 18
   },
   "market_migration": {
@@ -141,20 +141,20 @@
   },
   "modeling": {
     "account_item_vectors": 1022,
-    "canonical_items_per_vector": 127,
+    "canonical_items_per_vector": 133,
     "model_eligible_items": 19,
     "clean_normal_rows": 0,
     "clean_urgent_rows": 0,
     "clean_verified_sale_rows": 0,
     "excluded_or_review_rows": 103,
-    "item_value_rows": 127,
+    "item_value_rows": 133,
     "eligible_item_value_rows": 0,
     "model_status": "insufficient_training_data"
   },
   "p2_evidence": {
     "vendor_snapshot_items": 3266,
     "vendor_crosswalk_rows": 3266,
-    "canonical_exact_name_matches": 98,
+    "canonical_exact_name_matches": 104,
     "candidate_exact_name_matches": 296,
     "candidate_field_evidence_rows": 296,
     "approved_strict_listing_recoveries": 1,
@@ -179,9 +179,9 @@
   },
   "p2_3_reference_identities": {
     "source_scoped_identity_rows": 1758,
-    "canonical_relation_rows": 98,
+    "canonical_relation_rows": 104,
     "candidate_relation_rows": 296,
-    "unresolved_rows": 1364,
+    "unresolved_rows": 1358,
     "quarantined_rows": 26,
     "model_eligible_rows": 0,
     "market_near_miss_review_rows": 16,
@@ -189,21 +189,21 @@
     "market_audit_attestation_rows": 0
   },
   "p2_4_catalog_resolution": {
-    "query_index_rows": 2507,
-    "canonical_rows": 127,
+    "query_index_rows": 2513,
+    "canonical_rows": 133,
     "candidate_rows": 622,
     "source_reference_rows": 1758,
-    "canonical_resolved_eligible_rows": 48,
-    "catalog_scope_needs_review_rows": 1508
+    "canonical_resolved_eligible_rows": 54,
+    "catalog_scope_needs_review_rows": 3266
   },
   "p2_5_verified_identity_slice": {
-    "verified_canonical_items": 48,
-    "field_evidence_rows": 328,
+    "verified_canonical_items": 54,
+    "field_evidence_rows": 376,
     "visual_source_descriptions": 10,
     "model_eligible_items": 19
   },
   "p2_7_verified_identity_slice": {
-    "verified_canonical_items": 48,
+    "verified_canonical_items": 54,
     "verified_cohorts": {
       "canonical_cohort_aurora_faq968": 33,
       "canonical_cohort_cinnamoroll_popup_cafe_faq1308": 35,
@@ -211,6 +211,7 @@
       "canonical_cohort_days_of_fortune_faq1264_core_five": 40,
       "canonical_cohort_days_of_love_faq1374_core_four": 32,
       "canonical_cohort_days_of_sunlight_faq1343_core_three": 24,
+      "canonical_cohort_days_of_treasure_bloom_faq1381_core_six": 48,
       "canonical_cohort_journey_pack": 16,
       "canonical_cohort_kizuna_ai_2022": 22,
       "canonical_cohort_moomintroll_accessory_set": 15,
@@ -218,7 +219,7 @@
       "canonical_cohort_skyfest_faq1330_core_five": 37,
       "canonical_cohort_tournament_of_triumph_faq1330_core_four": 32
     },
-    "field_evidence_rows": 328,
+    "field_evidence_rows": 376,
     "model_eligible_items": 19
   },
   "p2_9_account_catalog_lexical_review": {
@@ -233,7 +234,7 @@
     "authorized_clean_normal_rows": 0,
     "authorized_clean_urgent_rows": 0,
     "authorized_clean_verified_sale_rows": 0,
-    "historical_cost_reference_rows": 48,
+    "historical_cost_reference_rows": 54,
     "historical_cost_model_features": 0,
     "resale_value_inferences": 0
   },
@@ -270,9 +271,9 @@
     "固定 Fandom revision 只有同一 Wiki lineage 的可重播 template coordinate，不能算第二獨立來源或升級 canonical identity。",
     "市場 claim 人工金標仍為 0；200 筆固定匿名 review queue 尚待兩位獨立人類標註與人工裁決。",
     "P3.1 保留 16 筆匿名 near-miss；只有外部信任根驗證的三方 OpenSSH attestations 才可接受非空人工 ledger，且不會自動取得市場訓練授權。",
-    "P3.1 的 2507 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 48，model eligible 仍為 19。",
+    "P3.1 的 2513 筆離線 Catalog 查詢索引仍嚴格區分 canonical、候選與來源觀測；verified canonical resolution 為 54，model eligible 仍為 19。",
     "P3.1 保留帳號 lexical catalog sidecar 供人工複核：1022 個帳號中有 86 個出現保守詞彙命中；不會輸出 ownership 或 model feature。",
-    "P3.1 的 48 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
+    "P3.1 的 54 筆官方歷史取得成本參考只描述當時的 IAP／遊戲幣／bundle 條件；全部 model_feature=false，且不推論帳號轉售價。",
     "Catalog scope 已逐列附處置理由，但 1,508 筆 WingBuff／Spell／Quest／Special 類型仍需人工範圍審查，不能把 type-only 排除當作全物品完成。",
     "套組完整度只有 required 成員皆經 canonical model eligibility 且狀態已知時才成為模型特徵；unknown 不再輸出 0 或 false。"
   ]

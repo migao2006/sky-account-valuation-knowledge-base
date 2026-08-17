@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "status", "artifact_publication_fields_consulted", "trained_models_treated_as_passed", "requirements", "formal_clean_price_rows", "valid_vector_accounts", "model_eligible_item_count", "verified_completed_sale_count", "market_pools", "blocking_reasons"],
   "properties": {
-    "schema_version": {"const": "1.1-p3.2"},
+    "schema_version": {"const": "1.2-p3.7"},
     "status": {"enum": ["not_ready", "ready_for_evaluation", "passed", "failed"]},
     "artifact_publication_fields_consulted": {"const": false},
     "trained_models_treated_as_passed": {"const": false},

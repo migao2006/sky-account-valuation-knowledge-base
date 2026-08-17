@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2-p3.4",
+  "schema_version": "1.3-p3.7",
   "status": "not_ready",
   "lineage_mode": "production_signed",
   "feature_payload_contract": {
@@ -25,17 +25,17 @@
     },
     {
       "path": "data/modeling/account-item-vectors.jsonl",
-      "sha256": "2CE726339AC1793EA1D9D0ADB0154BC562FBE2835EA08981A4BF01A0231EAA45"
+      "sha256": "67BB4EB6357D1BF3CCC6EA24B9D23AE4940D2194E13AC9F307BB16BC4E1DE8F6"
     }
   ],
   "catalog_provenance": {
-    "canonical_item_ids_sha256": "99DF97B544665847412121C28B679EF8F065D747701BBA440DF77C558B642E74",
+    "canonical_item_ids_sha256": "02B28FDE62D02725726848D3FCF0F2C9D8E6F7E6955FF36E1DC41673FC459E9D",
     "pinned_catalog_paths": [
       "knowledge/items/items.jsonl",
       "knowledge/aliases/item-aliases.jsonl",
       "knowledge/sets/item-sets.jsonl"
     ],
-    "pinned_catalog_sha256": "D2B06DDFF23092375299C894ABCC6225C92B42B32E35B7357763114D75ACBF8F"
+    "pinned_catalog_sha256": "645BBFCD822AB472EF1DA98A3CAFB24E0203807035424DC422F35C4166F18441"
   },
   "market_pools": [],
   "rejected_clean_row_count": 0,

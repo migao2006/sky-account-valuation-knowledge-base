@@ -261,6 +261,18 @@ class ModelEstimatorTest(unittest.TestCase):
         self.assertEqual(result["status"], "ineligible_input")
         self.assertIn(f"catalog_item_not_model_eligible:{item['item_id']}", result["insufficiency_reasons"])
 
+    def test_caller_cannot_make_unknown_eligible_item_an_owned_feature(self):
+        item = next(json.loads(line) for line in (ROOT / "knowledge/items/items.jsonl").read_text(encoding="utf-8").splitlines()
+                    if line.strip() and json.loads(line)["verification_status"] == "verified" and json.loads(line)["model_feature_status"] == "eligible")
+        account = self._account()
+        account["item_states"] = [{
+            "item_id": item["item_id"], "state": "unknown", "evidence_state": "profile_claim",
+            "model_feature": True, "conflict": False, "review_status": "approved",
+        }]
+        result = estimate_model(account, root=ROOT)
+        self.assertEqual(result["status"], "ineligible_input")
+        self.assertIn(f"item_evidence_not_approved:{item['item_id']}", result["insufficiency_reasons"])
+
 
 if __name__ == "__main__":
     unittest.main()

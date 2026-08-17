@@ -324,7 +324,7 @@ def _feature_contract(artifact: dict[str, Any]) -> tuple[list[str], dict[str, tu
     return features, bounds, {str(k): float(v) for k, v in baselines.items() if isinstance(v, (int, float))}
 
 
-def _predict(artifact: dict[str, Any], account: dict[str, Any]) -> tuple[float | None, list[dict[str, Any]], list[str]]:
+def _predict(artifact: dict[str, Any], account: dict[str, Any], *, root: Path | None = None) -> tuple[float | None, list[dict[str, Any]], list[str]]:
     """Run the portable, explicitly declared additive prediction contract.
 
     Training code may use sklearn/XGBoost, but P1 runtime only accepts an
@@ -339,7 +339,7 @@ def _predict(artifact: dict[str, Any], account: dict[str, Any]) -> tuple[float |
     if artifact.get("model_type") == "elastic_net":
         runtime_contract = dict(contract)
         runtime_contract["runtime_domain"] = artifact.get("feature_schema", {}).get("runtime_domain", {})
-        return _predict_elastic_net(runtime_contract, account, _feature_contract(artifact)[1])
+        return _predict_elastic_net(runtime_contract, account, _feature_contract(artifact)[1], root=root)
     intercept = contract.get("intercept")
     coefficients = contract.get("coefficients")
     if not isinstance(intercept, (int, float)) or not isinstance(coefficients, dict):
@@ -368,7 +368,7 @@ def _predict(artifact: dict[str, Any], account: dict[str, Any]) -> tuple[float |
     return prediction, contributions[:10], []
 
 
-def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], bounds: dict[str, tuple[float | None, float | None]]) -> tuple[float | None, list[dict[str, Any]], list[str]]:
+def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], bounds: dict[str, tuple[float | None, float | None]], *, root: Path | None = None) -> tuple[float | None, list[dict[str, Any]], list[str]]:
     """Exactly reproduce the trainer's JSON-exported sklearn preprocessing."""
     intercept, coefficients = contract.get("intercept"), contract.get("coefficients")
     continuous = contract.get("continuous")
@@ -391,9 +391,13 @@ def _predict_elastic_net(contract: dict[str, Any], account: dict[str, Any], boun
         from modeling.train_elastic_net import feature_mapping
         # Runtime consumes the same flattened representation as training,
         # including structured list entries and nested feature groups.
-        if account.get("feature_contract_version") == "authorized-market-feature-payload-v1":
-            from tools.modeling.market_feature_contract import feature_mapping_for_payload
-            flattened = feature_mapping_for_payload(account, Path(__file__).resolve().parents[2])
+        signed_payload = account if account.get("feature_contract_version") == "authorized-market-feature-payload-v1" else account.get("feature_payload")
+        if isinstance(signed_payload, dict) and signed_payload.get("feature_contract_version") == "authorized-market-feature-payload-v1":
+            from tools.modeling.market_feature_contract import feature_mapping_for_payload, runtime_domain_errors
+            flattened = feature_mapping_for_payload(signed_payload, root or Path(__file__).resolve().parents[2])
+            reasons = runtime_domain_errors(flattened, contract.get("runtime_domain", {}))
+            if reasons:
+                return None, [], reasons
         else:
             source = account.get("features") if isinstance(account.get("features"), dict) else account.get("feature_groups", account)
             flattened = feature_mapping({"features": source})
@@ -561,7 +565,7 @@ def _catalog_gated_account(account: dict[str, Any], root: Path) -> tuple[dict[st
             reasons.append(f"unknown_canonical_item:{item_id}")
             continue
         catalog_eligible = item.get("verification_status") == "verified" and item.get("model_feature_status") == "eligible"
-        evidence_eligible = state.get("review_status") == "approved" and state.get("evidence_state") in {"profile_claim", "text_claim"} and state.get("conflict") is False
+        evidence_eligible = state.get("state") in {"owned", "confirmed_missing"} and state.get("review_status") == "approved" and state.get("evidence_state") in {"profile_claim", "text_claim"} and state.get("conflict") is False
         if state.get("model_feature") is True and not catalog_eligible:
             reasons.append(f"catalog_item_not_model_eligible:{item_id}")
         if state.get("model_feature") is True and not evidence_eligible:
@@ -592,7 +596,7 @@ def estimate_model(account: dict[str, Any], *, root: Path, comparables: Iterable
     ood_reasons: list[str] = []
     selection: list[dict[str, Any]] = []
     for entry in artifacts:
-        prediction, drivers, reasons = _predict(entry["artifact"], model_account)
+        prediction, drivers, reasons = _predict(entry["artifact"], model_account, root=root)
         model_type = entry["artifact"]["model_type"]
         if prediction is None:
             selection.append({"model_type": model_type, "used": False, "reasons": reasons})

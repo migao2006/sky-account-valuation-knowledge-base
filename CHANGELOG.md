@@ -1,5 +1,15 @@
 # 變更紀錄
 
+## 4.9.0-p3.7 — 2026-08-17
+
+- 新增 Days of Treasure／Days of Bloom FAQ 1381 core-six 的六件 canonical identity、歷史取得成本與活動期間證據。
+- 將 keyed parser review 接到可撤銷的外部 custodian trust root 與 replay binding；公開 manifest 不保存可反推原文或個別 split 的資料。
+- 新增完整 signed v2 市場資料與 v3 verified-sale receipt 的非空端到端測試，涵蓋 identity mapping、cleaner、publication freeze 與 time-forward split。
+- 修正完整八組 feature payload 在 trainer、evaluator 與 estimator 的 canonicalization、categorical OOD、可信 item evidence 與 runtime admission 一致性。
+- Catalog completion 現可表達兩個獨立 secondary identity lineage，以及有權利限制理由的視覺不可用狀態；兩者均不冒充官方或實體圖片證據。
+- 新增無 promotion 權限的 declarative cohort shadow verifier，先以 Days of Love legacy ledger做 byte-for-byte parity。
+- Completion capacity gate 改為逐一驗證實際發布 binding 對應的市場池，不再由任一無關 pool 代替。
+
 ## 4.8.0-p3.6 — 2026-08-17
 
 - 新增 Days of Love FAQ 1374 core-four 的固定官方事實、vendor identity、歷史取得窗口與逐欄 replay evidence。

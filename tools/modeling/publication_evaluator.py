@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 MINIMUM_SUBGROUP_HOLDOUT_CASES = 30
-EVALUATION_SCHEMA_VERSION = "1.2-p3.4"
+EVALUATION_SCHEMA_VERSION = "1.3-p3.7"
 
 
 class PublicationEvaluationError(ValueError):
@@ -287,6 +287,12 @@ def _gate_reasons(metric: dict[str, Any]) -> list[str]:
     reasons = []
     if metric.get("runtime_supported_case_share", 1.0) < 0.80:
         reasons.append("runtime_supported_holdout_share_below_80_percent")
+    # Cluster weighting prevents duplicated easy listings from masking a bad
+    # independent cluster.  It does not replace row coverage: each signed
+    # listing that reaches production must itself be admitted at a useful
+    # rate, even when one row in its cluster happens to be in-domain.
+    if metric.get("runtime_supported_row_case_share", 1.0) < 0.80:
+        reasons.append("runtime_supported_holdout_row_share_below_80_percent")
     if metric["holdout_mdape"] > 0.20:
         reasons.append("holdout_mdape_above_20_percent")
     if metric["holdout_p90_ape"] > 0.40:

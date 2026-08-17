@@ -210,6 +210,12 @@ def feature_mapping(row: dict, eligible_item_ids: set[str] | None = None) -> dic
                 raise ModelingInputError(f"item_not_in_model_eligible_catalog:{item_id}")
             if state.get("review_status") != "approved":
                 raise ModelingInputError(f"item_model_feature_not_approved:{item_id}")
+            if state.get("state") not in {"owned", "confirmed_missing"} or state.get("evidence_state") not in {"profile_claim", "text_claim"} or state.get("conflict") is not False:
+                # Older audit vectors may retain a catalog-level eligibility
+                # marker for traceability.  It is never an admitted value:
+                # unknown/conflicting states are omitted rather than coerced
+                # into an owned item feature.
+                continue
             result[f"items.{item_id}"] = state.get("state", "unknown")
     return result
 

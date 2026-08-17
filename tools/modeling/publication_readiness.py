@@ -9,6 +9,7 @@ artifact or trusts a ``publication_gate`` supplied by one.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 from datetime import date
@@ -94,6 +95,7 @@ def audit(
     catalog_rows: list[dict[str, Any]],
     comparable_rows: list[dict[str, Any]],
     expected_provenance: dict[str, Any] | None = None,
+    registered_training_examples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return a deterministic readiness report from explicit formal inputs."""
     vectors = {row.get("account_id"): row for row in vector_rows if isinstance(row.get("account_id"), str)}
@@ -102,6 +104,16 @@ def audit(
         if expected_provenance is None or row.get("catalog_provenance") == expected_provenance
     }
     invalid_vector_accounts = sorted(set(vectors) - eligible_vectors)
+    expected_provenance_sha256 = (
+        hashlib.sha256((json.dumps(expected_provenance, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")).hexdigest().upper()
+        if expected_provenance is not None else None
+    )
+    registered_examples = {
+        str(row.get("training_example_id")): row
+        for row in (registered_training_examples or [])
+        if isinstance(row, dict) and isinstance(row.get("training_example_id"), str)
+    }
+    registered_accounts: set[str] = set()
     pools: dict[str, list[dict[str, Any]]] = defaultdict(list)
     invalid_market_rows = 0
     missing_vector_rows = 0
@@ -109,7 +121,18 @@ def audit(
         if row.get("currency") != "TWD" or row.get("server") != "international" or row.get("price_line") not in {"normal_listing", "urgent_sale", "verified_sale"}:
             invalid_market_rows += 1
             continue
-        if row.get("account_id") not in eligible_vectors:
+        example = registered_examples.get(str(row.get("training_example_id")))
+        signed_input_valid = bool(
+            example
+            and example.get("account_id") == row.get("account_id")
+            and example.get("feature_payload_sha256") == row.get("feature_payload_sha256")
+            and example.get("catalog_provenance_sha256") == row.get("catalog_provenance_sha256")
+            and (expected_provenance is None or example.get("catalog_provenance") == expected_provenance)
+            and (expected_provenance_sha256 is None or str(row.get("catalog_provenance_sha256", "")).upper() == expected_provenance_sha256)
+        )
+        if signed_input_valid:
+            registered_accounts.add(str(row.get("account_id")))
+        elif row.get("account_id") not in eligible_vectors:
             missing_vector_rows += 1
         # Pool capacity is a market-data fact.  Keep it visible even when a
         # later catalog revision has made vectors stale; that separate defect
@@ -186,11 +209,11 @@ def audit(
         global_reasons.extend(f"{pool['market_pool']}:{reason}" for reason in pool["blocking_reasons"])
     status = "ready_for_evaluation" if not global_reasons else "not_ready"
     return {
-        "schema_version": "1.1-p3.2", "status": status,
+        "schema_version": "1.2-p3.7", "status": status,
         "artifact_publication_fields_consulted": False,
         "trained_models_treated_as_passed": False,
         "requirements": {"independent_training_clusters": TRAINING_CLUSTERS_REQUIRED, "time_forward_holdout_clusters": HOLDOUT_CLUSTERS_REQUIRED},
-        "formal_clean_price_rows": len(clean_rows), "valid_vector_accounts": len(eligible_vectors),
+        "formal_clean_price_rows": len(clean_rows), "valid_vector_accounts": len(eligible_vectors | registered_accounts),
         "model_eligible_item_count": model_eligible, "verified_completed_sale_count": verified_sales,
         "market_pools": pool_reports, "blocking_reasons": sorted(set(global_reasons)),
     }
@@ -204,11 +227,16 @@ def build(root: Path) -> dict[str, Any]:
         root / "data/modeling/price-cleaned-verified-sales.jsonl",
     ]
     clean_rows = [row for path in clean_paths for row in read_jsonl(path)]
+    try:
+        from .publication_dataset import _registered_training_examples
+    except ImportError:
+        from publication_dataset import _registered_training_examples
     return audit(
         clean_rows, read_jsonl(root / "data/modeling/account-item-vectors.jsonl"),
         read_jsonl(root / "knowledge/items/items.jsonl"),
         read_jsonl(root / "data/modeling/price-cleaned-verified-sales.jsonl"),
         catalog_provenance(root),
+        _registered_training_examples(root),
     )
 
 

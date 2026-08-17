@@ -19,10 +19,10 @@
 3. canonical identity unresolved 必須為 0；市場實際觀察到的 unmapped alias 必須為 0。歧義別名可保留 conflict，但必須 fail closed。
 4. identity/name、category/source、free/premium/pass/ultimate、set membership、first release 與 availability-as-of 都必須有欄位級證據。
 5. 每個 assertion 至少保存 entity、field path、value、source、locator、retrieved date、evidence level、review state 與 conflict state。
-6. 可接受的最高證據為官方逐項來源；官方未提供逐項資料時，必須有兩個獨立且持續維護的 secondary，並明示較低證據等級。
+6. 可接受的最高證據為官方逐項來源；官方未提供逐項資料時，必須有兩個獨立且持續維護的 secondary，並明示較低證據等級。兩者的 source registry lineage 必須與 evidence ledger 完全一致，且來源 hostname 互異，不能由 evidence row 自行宣告獨立性。
 7. `officially_discontinued` 只能由官方明示來源支持。
 8. Coverage 必須以封閉母體為分母，逐季、逐活動、逐類滿足 `expected = canonical + explicitly excluded`。
-9. 可視物品必須有 visual-reference 狀態；無權保存圖片時，保存來源描述與 unavailable 原因，不得冒充已有圖像資產。
+9. 可視物品必須有 visual-reference 狀態；無權保存圖片時，保存來源描述、unavailable 原因，以及可重播的 rights snapshot SHA-256／claim locator，不得冒充已有圖像資產。
 
 ## 文案解析與 Item Vector 門檻
 

@@ -175,6 +175,12 @@ def verify_fresh_lf_checkout(
     parser_gold_authority_bundle_sha256: str | None = None,
     parser_gold_replay_inputs: Path | None = None,
     parser_gold_replay_inputs_sha256: str | None = None,
+    parser_keyed_custodian_authority_bundle: Path | None = None,
+    parser_keyed_custodian_authority_bundle_sha256: str | None = None,
+    parser_keyed_custodian_contract: Path | None = None,
+    parser_keyed_custodian_contract_sha256: str | None = None,
+    parser_keyed_replay_binding: Path | None = None,
+    parser_keyed_replay_binding_sha256: str | None = None,
 ) -> dict[str, object]:
     """Validate a clean Git checkout, where .gitattributes supplies actual LF bytes."""
     status = subprocess.run(
@@ -219,6 +225,12 @@ def verify_fresh_lf_checkout(
         if parser_gold_authority_bundle_sha256 is not None: command.extend(["--parser-gold-authority-bundle-sha256", parser_gold_authority_bundle_sha256])
         if parser_gold_replay_inputs is not None: command.extend(["--parser-gold-replay-inputs", str(parser_gold_replay_inputs)])
         if parser_gold_replay_inputs_sha256 is not None: command.extend(["--parser-gold-replay-inputs-sha256", parser_gold_replay_inputs_sha256])
+        if parser_keyed_custodian_authority_bundle is not None: command.extend(["--parser-keyed-custodian-authority-bundle", str(parser_keyed_custodian_authority_bundle)])
+        if parser_keyed_custodian_authority_bundle_sha256 is not None: command.extend(["--parser-keyed-custodian-authority-bundle-sha256", parser_keyed_custodian_authority_bundle_sha256])
+        if parser_keyed_custodian_contract is not None: command.extend(["--parser-keyed-custodian-contract", str(parser_keyed_custodian_contract)])
+        if parser_keyed_custodian_contract_sha256 is not None: command.extend(["--parser-keyed-custodian-contract-sha256", parser_keyed_custodian_contract_sha256])
+        if parser_keyed_replay_binding is not None: command.extend(["--parser-keyed-replay-binding", str(parser_keyed_replay_binding)])
+        if parser_keyed_replay_binding_sha256 is not None: command.extend(["--parser-keyed-replay-binding-sha256", parser_keyed_replay_binding_sha256])
         child = subprocess.run(command, text=True, capture_output=True, check=False)
         output = child.stdout.strip().splitlines()
         return {
@@ -255,6 +267,12 @@ def main() -> None:
     parser.add_argument("--parser-gold-authority-bundle-sha256")
     parser.add_argument("--parser-gold-replay-inputs", type=Path)
     parser.add_argument("--parser-gold-replay-inputs-sha256")
+    parser.add_argument("--parser-keyed-custodian-authority-bundle", type=Path)
+    parser.add_argument("--parser-keyed-custodian-authority-bundle-sha256")
+    parser.add_argument("--parser-keyed-custodian-contract", type=Path)
+    parser.add_argument("--parser-keyed-custodian-contract-sha256")
+    parser.add_argument("--parser-keyed-replay-binding", type=Path)
+    parser.add_argument("--parser-keyed-replay-binding-sha256")
     args = parser.parse_args()
     root = args.root.resolve()
     integrity = validate(
@@ -268,6 +286,9 @@ def main() -> None:
         args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
         args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
         args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
+        args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
+        args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
+        args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
     )
     # Run tests in a fresh interpreter. Importing the validator above adjusts
     # sys.path for its own local modules; sharing that interpreter with test
@@ -352,7 +373,7 @@ def main() -> None:
         root, market_claim_review, market_claim_gold, market_near_miss_review, market_near_miss_evidence,
         args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
     )
-    parser_gold_errors = audit_parser_gold(root, [json.loads(line) for line in (root / "data/review/parser-gold/claims.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()], args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
+    parser_gold_errors = audit_parser_gold(root, [json.loads(line) for line in (root / "data/review/parser-gold/claims.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()], args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256, args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256, args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256, args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256)
     reference_identities = [json.loads(line) for line in (root / "data/normalized/source-scoped-item-identities.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_index = [json.loads(line) for line in (root / "data/normalized/catalog-query-index.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     catalog_query_summary = json.loads((root / "data/normalized/catalog-query-index-summary.json").read_text(encoding="utf-8"))
@@ -482,7 +503,7 @@ def main() -> None:
         ),
         "p3_3_parser_gold_replayed_non_model": (
             not parser_gold_errors
-            and parser_gold_evaluation == build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
+            and parser_gold_evaluation == build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256, args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256, args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256, args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256)
             and parser_gold_evaluation.get("model_feature") is False
         ),
         "p3_4_market_gold_replayed_fail_closed": (
@@ -513,10 +534,13 @@ def main() -> None:
             args.market_receipt_authority_bundle, args.market_receipt_authority_bundle_sha256,
             args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256,
             args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256,
+            args.parser_keyed_custodian_authority_bundle, args.parser_keyed_custodian_authority_bundle_sha256,
+            args.parser_keyed_custodian_contract, args.parser_keyed_custodian_contract_sha256,
+            args.parser_keyed_replay_binding, args.parser_keyed_replay_binding_sha256,
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.8-p3.6", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.9-p3.7", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

@@ -1,3 +1,4 @@
+import base64
 import json
 import shutil
 import subprocess
@@ -8,8 +9,14 @@ from pathlib import Path
 
 from tools.market_authorization import (AuthorizedMarketEvaluator, NAMESPACE, attestation_payload, canonical_bytes,
     _valid_iso_date, make_authorization_evaluator, model_training_authorization_reasons, sha256_bytes, training_example_commitment, verify_authorized_market_intake)
+from tools.market_identity.verifier import identity_attestation_payload
 from tools.modeling.catalog_provenance import catalog_provenance
 from tools.modeling.clean_prices import clean as clean_prices, clean_authorized, clean_authorized_with_verified_sales
+from tools.market_receipts.verifier import (
+    ARCHIVE_SCHEMA as RECEIPT_ARCHIVE_SCHEMA, AUTHORITY_SCHEMA as RECEIPT_AUTHORITY_SCHEMA,
+    NAMESPACE as RECEIPT_NAMESPACE, signature_payload as receipt_signature_payload,
+)
+from tools.modeling.publication_dataset import build as build_publication_dataset, freeze, split as split_publication_dataset
 from tools.validate.validate import authorized_market_schema_files
 from tools.validate.schema_validator import OfflineSchemaValidator
 
@@ -218,6 +225,66 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
             row["feature_lineage"].update({key: example[key] for key in ("observation_row_digest", "completion_evidence_digest")})
         return row
 
+    def _write_external_identity_mapping(self, observations, examples, manifest):
+        """Create a test-only external resolver bundle for exact v2 bindings.
+
+        The fixture has no real account identities: commitments are opaque
+        hashes.  It nevertheless exercises the same detached-signature and
+        byte-binding path that a licensed resolver must use in production.
+        """
+        rows = []
+        for number, (observation, example) in enumerate(zip(observations, examples), 1):
+            rows.append({
+                "mapping_id": f"identity_mapping_fixture_{number:04d}",
+                "dataset_id": self.dataset["dataset_id"],
+                "authorization_record_id": self.dataset["authorization_record_id"],
+                "manifest_sha256": self.dataset["manifest_sha256"],
+                "observations_sha256": manifest["observations_sha256"],
+                "training_example_id": example["training_example_id"],
+                "training_example_digest": example["training_example_digest"],
+                "observation_id": observation["observation_id"],
+                "observation_row_digest": sha256_bytes(canonical_bytes(observation)),
+                "source_snapshot_sha256": observation["source_snapshot_sha256"],
+                "account_id": example["account_id"],
+                "dedup_cluster_id": example["dedup_cluster_id"],
+                "dedup_cluster_digest": example["dedup_cluster_digest"],
+                "identity_commitment": sha256_bytes(f"synthetic-identity-{number}".encode("utf-8")),
+                "identity_commitment_scheme": "resolver-hmac-sha256-v1",
+                "review_scope": "restricted-licensed-source-identity-resolution",
+                "reviewed_at": "2026-08-02",
+            })
+        mapping = self.external / "identity-mapping.jsonl"
+        mapping.write_bytes(b"".join(canonical_bytes(row) for row in rows))
+        mapping_sha = sha256_bytes(mapping.read_bytes())
+        authorities, keys = [], []
+        for number, role in enumerate(("identity_resolver", "identity_dedup_reviewer")):
+            key = self.external / f"identity-key-{number}"
+            subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
+            public = key.with_suffix(".pub").read_text(encoding="utf-8").strip()
+            fingerprint = subprocess.run(["ssh-keygen", "-lf", str(key.with_suffix(".pub"))], text=True, capture_output=True, check=True).stdout.split()[1]
+            authorities.append({"authority_id": f"fixture_{role}", "public_key": public, "fingerprint": fingerprint, "roles": [role]})
+            keys.append(key)
+        bundle = self.external / "identity-authorities.json"
+        self._write(bundle, {"schema_version": "market-identity-authority-bundle-v1", "authorities": authorities, "revoked_fingerprints": []})
+        bundle_sha = self._sha(bundle)
+        statement = {
+            "schema_version": "market-identity-statement-v1", "mapping_sha256": mapping_sha,
+            "dataset_roots": [{"dataset_id": self.dataset["dataset_id"], "manifest_sha256": self.dataset["manifest_sha256"], "observations_sha256": manifest["observations_sha256"]}],
+            "expires_at": (date.today() + timedelta(days=30)).isoformat(), "attestations": [],
+        }
+        for number, role in enumerate(("identity_resolver", "identity_dedup_reviewer")):
+            authority = authorities[number]
+            attestation = {"role": role, "authority_id": authority["authority_id"], "fingerprint": authority["fingerprint"], "signature_file": f"identity-{role}.sig"}
+            attestation["payload_sha256"] = sha256_bytes(identity_attestation_payload(bundle_sha, mapping_sha, statement, attestation))
+            payload = self.external / f"identity-{role}.payload"
+            payload.write_bytes(identity_attestation_payload(bundle_sha, mapping_sha, statement, attestation))
+            subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", str(keys[number]), "-n", "sky-market-identity-v1", str(payload)], check=True)
+            shutil.copyfile(str(payload) + ".sig", self.external / attestation["signature_file"])
+            statement["attestations"].append(attestation)
+        statement_path = self.external / "identity-statement.json"
+        self._write(statement_path, statement)
+        return bundle, bundle_sha, mapping, mapping_sha, statement_path, self._sha(statement_path)
+
     def test_v2_binds_exact_feature_price_cluster_and_catalog(self):
         observations, examples, manifest=self._write_lineage_fixture()
         self.assertEqual([], self.errors())
@@ -236,6 +303,47 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         self.assertFalse(evaluator(swapped))
         reused=dict(row, account_id=examples[1]["account_id"])
         self.assertFalse(evaluator(reused))
+
+    def test_v2_external_identity_e2e_projects_cleans_and_freezes(self):
+        """A non-empty authorized v2 dataset reaches the production freezer.
+
+        This is deliberately a two-row cryptographic fixture, not market
+        evidence.  It proves that external identity resolution unlocks the
+        normal-listing pipeline without adding synthetic rows to the registry.
+        """
+        observations, examples, manifest = self._write_lineage_fixture()
+        identity_args = self._write_external_identity_mapping(observations, examples, manifest)
+        evaluator = make_authorization_evaluator(self.root, *self.args(), *identity_args)
+        self.assertEqual((), evaluator.errors)
+        self.assertTrue(evaluator.factory_verified)
+        self.assertTrue(evaluator.feature_lineage_bound)
+        self.assertTrue(evaluator.cluster_independence_bound)
+        normal, urgent, exclusions = clean_authorized([], self.root, *self.args(), *identity_args)
+        self.assertEqual([], exclusions)
+        # The fixture's reduced listing is intentionally classified as an
+        # urgent price line by the cleaner; the asking listing remains a
+        # non-empty normal pool and is the publication input under test.
+        self.assertEqual(1, len(normal))
+        self.assertEqual(1, len(urgent))
+        registered = [{**example, "_registered_observation": observation} for observation, example in zip(observations, examples)]
+        frozen = freeze(normal, [], catalog_provenance(self.root), [], registered)
+        self.assertEqual(1, frozen["dataset_row_count"])
+        self.assertEqual("production_signed", frozen["lineage_mode"])
+        # ``build`` is the production split entrypoint: it must rebuild from
+        # the registered intake rather than trust a caller-provided manifest.
+        modeling = self.root / "data/modeling"
+        modeling.mkdir(parents=True, exist_ok=True)
+        (modeling / "price-cleaned-normal.jsonl").write_bytes(b"".join(canonical_bytes(row) for row in normal))
+        (modeling / "price-cleaned-urgent.jsonl").write_bytes(b"")
+        (modeling / "price-cleaned-verified-sales.jsonl").write_bytes(b"")
+        (modeling / "account-item-vectors.jsonl").write_bytes(b"")
+        rebuilt, derived = build_publication_dataset(self.root)
+        self.assertEqual(frozen["dataset_sha256"], rebuilt["dataset_sha256"])
+        self.assertEqual("not_ready", derived["status"])
+        jsonl_files, json_files = authorized_market_schema_files(self.root)
+        self.assertIn(manifest["observations_path"], jsonl_files)
+        self.assertIn(manifest["training_examples_path"], jsonl_files)
+        self.assertIn(self.dataset["manifest_path"], json_files)
 
     def test_v3_verified_sale_requires_two_signed_completion_evidences_and_stays_separate(self):
         observations, examples, manifest = self._write_lineage_fixture(verified_sales=True)
@@ -309,3 +417,114 @@ class AuthorizedMarketFeatureLineageTest(AuthorizedMarketIntakeTest):
         self._write_lineage_fixture()
         (self.root/"knowledge/items/items.jsonl").write_text('{"item_id":"item_drift"}\n',encoding="utf-8")
         self.assertTrue(any("stale catalog provenance" in error for error in self.errors()))
+
+
+class VerifiedSaleExternalTrustE2ETest(AuthorizedMarketFeatureLineageTest):
+    """A non-empty v3 sale can traverse every external trust boundary.
+
+    The fixture is deliberately temporary and outside the release root.  It
+    proves plumbing only; it never adds a formal completed-sale record.
+    """
+
+    def _external_key(self, name):
+        private = self.external / name
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(private)], check=True)
+        public = private.with_suffix(".pub").read_text(encoding="utf-8").strip()
+        fingerprint = subprocess.run(["ssh-keygen", "-lf", str(private.with_suffix(".pub"))], text=True, capture_output=True, check=True).stdout.split()[1]
+        return private, public, fingerprint
+
+    def _write_identity_material(self, observations, examples, manifest):
+        keys, authorities = {}, []
+        for role in ("identity_resolver", "identity_dedup_reviewer"):
+            private, public, fingerprint = self._external_key("identity-" + role)
+            keys[role] = private
+            authorities.append({"authority_id": "authority_" + role, "public_key": public, "fingerprint": fingerprint, "roles": [role]})
+        bundle = self.external / "identity-authorities.json"
+        self._write(bundle, {"schema_version": "market-identity-authority-bundle-v1", "authorities": authorities, "revoked_fingerprints": []})
+        rows = []
+        for number, (observation, example) in enumerate(zip(observations, examples), 1):
+            rows.append({
+                "mapping_id": f"identity_mapping_fixture_{number:04d}", "dataset_id": self.dataset["dataset_id"],
+                "authorization_record_id": self.dataset["authorization_record_id"], "manifest_sha256": self.dataset["manifest_sha256"],
+                "observations_sha256": manifest["observations_sha256"], "training_example_id": example["training_example_id"],
+                "training_example_digest": example["training_example_digest"], "observation_id": observation["observation_id"],
+                "observation_row_digest": sha256_bytes(canonical_bytes(observation)), "source_snapshot_sha256": observation["source_snapshot_sha256"],
+                "account_id": example["account_id"], "dedup_cluster_id": example["dedup_cluster_id"],
+                "dedup_cluster_digest": example["dedup_cluster_digest"], "identity_commitment": (f"{number:X}" * 64),
+                "identity_commitment_scheme": "resolver-hmac-sha256-v1", "review_scope": "restricted-licensed-source-identity-resolution",
+                "reviewed_at": "2026-08-03",
+            })
+        mapping = self.external / "identity-mapping.jsonl"
+        mapping.write_bytes(b"".join(canonical_bytes(row) for row in rows))
+        claim = {
+            "schema_version": "market-identity-statement-v1", "mapping_sha256": self._sha(mapping),
+            "expires_at": (date.today() + timedelta(days=30)).isoformat(),
+            "dataset_roots": [{"dataset_id": self.dataset["dataset_id"], "manifest_sha256": self.dataset["manifest_sha256"], "observations_sha256": manifest["observations_sha256"]}],
+            "attestations": [],
+        }
+        for role in ("identity_resolver", "identity_dedup_reviewer"):
+            authority = next(item for item in authorities if role in item["roles"])
+            attestation = {"role": role, "authority_id": authority["authority_id"], "fingerprint": authority["fingerprint"], "signature_file": role + ".sig"}
+            attestation["payload_sha256"] = sha256_bytes(identity_attestation_payload(self._sha(bundle), self._sha(mapping), claim, attestation))
+            payload = self.external / (role + ".payload")
+            payload.write_bytes(identity_attestation_payload(self._sha(bundle), self._sha(mapping), claim, attestation))
+            subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", str(keys[role]), "-n", "sky-market-identity-v1", str(payload)], check=True)
+            shutil.copyfile(str(payload) + ".sig", self.external / attestation["signature_file"])
+            claim["attestations"].append(attestation)
+        statement = self.external / "identity-statement.json"
+        self._write(statement, claim)
+        return bundle, mapping, statement, rows
+
+    def _write_receipt_material(self, observations, examples, identity_rows):
+        keys, authorities = {}, []
+        for name, group in (("settlement", "payments"), ("completion", "counterparty")):
+            private, public, fingerprint = self._external_key("receipt-" + name)
+            keys[name] = private
+            authorities.append({"issuer_id": "issuer_" + name, "public_key": public, "fingerprint": fingerprint, "independence_group": group})
+        bundle = self.external / "receipt-authorities.json"
+        self._write(bundle, {"schema_version": RECEIPT_AUTHORITY_SCHEMA, "authorities": authorities, "revoked_fingerprints": []})
+        disclosures = []
+        for number, (observation, example, identity) in enumerate(zip(observations, examples, identity_rows), 1):
+            disclosure = {
+                "sale_event_id": f"sale_event_fixture_{number:04d}", "observation_id": observation["observation_id"],
+                "training_example_id": example["training_example_id"], "training_example_digest": example["training_example_digest"],
+                "observation_row_digest": example["observation_row_digest"], "seller_identity_commitment_sha256": identity["identity_commitment"],
+                "sale_price_twd": observation["price_twd"], "sale_completed_at": observation["completed_sale_date"] + "T12:00:00Z",
+                "currency": "TWD", "server": "international", "evidence_assertions": [],
+            }
+            for name, evidence_class in (("settlement", "settlement_receipt"), ("completion", "independent_completion_attestation")):
+                assertion = {"assertion_id": f"assertion_{name}_{number:04d}", "issuer_id": "issuer_" + name, "evidence_class": evidence_class, "issued_at": "2026-08-04T00:00:00Z"}
+                payload = receipt_signature_payload("archive_fixture_sales", disclosure, assertion)
+                assertion["payload_sha256"] = sha256_bytes(payload)
+                payload_path = self.external / f"receipt-{name}-{number}.payload"; payload_path.write_bytes(payload)
+                subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", str(keys[name]), "-n", RECEIPT_NAMESPACE, str(payload_path)], check=True)
+                assertion["signature"] = base64.b64encode(Path(str(payload_path) + ".sig").read_bytes()).decode("ascii")
+                disclosure["evidence_assertions"].append(assertion)
+            disclosure["disclosure_digest"] = sha256_bytes(canonical_bytes(disclosure))
+            disclosures.append(disclosure)
+        archive = self.external / "receipt-archive.json"
+        self._write(archive, {"schema_version": RECEIPT_ARCHIVE_SCHEMA, "archive_id": "archive_fixture_sales", "issued_at": "2026-08-01T00:00:00Z", "expires_at": "2030-01-01T00:00:00Z", "disclosures": disclosures})
+        return archive, bundle
+
+    def test_verified_sale_external_identity_receipts_clean_and_publication_replay(self):
+        observations, examples, manifest = self._write_lineage_fixture(verified_sales=True)
+        identity_bundle, mapping, identity_statement, identity_rows = self._write_identity_material(observations, examples, manifest)
+        receipt_archive, receipt_bundle = self._write_receipt_material(observations, examples, identity_rows)
+        trust_args = (*self.args(), identity_bundle, self._sha(identity_bundle), mapping, self._sha(mapping), identity_statement, self._sha(identity_statement), receipt_archive, self._sha(receipt_archive), receipt_bundle, self._sha(receipt_bundle))
+
+        evaluator = make_authorization_evaluator(self.root, *trust_args)
+        self.assertEqual((), evaluator.errors)
+        self.assertTrue(evaluator.cluster_independence_bound)
+        self.assertEqual({item["observation_id"] for item in observations}, set(evaluator.receipt_bound_observation_ids))
+        normal, urgent, sales, exclusions = clean_authorized_with_verified_sales([], self.root, *trust_args)
+        self.assertEqual((0, 0, 2, 0), (len(normal), len(urgent), len(sales), len(exclusions)))
+        self.assertTrue(all(row["price_line"] == "verified_sale" and row["completed_sale_date"] == row["post_date"] for row in sales))
+
+        modeling = self.root / "data/modeling"; modeling.mkdir(parents=True, exist_ok=True)
+        for name, rows in (("price-cleaned-normal.jsonl", normal), ("price-cleaned-urgent.jsonl", urgent), ("price-cleaned-verified-sales.jsonl", sales), ("account-item-vectors.jsonl", [])):
+            (modeling / name).write_bytes(b"".join(canonical_bytes(row) for row in rows))
+        frozen, report = build_publication_dataset(self.root)
+        self.assertEqual(2, frozen["dataset_row_count"])
+        self.assertEqual("verified_sale", frozen["dataset_rows"][0]["price_line"])
+        self.assertEqual("not_ready", report["status"])
+        self.assertEqual(report, split_publication_dataset(frozen, root=self.root))

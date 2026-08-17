@@ -26,7 +26,9 @@ QUEUE_SIZE = 200
 SPLIT_SIZE = QUEUE_SIZE // 2
 COMMITMENT_NAMESPACE = "sky-parser-review-commitment-v1"
 KEYED_PROTOCOL = "sky-parser-review-keyed-hmac-v1"
-KEYED_CONTRACT_NAMESPACE = "sky-parser-review-keyed-custodian-v1"
+KEYED_CONTRACT_NAMESPACE = "sky-parser-review-keyed-custodian-v2"
+KEYED_AUTHORITY_BUNDLE_VERSION = "sky-parser-keyed-custodian-authority-bundle-v1"
+KEYED_CUSTODIAN_ROLE = "keyed_custodian_contract"
 KEYED_QUEUE_SIZE = 200
 KEYED_SPLIT_COUNTS = {"development": 100, "heldout": 100}
 _KEYED_HEX = re.compile(r"[A-F0-9]{64}")
@@ -41,6 +43,22 @@ def digest(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest().upper()
 
 
+def keyed_commitment_merkle_root(commitments: list[str]) -> str:
+    """Canonical Merkle root for opaque HMAC commitment leaves.
+
+    Ordering is intentionally by commitment, never by raw input or split, so
+    the published root cannot reveal the private assignment mapping.
+    """
+    if not commitments or len(commitments) != len(set(commitments)) or any(not isinstance(value, str) or not _KEYED_HEX.fullmatch(value) for value in commitments):
+        raise ValueError("keyed commitment leaves must be unique SHA-256 values")
+    level = [bytes.fromhex(value) for value in sorted(commitments)]
+    while len(level) > 1:
+        if len(level) % 2:
+            level.append(level[-1])
+        level = [hashlib.sha256(level[index] + level[index + 1]).digest() for index in range(0, len(level), 2)]
+    return level[0].hex().upper()
+
+
 def input_sha256(profile: dict[str, Any], listing: dict[str, Any]) -> str:
     return digest(canonical_bytes({"listing": listing, "profile": profile}))
 
@@ -52,7 +70,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         "reason": "No external replay inputs have been supplied; no queue or formal gold exists.",
     }:
         return []
-    if isinstance(manifest, dict) and manifest.get("schema_version") == "1.0-p3.6":
+    if isinstance(manifest, dict) and manifest.get("schema_version") == "1.0-p3.7":
         try:
             _validate_keyed_public_manifest(manifest)
         except ValueError as exc:
@@ -66,7 +84,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
 
 
 def _validate_keyed_public_manifest(manifest: dict[str, Any]) -> None:
-    """Validate only the non-linkable public surface of a P3.6 cohort.
+    """Validate only the non-linkable public surface of a P3.7 cohort.
 
     Detached custodian signature validation is deliberately separate because
     its contract lives outside the release root.  This guard rejects any old
@@ -75,13 +93,13 @@ def _validate_keyed_public_manifest(manifest: dict[str, Any]) -> None:
     required = {
         "schema_version", "status", "cohort_id", "keyed_protocol", "queue_size", "split_counts",
         "required_strata", "strata_distinct_value_counts", "commitment_merkle_root", "split_commitment",
-        "packet_sha256", "assignment_ledger_sha256", "custodian_id", "custodian_fingerprint",
+        "packet_sha256", "assignment_ledger_sha256", "custodian_id", "custodian_authority_id", "custodian_fingerprint",
         "custodian_contract_sha256", "manifest_sha256",
     }
     forbidden = {"queue", "input_sha256", "input_commitment", "source_sha256", "queue_id", "split", "profile", "listing"}
     if not isinstance(manifest, dict) or set(manifest) != required or any(key in manifest for key in forbidden):
         raise ValueError("keyed public manifest contains unsupported or linkable fields")
-    if manifest.get("schema_version") != "1.0-p3.6" or manifest.get("status") != "keyed_frozen_pending_external_decisions" or manifest.get("keyed_protocol") != KEYED_PROTOCOL:
+    if manifest.get("schema_version") != "1.0-p3.7" or manifest.get("status") != "keyed_frozen_pending_external_decisions" or manifest.get("keyed_protocol") != KEYED_PROTOCOL:
         raise ValueError("keyed public manifest protocol/version is invalid")
     if not isinstance(manifest.get("cohort_id"), str) or not re.fullmatch(r"parser_keyed_[a-z0-9_]{8,64}", manifest["cohort_id"]):
         raise ValueError("keyed public manifest cohort ID is invalid")
@@ -97,6 +115,8 @@ def _validate_keyed_public_manifest(manifest: dict[str, Any]) -> None:
         raise ValueError("keyed public manifest packet commitments are invalid")
     if not isinstance(manifest.get("custodian_id"), str) or not re.fullmatch(r"parser_custodian_[a-z0-9_]{3,64}", manifest["custodian_id"]) or not isinstance(manifest.get("custodian_fingerprint"), str) or not manifest["custodian_fingerprint"]:
         raise ValueError("keyed public manifest custodian identity is invalid")
+    if not isinstance(manifest.get("custodian_authority_id"), str) or not re.fullmatch(r"parser_custodian_authority_[a-z0-9_]{3,64}", manifest["custodian_authority_id"]):
+        raise ValueError("keyed public manifest custodian authority identity is invalid")
     if manifest.get("manifest_sha256") != digest(canonical_bytes({key: value for key, value in manifest.items() if key != "manifest_sha256"})):
         raise ValueError("keyed public manifest digest does not bind its contents")
 
@@ -147,12 +167,53 @@ def _verify_openssh_payload(payload: dict[str, Any], *, public_key: str, fingerp
         raise ValueError("custodian detached signature verification failed")
 
 
+def load_keyed_custodian_authorities(path_value: str | Path | None, expected_sha: str | None, root: Path) -> dict[str, dict[str, Any]]:
+    """Load the injected, revocable trust root for a keyed custodian.
+
+    The signed contract carries an authority reference only.  It must never
+    carry the public key that validates itself.
+    """
+    if path_value is None or not expected_sha:
+        raise ValueError("external keyed custodian authority bundle path and SHA-256 must be injected")
+    path = _outside_root(Path(path_value), root, "keyed custodian authority bundle")
+    if not path.is_file():
+        raise ValueError("external keyed custodian authority bundle is missing")
+    if digest(path.read_bytes()) != str(expected_sha).upper():
+        raise ValueError("external keyed custodian authority bundle SHA-256 does not match injected digest")
+    try:
+        bundle = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("external keyed custodian authority bundle is not valid JSON") from exc
+    if not isinstance(bundle, dict) or set(bundle) != {"schema_version", "authorities", "revoked_fingerprints"} or bundle.get("schema_version") != KEYED_AUTHORITY_BUNDLE_VERSION:
+        raise ValueError("external keyed custodian authority bundle has unsupported schema")
+    records, revoked = bundle.get("authorities"), bundle.get("revoked_fingerprints")
+    if not isinstance(records, list) or not isinstance(revoked, list) or any(not isinstance(value, str) for value in revoked):
+        raise ValueError("external keyed custodian authority bundle is malformed")
+    authorities: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict) or set(record) != {"authority_id", "public_key", "fingerprint", "roles"}:
+            raise ValueError("external keyed custodian authority has unsupported fields")
+        authority_id, public_key, fingerprint, roles = record.get("authority_id"), record.get("public_key"), record.get("fingerprint"), record.get("roles")
+        actual = _fingerprint(public_key) if isinstance(public_key, str) else None
+        if (not isinstance(authority_id, str) or not re.fullmatch(r"parser_custodian_authority_[a-z0-9_]{3,64}", authority_id)
+                or authority_id in authorities or not actual or fingerprint != actual
+                or not isinstance(roles, list) or len(roles) != len(set(roles))
+                or any(not isinstance(role, str) for role in roles) or KEYED_CUSTODIAN_ROLE not in roles):
+            raise ValueError("external keyed custodian authority identity, key, role, or fingerprint is invalid")
+        if fingerprint in revoked:
+            raise ValueError(f"external keyed custodian authority {authority_id} fingerprint is revoked")
+        authorities[authority_id] = record
+    if not authorities:
+        raise ValueError("external keyed custodian authority bundle has no active authorities")
+    return authorities
+
+
 def _keyed_contract_payload(contract: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in contract.items() if key not in {"signature_file", "contract_sha256"}}
 
 
-def validate_keyed_custodian_contract(contract: dict[str, Any], contract_path: Path, root: Path) -> dict[str, Any]:
-    """Validate a P3.6 external custodian contract without seeing its secrets.
+def validate_keyed_custodian_contract(contract: dict[str, Any], contract_path: Path, root: Path, authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, Any]:
+    """Validate a P3.7 external custodian contract without seeing its secrets.
 
     A custodian creates the keyed HMAC commitments and private raw-input/split
     map outside the repository.  The public issuer may only act on this signed,
@@ -163,12 +224,12 @@ def validate_keyed_custodian_contract(contract: dict[str, Any], contract_path: P
         "schema_version", "contract_type", "cohort_id", "keyed_protocol",
         "queue_size", "split_counts", "required_strata", "strata_distinct_value_counts",
         "commitment_merkle_root", "split_commitment", "packet_sha256",
-        "assignment_ledger_sha256", "custodian_id", "public_key", "fingerprint",
+        "assignment_ledger_sha256", "custodian_id", "authority_id", "fingerprint",
         "signature_file", "contract_sha256",
     }
     if not isinstance(contract, dict) or set(contract) != required:
         raise ValueError("keyed custodian contract has unsupported fields")
-    if contract.get("schema_version") != "1.0-p3.6" or contract.get("contract_type") != "parser_review_keyed_custodian_contract" or contract.get("keyed_protocol") != KEYED_PROTOCOL:
+    if contract.get("schema_version") != "1.0-p3.7" or contract.get("contract_type") != "parser_review_keyed_custodian_contract" or contract.get("keyed_protocol") != KEYED_PROTOCOL:
         raise ValueError("keyed custodian contract protocol/version is invalid")
     if not isinstance(contract.get("cohort_id"), str) or not re.fullmatch(r"parser_keyed_[a-z0-9_]{8,64}", contract["cohort_id"]):
         raise ValueError("keyed custodian cohort ID is invalid")
@@ -183,13 +244,18 @@ def validate_keyed_custodian_contract(contract: dict[str, Any], contract_path: P
         raise ValueError("keyed custodian packet commitments are invalid")
     if not isinstance(contract.get("custodian_id"), str) or not re.fullmatch(r"parser_custodian_[a-z0-9_]{3,64}", contract["custodian_id"]):
         raise ValueError("keyed custodian ID is invalid")
+    authorities = load_keyed_custodian_authorities(authority_bundle, authority_bundle_sha256, root)
+    authority_id = contract.get("authority_id")
+    authority = authorities.get(authority_id) if isinstance(authority_id, str) else None
+    if authority is None or authority.get("fingerprint") != contract.get("fingerprint") or KEYED_CUSTODIAN_ROLE not in authority.get("roles", []):
+        raise ValueError("keyed custodian contract authority is missing, revoked, or unauthorized")
     if contract.get("contract_sha256") != digest(canonical_bytes(_keyed_contract_payload(contract))):
         raise ValueError("keyed custodian contract digest does not bind its payload")
     signature_name = contract.get("signature_file")
     if not isinstance(signature_name, str) or Path(signature_name).name != signature_name:
         raise ValueError("keyed custodian signature path is invalid")
     _verify_openssh_payload(
-        _keyed_contract_payload(contract), public_key=contract["public_key"], fingerprint=contract["fingerprint"],
+        _keyed_contract_payload(contract), public_key=str(authority["public_key"]), fingerprint=str(authority["fingerprint"]),
         signature=contract_path.parent / signature_name, identity=contract["custodian_id"], namespace=KEYED_CONTRACT_NAMESPACE,
     )
     return contract
@@ -213,7 +279,7 @@ def _read_keyed_assignment_ledger(path: Path, contract: dict[str, Any], root: Pa
     return rows
 
 
-def issue_keyed_blind_packages(contract_path: Path, assignment_ledger_path: Path, packet_dir: Path, output_dir: Path, root: Path) -> dict[str, Any]:
+def issue_keyed_blind_packages(contract_path: Path, assignment_ledger_path: Path, packet_dir: Path, output_dir: Path, root: Path, authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, Any]:
     """Validate and copy custodian-issued blind packets outside the release root.
 
     It deliberately cannot construct packets from source input.  Only a signed
@@ -222,7 +288,7 @@ def issue_keyed_blind_packages(contract_path: Path, assignment_ledger_path: Path
     contract_path = _outside_root(contract_path, root, "keyed custodian contract")
     packet_dir = _outside_root(packet_dir, root, "keyed restricted packet directory")
     output_dir = _outside_root(output_dir, root, "keyed blind package output")
-    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root)
+    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root, authority_bundle, authority_bundle_sha256)
     assignments = _read_keyed_assignment_ledger(assignment_ledger_path, contract, root)
     by_reviewer = {reviewer: {row["assignment_id"] for row in assignments if row["reviewer"] == reviewer} for reviewer in ("annotator_a", "annotator_b")}
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -252,19 +318,19 @@ def issue_keyed_blind_packages(contract_path: Path, assignment_ledger_path: Path
     return {"schema_version": "1.0-p3.6", "status": "external_keyed_blind_packets_issued", "cohort_id": contract["cohort_id"], "contract_sha256": contract["contract_sha256"], "packet_sha256": written, "formal_gold_written": False}
 
 
-def publish_keyed_queue_manifest(contract_path: Path, manifest_out: Path, root: Path) -> dict[str, Any]:
+def publish_keyed_queue_manifest(contract_path: Path, manifest_out: Path, root: Path, authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None) -> dict[str, Any]:
     """Publish only the signed public commitment surface of a keyed cohort."""
     contract_path = _outside_root(contract_path, root, "keyed custodian contract")
     manifest_out = _safe_queue_manifest_output(manifest_out, root)
-    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root)
+    contract = validate_keyed_custodian_contract(json.loads(contract_path.read_text(encoding="utf-8")), contract_path, root, authority_bundle, authority_bundle_sha256)
     manifest = {
-        "schema_version": "1.0-p3.6", "status": "keyed_frozen_pending_external_decisions",
+        "schema_version": "1.0-p3.7", "status": "keyed_frozen_pending_external_decisions",
         "cohort_id": contract["cohort_id"], "keyed_protocol": contract["keyed_protocol"],
         "queue_size": contract["queue_size"], "split_counts": contract["split_counts"],
         "required_strata": contract["required_strata"], "strata_distinct_value_counts": contract["strata_distinct_value_counts"],
         "commitment_merkle_root": contract["commitment_merkle_root"], "split_commitment": contract["split_commitment"],
         "packet_sha256": contract["packet_sha256"], "assignment_ledger_sha256": contract["assignment_ledger_sha256"],
-        "custodian_id": contract["custodian_id"], "custodian_fingerprint": contract["fingerprint"],
+        "custodian_id": contract["custodian_id"], "custodian_authority_id": contract["authority_id"], "custodian_fingerprint": contract["fingerprint"],
         "custodian_contract_sha256": contract["contract_sha256"],
     }
     manifest["manifest_sha256"] = digest(canonical_bytes(manifest))
@@ -656,9 +722,9 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build-queue"); build.add_argument("--source", type=Path, required=True); build.add_argument("--source-sha256", required=True); build.add_argument("--manifest-out", type=Path, required=True); build.add_argument("--packet-dir", type=Path, required=True); build.add_argument("--root", type=Path, default=ROOT)
     keyed_publish = sub.add_parser("publish-keyed-manifest", help="publish a signed custodian's non-linkable keyed cohort manifest")
-    keyed_publish.add_argument("--custodian-contract", type=Path, required=True); keyed_publish.add_argument("--manifest-out", type=Path, required=True); keyed_publish.add_argument("--root", type=Path, default=ROOT)
+    keyed_publish.add_argument("--custodian-contract", type=Path, required=True); keyed_publish.add_argument("--custodian-authority-bundle", type=Path, required=True); keyed_publish.add_argument("--custodian-authority-bundle-sha256", required=True); keyed_publish.add_argument("--manifest-out", type=Path, required=True); keyed_publish.add_argument("--root", type=Path, default=ROOT)
     keyed_issue = sub.add_parser("issue-keyed-blind-packages", help="copy only contract-bound, already-issued custodian blind packets")
-    keyed_issue.add_argument("--custodian-contract", type=Path, required=True); keyed_issue.add_argument("--assignment-ledger", type=Path, required=True); keyed_issue.add_argument("--packet-dir", type=Path, required=True); keyed_issue.add_argument("--output-dir", type=Path, required=True); keyed_issue.add_argument("--root", type=Path, default=ROOT)
+    keyed_issue.add_argument("--custodian-contract", type=Path, required=True); keyed_issue.add_argument("--custodian-authority-bundle", type=Path, required=True); keyed_issue.add_argument("--custodian-authority-bundle-sha256", required=True); keyed_issue.add_argument("--assignment-ledger", type=Path, required=True); keyed_issue.add_argument("--packet-dir", type=Path, required=True); keyed_issue.add_argument("--output-dir", type=Path, required=True); keyed_issue.add_argument("--root", type=Path, default=ROOT)
     packages = sub.add_parser("build-blind-packages"); packages.add_argument("--manifest", type=Path, required=True); packages.add_argument("--packet-dir", type=Path, required=True); packages.add_argument("--output-dir", type=Path, required=True); packages.add_argument("--blind-secret", required=True); packages.add_argument("--root", type=Path, default=ROOT)
     receipt = sub.add_parser("decision-receipt-payload"); receipt.add_argument("--assignment", type=Path, required=True); receipt.add_argument("--assignment-ledger", type=Path, required=True); receipt.add_argument("--decision", type=Path, required=True); receipt.add_argument("--manifest", type=Path, required=True); receipt.add_argument("--output", type=Path, required=True); receipt.add_argument("--root", type=Path, default=ROOT)
     conflict = sub.add_parser("build-conflict-packet"); conflict.add_argument("--manifest", type=Path, required=True); conflict.add_argument("--decisions-a", type=Path, required=True); conflict.add_argument("--decisions-b", type=Path, required=True); conflict.add_argument("--output", type=Path, required=True); conflict.add_argument("--root", type=Path, default=ROOT)
@@ -667,9 +733,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "build-queue": build_queue(args.root.resolve(), args.source, args.source_sha256, args.manifest_out.resolve(), args.packet_dir)
     elif args.command == "publish-keyed-manifest":
-        publish_keyed_queue_manifest(args.custodian_contract, args.manifest_out, args.root.resolve())
+        publish_keyed_queue_manifest(args.custodian_contract, args.manifest_out, args.root.resolve(), args.custodian_authority_bundle, args.custodian_authority_bundle_sha256)
     elif args.command == "issue-keyed-blind-packages":
-        issue_keyed_blind_packages(args.custodian_contract, args.assignment_ledger, args.packet_dir, args.output_dir, args.root.resolve())
+        issue_keyed_blind_packages(args.custodian_contract, args.assignment_ledger, args.packet_dir, args.output_dir, args.root.resolve(), args.custodian_authority_bundle, args.custodian_authority_bundle_sha256)
     elif args.command == "build-blind-packages":
         manifest = json.loads(args.manifest.read_text(encoding="utf-8")); build_blind_packages(manifest, args.packet_dir, args.output_dir, args.blind_secret, args.root.resolve())
     elif args.command == "decision-receipt-payload":
