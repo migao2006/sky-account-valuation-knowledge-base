@@ -22,6 +22,8 @@
     "evidence_basis": {"enum": ["pinned_vendor_snapshot_and_crosswalk", "pinned_vendor_snapshot_type"]},
     "canonical_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
     "candidate_item_ids": {"type": "array", "items": {"type": "string", "pattern": "^item_[a-z0-9_]+$"}, "uniqueItems": true},
-    "review_status": {"const": "needs_review"}
-  }
+    "scope_approval": {"type": ["object", "null"], "additionalProperties": false, "required": ["evidence_source_id", "evidence_snapshot_path", "evidence_snapshot_sha256", "evidence_locator", "review_status"], "properties": {"evidence_source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"}, "evidence_snapshot_path": {"type": "string", "pattern": "^data/source/research/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+\\.json$"}, "evidence_snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "evidence_locator": {"type": "string", "pattern": "^/"}, "review_status": {"const": "approved"}}},
+    "review_status": {"enum": ["approved", "needs_review"]}
+  },
+  "allOf": [{"if": {"properties": {"review_status": {"const": "approved"}}}, "then": {"required": ["scope_approval"], "properties": {"scope_approval": {"type": "object"}}}}]
 }

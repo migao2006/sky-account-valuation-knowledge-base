@@ -13,11 +13,13 @@ import json
 import os
 import subprocess
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 NAMESPACE = "sky-market-audit-v1"
+V2_NAMESPACE = "sky-market-audit-v2"
 AUTHORITY_ENV = "SKY_MARKET_AUDIT_AUTHORITY_BUNDLE"
 AUTHORITY_SHA_ENV = "SKY_MARKET_AUDIT_AUTHORITY_BUNDLE_SHA256"
 ATTESTATIONS_REL = Path("data/review/market-audit/attestations.jsonl")
@@ -72,6 +74,44 @@ def attestation_payload(ledger_kind: str, ledger_row: dict[str, Any], queue_row:
     """Return the exact signed bytes, binding all ledger and queue fields."""
     signed_attestation = {key: value for key, value in attestation.items() if key != "payload_sha256"}
     return canonical_bytes({"contract": NAMESPACE, "ledger_kind": ledger_kind, "ledger": ledger_row, "queue": queue_row, "attestation": signed_attestation})
+
+
+def queue_commitment(queue_row: dict[str, Any]) -> str:
+    """Stable commitment to the anonymous review assignment."""
+    return sha256_bytes(canonical_bytes(queue_row))
+
+
+def annotation_commitment(ledger_kind: str, ledger_id: str, role: str, queue_hash: str, annotation: dict[str, Any]) -> str:
+    """Commit a blinded individual annotation without signing the final row."""
+    return sha256_bytes(canonical_bytes({"contract": V2_NAMESPACE, "ledger_kind": ledger_kind,
+        "ledger_id": ledger_id, "role": role, "queue_commitment_sha256": queue_hash,
+        "annotation": annotation}))
+
+
+def adjudication_commitment(ledger_kind: str, ledger_id: str, queue_hash: str, adjudication: dict[str, Any]) -> str:
+    return sha256_bytes(canonical_bytes({"contract": V2_NAMESPACE, "ledger_kind": ledger_kind,
+        "ledger_id": ledger_id, "queue_commitment_sha256": queue_hash, "adjudication": adjudication}))
+
+
+def v2_attestation_payload(attestation: dict[str, Any]) -> bytes:
+    """Exact detached bytes for a blinded submission or its adjudication receipt."""
+    signed = {key: value for key, value in attestation.items() if key != "payload_sha256"}
+    return canonical_bytes({"contract": V2_NAMESPACE, "attestation": signed})
+
+
+def v2_receipt_digest(attestation: dict[str, Any]) -> str:
+    """Digest of the complete signed receipt, including its submission time."""
+    return sha256_bytes(v2_attestation_payload(attestation))
+
+
+def _utc_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed) else None
 
 
 def _external_bundle(path_value: str | Path | None, expected_sha: str | None, root: Path) -> tuple[dict[str, dict[str, Any]] | None, list[str]]:
@@ -137,6 +177,10 @@ def audit_market_ledgers(
     signature_paths: set[str] = set()
     attestation_ids: set[str] = set()
     for item in attestations:
+        # v2 gold receipts deliberately do not sign a completed ledger row;
+        # their evidence is replayed by the dedicated independence verifier.
+        if item.get("schema_version") == "sky-market-audit-attestation-v2":
+            continue
         attestation_id = item.get("attestation_id")
         if not isinstance(attestation_id, str) or attestation_id in attestation_ids:
             errors.append("market audit attestation_id is missing or duplicated")
@@ -155,6 +199,14 @@ def audit_market_ledgers(
             queue_row = queue_by_id.get(row.get("review_id"))
             if not queue_row:
                 errors.append(f"{kind}:{ledger_id}: queue linkage is unavailable for audit")
+                continue
+            if kind == "market_claim_gold" and any(
+                entry.get("schema_version") == "sky-market-audit-attestation-v2"
+                for entry in attestations
+                if str(entry.get("ledger_kind")) == kind and str(entry.get("ledger_id")) == ledger_id
+            ):
+                # The v2 verifier below checks all three receipts, including
+                # identities, distinct keys, commitments and signatures.
                 continue
             entries = by_target.get((kind, ledger_id), [])
             roles = [entry.get("role") for entry in entries]
@@ -195,4 +247,126 @@ def audit_market_ledgers(
     ledger_targets = {(kind, str(row.get(LEDGER_KINDS[kind][0]))) for kind, (_, rows) in ledgers.items() for row in rows}
     if set(by_target) - ledger_targets:
         errors.append("market audit attestation ledger references an absent market ledger row")
+    if claim_gold:
+        errors.extend(independent_blinded_decisions_errors(root, claim_queue, claim_gold, authority_bundle, authority_bundle_sha256))
+    return errors
+
+
+def _verify_detached(root: Path, authority: dict[str, Any], attestation: dict[str, Any], payload: bytes, errors: list[str], label: str) -> None:
+    """Verify one v2 receipt, keeping the verification mechanics in one place."""
+    if attestation.get("payload_sha256") != sha256_bytes(payload):
+        errors.append(f"{label}: payload hash does not bind the v2 receipt")
+        return
+    signature_value = attestation.get("signature_file")
+    signature = root / signature_value if isinstance(signature_value, str) else root
+    try:
+        signature.resolve().relative_to((root / SIGNATURES_REL).resolve())
+    except ValueError:
+        errors.append(f"{label}: signature path escapes market-audit/signatures")
+        return
+    if not signature.is_file():
+        errors.append(f"{label}: detached signature is missing")
+        return
+    with tempfile.TemporaryDirectory(prefix="sky-market-audit-") as temporary:
+        allowed = Path(temporary) / "allowed_signers"
+        allowed.write_text(f"{attestation.get('authority_id')} {authority['public_key'].strip()}\n", encoding="utf-8", newline="\n")
+        child = subprocess.run(
+            ["ssh-keygen", "-Y", "verify", "-f", str(allowed), "-I", str(attestation.get("authority_id")), "-n", V2_NAMESPACE, "-s", str(signature)],
+            input=payload, capture_output=True, check=False,
+        )
+    if child.returncode != 0:
+        errors.append(f"{label}: ssh-keygen detached signature verification failed")
+
+
+def independent_blinded_decisions_errors(
+    root: Path, claim_queue: list[dict[str, Any]], claim_gold: list[dict[str, Any]],
+    authority_bundle: str | Path | None = None, authority_bundle_sha256: str | None = None,
+) -> list[str]:
+    """Replay v2 independent blinded-submission evidence for every gold row.
+
+    A v1 signature over a completed row is intentionally not accepted here.
+    This function makes the evaluator's independence result evidence-based while
+    allowing an empty formal ledger to remain valid without a trust-root input.
+    """
+    if not claim_gold:
+        return []
+    authorities, errors = _external_bundle(authority_bundle, authority_bundle_sha256, root)
+    if authorities is None:
+        return errors
+    try:
+        attestations = read_jsonl(root / ATTESTATIONS_REL)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [f"market audit attestation ledger is unreadable: {exc}"]
+    queue_by_id = {row.get("review_id"): row for row in claim_queue}
+    by_target: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    ids: set[str] = set()
+    signatures: set[str] = set()
+    for entry in attestations:
+        if entry.get("schema_version") != "sky-market-audit-attestation-v2":
+            continue
+        identity = entry.get("attestation_id")
+        signature = entry.get("signature_file")
+        if not isinstance(identity, str) or identity in ids:
+            errors.append("market v2 attestation_id is missing or duplicated")
+        ids.add(str(identity))
+        if not isinstance(signature, str) or signature in signatures:
+            errors.append("market v2 signature_file is missing or reused")
+        signatures.add(str(signature))
+        by_target.setdefault((str(entry.get("ledger_kind")), str(entry.get("ledger_id"))), []).append(entry)
+    targets = {("market_claim_gold", str(row.get("gold_id"))) for row in claim_gold}
+    if set(by_target) - targets:
+        errors.append("market v2 attestation ledger references an absent market gold row")
+    for row in claim_gold:
+        ledger_id = str(row.get("gold_id")); label = f"market_claim_gold:{ledger_id}"
+        queue = queue_by_id.get(row.get("review_id"))
+        if not queue:
+            errors.append(f"{label}: queue linkage is unavailable for blinded audit")
+            continue
+        queue_hash = queue_commitment(queue)
+        entries = by_target.get(("market_claim_gold", ledger_id), [])
+        roles = {entry.get("role"): entry for entry in entries}
+        if len(entries) != 3 or set(roles) != {"annotator_a", "annotator_b", "adjudicator"}:
+            errors.append(f"{label}: requires exactly two v2 blinded submissions and one v2 adjudication receipt")
+            continue
+        fingerprints: set[str] = set()
+        annotations: dict[str, dict[str, Any]] = {}
+        for role in ("annotator_a", "annotator_b"):
+            entry = roles[role]; authority_id = entry.get("authority_id")
+            authority = authorities.get(authority_id) if isinstance(authority_id, str) else None
+            if (entry.get("receipt_type") != "blinded_annotation_submission" or not authority or
+                    role not in authority.get("roles", []) or authority.get("fingerprint") != entry.get("fingerprint") or
+                    _review_identity(row, "market_claim_gold", role) != authority_id):
+                errors.append(f"{label}:{role}: authority or blinded-submission role binding is invalid")
+                continue
+            fingerprints.add(str(entry.get("fingerprint")))
+            annotation = row.get(role)
+            expected = annotation_commitment("market_claim_gold", ledger_id, role, queue_hash, annotation if isinstance(annotation, dict) else {})
+            if entry.get("review_id") != row.get("review_id") or entry.get("queue_commitment_sha256") != queue_hash or entry.get("annotation_commitment_sha256") != expected:
+                errors.append(f"{label}:{role}: blinded annotation or queue commitment does not replay")
+            _verify_detached(root, authority, entry, v2_attestation_payload(entry), errors, f"{label}:{role}")
+            annotations[role] = entry
+        adjudicator = roles["adjudicator"]; authority_id = adjudicator.get("authority_id")
+        authority = authorities.get(authority_id) if isinstance(authority_id, str) else None
+        if (adjudicator.get("receipt_type") != "adjudication" or not authority or "adjudicator" not in authority.get("roles", []) or
+                authority.get("fingerprint") != adjudicator.get("fingerprint") or _review_identity(row, "market_claim_gold", "adjudicator") != authority_id):
+            errors.append(f"{label}:adjudicator: authority or adjudication role binding is invalid")
+        else:
+            fingerprints.add(str(adjudicator.get("fingerprint")))
+            final = row.get("adjudication")
+            expected_final = adjudication_commitment("market_claim_gold", ledger_id, queue_hash, final if isinstance(final, dict) else {})
+            a, b = annotations.get("annotator_a", {}), annotations.get("annotator_b", {})
+            linked = (adjudicator.get("review_id") == row.get("review_id") and adjudicator.get("queue_commitment_sha256") == queue_hash and
+                adjudicator.get("annotator_a_attestation_id") == a.get("attestation_id") and adjudicator.get("annotator_b_attestation_id") == b.get("attestation_id") and
+                adjudicator.get("annotator_a_annotation_commitment_sha256") == a.get("annotation_commitment_sha256") and adjudicator.get("annotator_b_annotation_commitment_sha256") == b.get("annotation_commitment_sha256") and
+                adjudicator.get("annotator_a_receipt_sha256") == v2_receipt_digest(a) and adjudicator.get("annotator_b_receipt_sha256") == v2_receipt_digest(b) and
+                adjudicator.get("final_adjudication_commitment_sha256") == expected_final)
+            if not linked:
+                errors.append(f"{label}:adjudicator: receipt does not link both verified blinded commitments and final adjudication")
+            submitted = [_utc_timestamp(a.get("submitted_at")), _utc_timestamp(b.get("submitted_at"))]
+            adjudicated = _utc_timestamp(adjudicator.get("adjudicated_at"))
+            if adjudicated is None or any(value is None or value >= adjudicated for value in submitted):
+                errors.append(f"{label}:adjudicator: both blinded submissions must be timestamped before adjudication")
+            _verify_detached(root, authority, adjudicator, v2_attestation_payload(adjudicator), errors, f"{label}:adjudicator")
+        if len(fingerprints) != 3:
+            errors.append(f"{label}: v2 reviewer roles require three distinct authority fingerprints")
     return errors

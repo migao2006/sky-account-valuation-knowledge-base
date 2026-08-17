@@ -28,6 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 DATASET_PATH = "reports/model-publication-dataset-manifest.json#dataset_rows"
+DATASET_SCHEMA_VERSION = "1.2-p3.4"
+SPLIT_SCHEMA_VERSION = "1.2-p3.4"
 LINEAGE_FIELDS = (
     "training_example_id", "training_example_digest", "feature_payload_sha256",
     "catalog_provenance_sha256", "dedup_cluster_digest",
@@ -147,7 +149,22 @@ def _registered_training_examples(root: Path) -> list[dict[str, Any]]:
             examples_path.relative_to(dataset_root)
         except ValueError as error:
             raise PublicationDatasetError("registered_training_examples_path_escapes_datasets") from error
-        examples.extend(read_jsonl(examples_path))
+        observations_rel = manifest.get("observations_path")
+        if not isinstance(observations_rel, str):
+            raise PublicationDatasetError("registered_observations_path_missing")
+        observations_path = (root / observations_rel).resolve()
+        try:
+            observations_path.relative_to(dataset_root)
+        except ValueError as error:
+            raise PublicationDatasetError("registered_observations_path_escapes_datasets") from error
+        observations = {row.get("observation_id"): row for row in read_jsonl(observations_path)}
+        for example in read_jsonl(examples_path):
+            observation = observations.get(example.get("observation_id"))
+            if not isinstance(observation, dict):
+                raise PublicationDatasetError("registered_training_example_observation_missing")
+            # Retained only in memory; the frozen manifest records the signed
+            # lineage digests, not raw authorized observation material.
+            examples.append({**example, "_registered_observation": observation})
     return examples
 
 
@@ -185,6 +202,19 @@ def _assert_signed_lineage(
         raise PublicationDatasetError(f"signed_catalog_provenance_mismatch:{payload['account_id']}")
     if payload["dedup_cluster_digest"].upper() != _signed_payload_sha256(payload["cluster_id"]).upper():
         raise PublicationDatasetError(f"signed_dedup_cluster_mismatch:{payload['account_id']}")
+    observation = example.get("_registered_observation")
+    expected_lines = {
+        "normal_listing": {"asking", "reduced"},
+        "urgent_sale": {"urgent_sale"},
+        "verified_sale": {"verified_sale"},
+    }
+    if (
+        not isinstance(observation, dict)
+        or observation.get("price_twd") != payload["selected_price_twd"]
+        or observation.get("post_date") != payload["post_date"]
+        or observation.get("price_line") not in expected_lines[payload["price_line"]]
+    ):
+        raise PublicationDatasetError(f"signed_observation_price_or_date_mismatch:{payload['training_example_id']}")
     if payload["price_line"] == "verified_sale":
         if any(payload.get(field) != example.get(field) for field in ("completed_sale_verified", "sale_verified", "completed_sale_date", "completion_evidence_digest", "independent_evidence_ids", "observation_row_digest")):
             raise PublicationDatasetError(f"signed_verified_sale_commitment_mismatch:{payload['training_example_id']}")
@@ -237,6 +267,10 @@ def _freeze(
         if require_signed_lineage:
             _assert_signed_lineage(payload, matching_vectors[0], provenance, examples)
         payload["evaluation_subgroup"] = _evaluation_subgroup(matching_vectors[0])
+        # Preserve the *exact* signed account vector in the frozen row.  The
+        # evaluator must never silently substitute listing date or an
+        # unbound feature projection for an account-feature model.
+        payload["feature_payload"] = matching_vectors[0]
         ids.add(payload["cleaned_price_id"])
         histories.add(payload["history_id"])
         frozen.append({**payload, "row_sha256": _sha256(payload)})
@@ -245,7 +279,16 @@ def _freeze(
     for row in frozen:
         pools[(row["currency"], row["server"], row["price_line"])].append(row)
     return {
-        "schema_version": "1.1-p3.2", "status": "not_ready",
+        "schema_version": DATASET_SCHEMA_VERSION, "status": "not_ready",
+        # The production evaluator must rebuild this from repository inputs.
+        # Synthetic rows deliberately carry a different, test-only mode and
+        # cannot enter the production split/evaluation entry points.
+        "lineage_mode": "production_signed" if require_signed_lineage else "test_only_synthetic",
+        "feature_payload_contract": {
+            "schema_version": "signed-account-feature-payload-v1",
+            "evaluator_feature_source": "feature_payload.feature_groups",
+            "evaluation_subgroup_derivation": "feature_payload.feature_groups.base_account.account_type_or_unknown",
+        },
         "dataset_path": DATASET_PATH, "dataset_sha256": _sha256(frozen), "dataset_row_count": len(frozen),
         "input_snapshots": snapshots, "catalog_provenance": provenance,
         "market_pools": [
@@ -302,8 +345,13 @@ def _best_split(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {"cut_date": cut.isoformat(), "training_cluster_ids": train, "holdout_cluster_ids": holdout, "excluded_spanning_cluster_ids": spanning, "cluster_overlap": bool(set(train) & set(holdout)), "requirements_met": len(train) >= TRAINING_CLUSTERS_REQUIRED and len(holdout) >= HOLDOUT_CLUSTERS_REQUIRED}
 
 
-def split(manifest: dict[str, Any]) -> dict[str, Any]:
-    """Derive a cluster-exclusive time-forward split from a frozen manifest."""
+def _derive_split(manifest: dict[str, Any], *, allow_test_synthetic: bool) -> dict[str, Any]:
+    """Derive a cluster-exclusive time-forward split after lineage admission."""
+    mode = manifest.get("lineage_mode")
+    if mode == "test_only_synthetic" and not allow_test_synthetic:
+        raise PublicationDatasetError("test_only_manifest_requires_split_synthetic_for_test")
+    if mode not in {"production_signed", "test_only_synthetic"}:
+        raise PublicationDatasetError("dataset_lineage_mode_invalid")
     if manifest.get("dataset_path") != DATASET_PATH or manifest.get("dataset_sha256") != _sha256(manifest.get("dataset_rows")):
         raise PublicationDatasetError("dataset_manifest_hash_mismatch")
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -311,6 +359,14 @@ def split(manifest: dict[str, Any]) -> dict[str, Any]:
         payload = {key: row[key] for key in row if key != "row_sha256"}
         if row.get("row_sha256") != _sha256(payload):
             raise PublicationDatasetError("dataset_row_hash_mismatch")
+        # Revalidate the preserved signed feature bytes during every replay,
+        # so a manifest editor cannot swap a plausible vector and simply
+        # recompute the enclosing row hash.
+        if "feature_payload_sha256" in row and (
+            not isinstance(row.get("feature_payload"), dict)
+            or row["feature_payload_sha256"].upper() != _signed_payload_sha256(row["feature_payload"]).upper()
+        ):
+            raise PublicationDatasetError("dataset_feature_payload_hash_mismatch")
         grouped[(row["currency"], row["server"], row["price_line"])].append(row)
     pools = []
     for key, rows in sorted(grouped.items()):
@@ -319,10 +375,31 @@ def split(manifest: dict[str, Any]) -> dict[str, Any]:
         pools.append(result)
     status = "ready_for_evaluation" if any(pool["requirements_met"] for pool in pools) else "not_ready"
     return {
-        "schema_version": "1.1-p3.2", "status": status, "dataset_path": manifest["dataset_path"],
+        "schema_version": SPLIT_SCHEMA_VERSION, "status": status, "dataset_path": manifest["dataset_path"],
         "dataset_sha256": manifest["dataset_sha256"], "requirements": {"training_clusters": TRAINING_CLUSTERS_REQUIRED, "holdout_clusters": HOLDOUT_CLUSTERS_REQUIRED},
         "market_pools": pools,
     }
+
+
+def split(manifest: dict[str, Any], *, root: Path | None = None) -> dict[str, Any]:
+    """Replay a production split against its deterministic repository inputs.
+
+    A self-contained JSON manifest is not an authority: a caller could edit a
+    price/subgroup and recompute its enclosing hashes.  Production callers must
+    supply the repository root so this function rebuilds and compares the
+    entire signed manifest before returning its split.
+    """
+    if root is None:
+        raise PublicationDatasetError("production_split_requires_deterministic_root_replay")
+    expected_manifest, expected_split = build(root)
+    if manifest != expected_manifest:
+        raise PublicationDatasetError("dataset_manifest_differs_from_deterministic_root_replay")
+    return expected_split
+
+
+def split_synthetic_for_test(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Test-only split helper for fixtures created by ``freeze_synthetic_for_test``."""
+    return _derive_split(manifest, allow_test_synthetic=True)
 
 
 def build(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -336,8 +413,8 @@ def build(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         clean_rows, read_jsonl(root / "data/modeling/account-item-vectors.jsonl"), catalog_provenance(root), _snapshot(root),
         _registered_training_examples(root),
     )
-    report = split(manifest)
-    manifest["schema_version"] = "1.1-p3.2"
+    report = _derive_split(manifest, allow_test_synthetic=False)
+    manifest["schema_version"] = DATASET_SCHEMA_VERSION
     manifest["status"] = report["status"]
     return manifest, report
 

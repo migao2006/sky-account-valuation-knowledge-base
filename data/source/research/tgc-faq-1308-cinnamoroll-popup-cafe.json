@@ -1,0 +1,28 @@
+{
+  "snapshot_format":"fact_limited_official_support_snapshot_v1",
+  "snapshot_id":"tgc_faq_1308_cinnamoroll_popup_cafe_2026_08_17",
+  "source_id":"source_tgc_faq_1308_cinnamoroll_popup_cafe",
+  "source_url":"https://thatgamecompany.helpshift.com/hc/en/17-sky-children-of-the-light/faq/1308-patch-notes---april-10-2024---0-25-0-257483-android-huawei-256148-ios-playstation-257607-pc-255731-switch/",
+  "retrieved_at":"2026-08-17",
+  "capture_policy":"Structured, fact-limited transcription of FAQ 1308's Cinnamoroll Pop-Up Cafe dates and paid-offer descriptions and prices. No HTML, images, storefront state, account data, or full-page text is retained.",
+  "facts":{
+    "historical_window_start_date":"2024-04-27",
+    "historical_window_end_date":"2024-05-17",
+    "paid_offers":[
+      {"offer_id":"cinnamoroll_mini_companion","official_name_en":"Cinnamoroll Pop-Up Cafe Mini Companion","original_currency":"USD","original_cost":6.99,"item_ids":["item_cinnamoroll_mini_companion"]},
+      {"offer_id":"cinnamoroll_bowtie_cloud_cape","official_name_en":"Cinnamoroll Pop-Up Cafe Bowtie and Cloud Cape","original_currency":"USD","original_cost":14.99,"item_ids":["item_cinnamoroll_bowtie","item_cinnamoroll_cloud_cape"]},
+      {"offer_id":"cinnamoroll_combo","official_name_en":"Cinnamoroll Pop-Up Cafe Combo","original_currency":"USD","original_cost":14.99,"item_ids":["item_cinnamoroll_swirled_hair","item_cinnamoroll_ears"],"included_component_descriptions_en":["a swirled hair style","a head accessory modeled after Cinnamoroll’s ears"]},
+      {"offer_id":"cinnamoroll_plushie","official_name_en":"Cinnamoroll Pop-Up Cafe Plushie","original_currency":"USD","original_cost":14.99,"item_ids":["item_cinnamoroll_plush"]}
+    ],
+    "event_currency_offers":[
+      {"offer_id":"cozy_teacup_headband","official_name_en":"Cozy Teacup Headband","original_currency":"event_currency","original_cost":22,"item_ids":["item_cinnamoroll_cozy_teacup_headband"]},
+      {"offer_id":"cozy_cafe_table","official_name_en":"Cozy Cafe Table","original_currency":"event_currency","original_cost":52,"item_ids":["item_cinnamoroll_cozy_cafe_table"]}
+    ],
+    "return_plan_statement":"items from this collaboration event are not currently planned to return"
+  },
+  "non_claims":[
+    "This historical FAQ does not establish current availability, current storefront state, or a binding future return policy.",
+    "The FAQ does not allocate bundle prices to individual Bowtie, Cloud Cape, Swirled Hair, or Ears items.",
+    "The FAQ does not provide formal Traditional Chinese names, image assets, visual matches, or permanent-account property."
+  ]
+}

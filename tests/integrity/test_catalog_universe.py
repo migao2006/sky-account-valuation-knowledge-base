@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -41,7 +42,7 @@ class CatalogUniverseTests(unittest.TestCase):
             "quest_record": 155,
             "vendor_special_needs_scope_review": 1178,
         })
-        self.assertEqual(summary["needs_scope_review_count"], 1508)
+        self.assertEqual(summary["needs_scope_review_count"], sum(row["review_status"] == "needs_review" for row in universe))
         self.assertEqual(sum(summary["vendor_item_type_counts"].values()), len(snapshot))
         self.assertEqual(sum(summary["scope_disposition_counts"].values()), len(snapshot))
         for row in universe:
@@ -104,6 +105,41 @@ class CatalogUniverseTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "not reviewable"):
             validate_scope_accounting(rows)
+
+    def test_independent_scope_decisions_can_approve_every_noncollectible_disposition(self):
+        types = [("WingBuff", "progression_unlock"), ("Spell", "consumable_effect"), ("Quest", "quest_record"), ("Special", "vendor_special_needs_scope_review")]
+        snapshot = {"items": [{"id": index, "guid": f"guid{index}", "name": name, "type": name, "subtype": None, "group": None} for index, (name, _disposition) in enumerate(types, 1)]}
+        metadata = {"snapshot_id": "vendor_skygame_data_1_3_4", "source_id": "source_skygame_data_1_3_4", "snapshot_sha256": "A" * 64}
+        crosswalk = [{"snapshot_id": metadata["snapshot_id"], "source_id": metadata["source_id"], "vendor_item_id": index, "vendor_guid": f"guid{index}", "vendor_name": name, "vendor_item_type": name, "canonical_item_ids": [], "candidate_item_ids": [], "match_status": "excluded_non_collectible", "review_status": "needs_review"} for index, (name, _disposition) in enumerate(types, 1)]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot_path = root / "data/source/research/scope-decision.json"
+            snapshot_path.parent.mkdir(parents=True)
+            snapshot_path.write_text(json.dumps({"decisions": [{"vendor_item_id": index, "vendor_guid": f"guid{index}", "scope_disposition": disposition, "review_status": "approved"} for index, (_name, disposition) in enumerate(types, 1)]}), encoding="utf-8")
+            digest = hashlib.sha256(snapshot_path.read_bytes()).hexdigest().upper()
+            decisions = [{"vendor_item_id": index, "vendor_guid": f"guid{index}", "scope_disposition": disposition, "evidence_source_id": "source_independent_scope", "evidence_snapshot_path": "data/source/research/scope-decision.json", "evidence_snapshot_sha256": digest, "evidence_locator": f"/decisions/{index - 1}", "review_status": "approved"} for index, (_name, disposition) in enumerate(types, 1)]
+            rows, summary = build_catalog_universe(snapshot, metadata, crosswalk, decisions, root=root, sources={"source_independent_scope": {}})
+        self.assertTrue(all(row["review_status"] == "approved" for row in rows))
+        self.assertEqual(summary["needs_scope_review_count"], 0)
+
+    def test_scope_decision_missing_hash_or_tampered_locator_fails_closed(self):
+        snapshot = {"items": [{"id": 1, "guid": "guid1", "name": "WingBuff", "type": "WingBuff", "subtype": None, "group": None}]}
+        metadata = {"snapshot_id": "vendor_skygame_data_1_3_4", "source_id": "source_skygame_data_1_3_4", "snapshot_sha256": "A" * 64}
+        crosswalk = [{"snapshot_id": metadata["snapshot_id"], "source_id": metadata["source_id"], "vendor_item_id": 1, "vendor_guid": "guid1", "vendor_name": "WingBuff", "vendor_item_type": "WingBuff", "canonical_item_ids": [], "candidate_item_ids": [], "match_status": "excluded_non_collectible", "review_status": "needs_review"}]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); path = root / "data/source/research/decision.json"; path.parent.mkdir(parents=True)
+            path.write_text('{"decision":{"vendor_item_id":1,"vendor_guid":"guid1","scope_disposition":"progression_unlock","review_status":"approved"}}', encoding="utf-8")
+            decision = {"vendor_item_id": 1, "vendor_guid": "guid1", "scope_disposition": "progression_unlock", "evidence_source_id": "source_independent", "evidence_snapshot_path": "data/source/research/decision.json", "evidence_snapshot_sha256": "A" * 64, "evidence_locator": "/missing", "review_status": "approved"}
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                build_catalog_universe(snapshot, metadata, crosswalk, [decision], root=root, sources={"source_independent": {}})
+            decision["evidence_snapshot_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest().upper()
+            with self.assertRaisesRegex(ValueError, "locator cannot replay"):
+                build_catalog_universe(snapshot, metadata, crosswalk, [decision], root=root, sources={"source_independent": {}})
+
+    def test_scope_approval_cannot_be_self_asserted_or_evidenceless(self):
+        row = {"universe_id": "catalog_vendor_wing", "source_id": "source_skygame_data_1_3_4", "classification": "explicitly_excluded", "scope_disposition": "progression_unlock", "disposition_reason": "x", "evidence_basis": "x", "review_status": "approved"}
+        with self.assertRaisesRegex(ValueError, "lacks independent"):
+            validate_scope_accounting([row])
 
 
 if __name__ == "__main__":

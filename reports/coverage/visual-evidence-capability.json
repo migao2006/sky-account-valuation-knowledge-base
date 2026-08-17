@@ -1,0 +1,68 @@
+{
+  "as_of_date": "2026-08-17",
+  "asset_registry_summary": {
+    "duplicate_hash_count": 0,
+    "row_count": 0,
+    "unique_content_addressed_asset_count": 0
+  },
+  "counts": {
+    "all": {
+      "actual_content_addressed_assets": 0,
+      "approved_detections": 0,
+      "asset_backed_refs": 0,
+      "catalog_identity_locators": 10,
+      "catalog_items": 118,
+      "source_description_only_refs": 10
+    },
+    "eligible": {
+      "actual_content_addressed_assets": 0,
+      "approved_detections": 0,
+      "asset_backed_refs": 0,
+      "catalog_identity_locators": 6,
+      "catalog_items": 19,
+      "source_description_only_refs": 6
+    },
+    "verified": {
+      "actual_content_addressed_assets": 0,
+      "approved_detections": 0,
+      "asset_backed_refs": 0,
+      "catalog_identity_locators": 10,
+      "catalog_items": 39,
+      "source_description_only_refs": 10
+    }
+  },
+  "detection_summary": {
+    "approved_detection_count": 0,
+    "image_evidence_row_count": 0,
+    "unapproved_detection_count": 0
+  },
+  "inputs": {
+    "asset_registry": "data/curated/visual-assets.jsonl",
+    "asset_registry_present": false,
+    "image_evidence": "data/curated/image-evidence.jsonl",
+    "items": "knowledge/items/items.jsonl",
+    "visual_references": "knowledge/visual-references/manifest.jsonl"
+  },
+  "limitations": [
+    "No visual asset registry is present; actual content-addressed asset and asset-backed reference counts are zero.",
+    "The image-evidence ledger is empty; approved detection counts are zero.",
+    "Catalog identity locators are canonical item links in visual-reference rows; they do not assert a visual match.",
+    "Source-description references are text-only locators and are never counted as assets or detections.",
+    "Approved detections require confirmed review and a registry-backed image hash; no recognition accuracy is inferred."
+  ],
+  "metric_definitions": {
+    "actual_content_addressed_assets": "Count of distinct SHA-256 assets referenced by registry-bound offline_asset rows in the scope.",
+    "approved_detections": "Count of distinct detection IDs with approved review, confirmed evidence, a canonical item, and a registry-backed image hash.",
+    "asset_backed_refs": "Count of visual-reference rows in offline_asset mode with a matching registry binding.",
+    "catalog_identity_locators": "Count of distinct canonical item IDs linked by visual-reference rows in the scope.",
+    "catalog_items": "Count of canonical items in the scope.",
+    "source_description_only_refs": "Count of visual-reference rows in source_description mode; these remain non-visual text locators."
+  },
+  "offline_only": true,
+  "schema_version": "1.0-p3.4",
+  "scope_definitions": {
+    "all": "All canonical item rows in knowledge/items/items.jsonl.",
+    "eligible": "Canonical items with model_feature_status=eligible.",
+    "verified": "Canonical items with verification_status=verified."
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reports/visual-evidence-capability.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of_date",
+    "offline_only",
+    "inputs",
+    "scope_definitions",
+    "metric_definitions",
+    "counts",
+    "asset_registry_summary",
+    "detection_summary",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0-p3.4"},
+    "as_of_date": {"type": "string", "format": "date"},
+    "offline_only": {"const": true},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "visual_references", "image_evidence", "asset_registry", "asset_registry_present"],
+      "properties": {
+        "items": {"type": "string", "minLength": 1},
+        "visual_references": {"type": "string", "minLength": 1},
+        "image_evidence": {"type": "string", "minLength": 1},
+        "asset_registry": {"type": "string", "minLength": 1},
+        "asset_registry_present": {"type": "boolean"}
+      }
+    },
+    "scope_definitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all", "verified", "eligible"],
+      "properties": {
+        "all": {"type": "string", "minLength": 1},
+        "verified": {"type": "string", "minLength": 1},
+        "eligible": {"type": "string", "minLength": 1}
+      }
+    },
+    "metric_definitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_items",
+        "catalog_identity_locators",
+        "actual_content_addressed_assets",
+        "asset_backed_refs",
+        "approved_detections",
+        "source_description_only_refs"
+      ],
+      "properties": {
+        "catalog_items": {"type": "string", "minLength": 1},
+        "catalog_identity_locators": {"type": "string", "minLength": 1},
+        "actual_content_addressed_assets": {"type": "string", "minLength": 1},
+        "asset_backed_refs": {"type": "string", "minLength": 1},
+        "approved_detections": {"type": "string", "minLength": 1},
+        "source_description_only_refs": {"type": "string", "minLength": 1}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all", "verified", "eligible"],
+      "properties": {
+        "all": {"$ref": "#/$defs/scopeCounts"},
+        "verified": {"$ref": "#/$defs/scopeCounts"},
+        "eligible": {"$ref": "#/$defs/scopeCounts"}
+      }
+    },
+    "asset_registry_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_count", "unique_content_addressed_asset_count", "duplicate_hash_count"],
+      "properties": {
+        "row_count": {"type": "integer", "minimum": 0},
+        "unique_content_addressed_asset_count": {"type": "integer", "minimum": 0},
+        "duplicate_hash_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "detection_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_evidence_row_count", "approved_detection_count", "unapproved_detection_count"],
+      "properties": {
+        "image_evidence_row_count": {"type": "integer", "minimum": 0},
+        "approved_detection_count": {"type": "integer", "minimum": 0},
+        "unapproved_detection_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "scopeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_items",
+        "catalog_identity_locators",
+        "actual_content_addressed_assets",
+        "asset_backed_refs",
+        "approved_detections",
+        "source_description_only_refs"
+      ],
+      "properties": {
+        "catalog_items": {"type": "integer", "minimum": 0},
+        "catalog_identity_locators": {"type": "integer", "minimum": 0},
+        "actual_content_addressed_assets": {"type": "integer", "minimum": 0},
+        "asset_backed_refs": {"type": "integer", "minimum": 0},
+        "approved_detections": {"type": "integer", "minimum": 0},
+        "source_description_only_refs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

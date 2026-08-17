@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 
 SELECTION_VERSION = "p2.2-market-claim-stratified-200"
-REQUESTED_FIELDS = ["offer_kind", "entity_kind", "server", "currency", "price_type", "price_twd", "status", "date_verified"]
+REQUESTED_FIELDS = ["offer_kind", "entity_kind", "server", "currency", "price_type", "price_twd", "status", "date_verified", "verified_sale"]
 
 # These predicates are used only to make a balanced sample from the existing
 # normalized corpus.  The emitted queue contains neither a predicate name nor

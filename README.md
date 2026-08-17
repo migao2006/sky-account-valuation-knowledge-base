@@ -1,12 +1,12 @@
-# Sky 光遇知識庫與授權估價框架 v4.5 P3.3
+# Sky 光遇知識庫與授權估價框架 v4.6 P3.4
 
 這是完全離線的靜態知識庫與估價工具資料包。它以匿名化市場刊登資料、可追溯的遊戲知識主檔與可重建的衍生資料為基礎；不會登入帳號、讀取私人社團、傳送訊息或連線更新。
 
-v4.5 P3.3 新增 Days of Sunlight FAQ 1343 core-three、19 個具官方精確英文名稱的保守 model-eligibility 白名單、可簽章重播的 parser gold 評估器，以及可在 300/100 時間前推資料上實際計算門檻的 publication evaluator。授權市場契約另隔離 verified-sale metadata；在可重播成交證據 archive 完成前，production 成交池固定 fail closed，且絕不與 asking／urgent 混用。正式授權 registry 與真人 gold 仍為空，因此 production training 與估價維持 fail closed。所有正式工具只處理本機檔案，不主動連網。
+v4.6 P3.4 新增 Cinnamoroll Pop-Up Cafe FAQ 1308 六項受限 canonical evidence、可重播 catalog-completion 與 visual-capability 報告、market-gold accuracy evaluator，以及 release 外部的 parser 雙盲 review onboarding。Publication dataset 現保留並重播簽署的帳號 feature payload；評估器不再以日期作價格特徵，但在尚無 runtime-compatible 正式 artifact 前仍 fail closed。正式授權 registry、真人 gold、圖片資產與 verified sale 仍為空，因此 production training 與估價不會輸出價格。所有正式工具只處理本機檔案，不主動連網。
 
-目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。115 個 canonical item 中 33 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
+目前資料仍不足以訓練可信模型：103 筆既有市場歷程全標示為 `legacy_research_only`，授權 dataset registry 為空，因此正式正常／急售／verified-sale 列皆為 0。118 個 canonical item 中 39 筆 identity 已驗證，19 筆只允許官方精確英文 token 進入模型白名單；正式帳號資料仍沒有可發布的授權價格。四個正式模型 artifact 均為 `insufficient_training_data`，Item Value Table 也全部為 `insufficient_support`。
 
-P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.3 的 relation、成本參考、parser coverage 與 lexical sidecar 都只是來源／文字覆核關係，不會自動提升 ownership 或轉售價。固定 publication dataset／split／evaluation 報告目前為空且 `not_ready`；[`reports/completion-status.json`](reports/completion-status.json) 逐條公開尚未完成的契約。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
+P2 固定保存 MIT 授權 `skygame-data@1.3.4` 的 3,266 筆欄位限制快照。P3.4 的 relation、成本參考、parser coverage、lexical sidecar 與 visual locator 都只是來源／文字覆核關係，不會自動提升 ownership 或轉售價。現有 1,369 個 source-scoped observations 仍 unresolved。固定 publication dataset／split／evaluation 報告目前為空且 `not_ready`；[`reports/completion-status.json`](reports/completion-status.json) 逐條公開尚未完成的契約。完整知識庫與精準估價的正式完成門檻見 [`docs/methodology/completion-contract.md`](docs/methodology/completion-contract.md)。
 
 本專案不會抓取公開第三方帳號交易貼文來補足訓練資料。官方條款禁止帳號出售／轉讓，新的市場資料必須具備明確授權、去識別、固定來源 bytes 與可驗證人審；詳見 [`docs/methodology/market-data-authorization-policy.md`](docs/methodology/market-data-authorization-policy.md)。在此之前，轉售估價維持 fail closed；官方歷史取得成本也不得被解讀為帳號轉售價。
 
@@ -54,4 +54,4 @@ python tools/modeling/clean_prices.py --root .
 python tools/estimate/model_estimator.py valuation-account.json --root . --output model-estimate.json
 ```
 
-`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.3 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或任何正式 verified sale；visual reference 只有來源文字描述，不是圖片資產或辨識結果。已售聲稱不會被升級為 verified sale。
+`manifest.json` 記錄版本、資料統計、模型狀態、檔案 hash 與來源 ZIP 指紋。P3.4 仍未完成全物品 canonical identity、圖片 evidence 的實際辨識或任何正式 verified sale；visual capability 報告明確記錄實體資產 0、核准 detection 0、來源文字描述 10。已售聲稱不會被升級為 verified sale。

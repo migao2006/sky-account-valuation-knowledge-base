@@ -1,10 +1,19 @@
 {
-  "schema_version": "1.1-p3.3",
+  "schema_version": "1.2-p3.4",
   "publication_ready": false,
   "artifact_publication_fields_consulted": false,
+  "feature_evaluator_contract": {
+    "schema_version": "publication-feature-evaluator-v1",
+    "feature_source": "signed_feature_payload.feature_groups",
+    "target": "selected_price_twd",
+    "dates_used_only_for": [
+      "time_forward_split",
+      "comparable_selector_baseline"
+    ]
+  },
   "dataset_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
-  "dataset_manifest_sha256": "5494D7ADC05A86C75557D94520831992D85463E2FF44A564AAD2769E9CF24AF5",
-  "split_sha256": "3130E73FD2C2675A71266E4ADD2B49080C164DF88AB9769D800B7B7E238613AB",
+  "dataset_manifest_sha256": "5E7E8E18080D12816189407E4FF46D3F6FED3CD452AE51BA19F3610CC3105504",
+  "split_sha256": "44165670D320B52EC0BB04B0C3B1C22DE64DE272F8DDBD48B0E9F3FA8E2E22C4",
   "artifact_bindings": [],
   "requirements": {
     "training_clusters": 300,
