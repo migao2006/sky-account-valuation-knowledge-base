@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 4.6.0-p3.4 — 2026-08-17
+
+- 新增 Cinnamoroll Pop-Up Cafe FAQ 1308 六項可重播官方／vendor identity 與歷史成本證據。
+- 新增動態 catalog-completion 與 visual-capability 報告，移除永久 partial 與文字描述冒充圖片的風險。
+- 新增 fail-closed market-gold accuracy evaluator，以及 release 外部的 parser A/B 獨立標註與分歧裁決 onboarding。
+- Publication dataset 現保存並驗證簽署的帳號 feature payload；日期只用於時間前推切分，不再作價格特徵。
+- 正式授權資料、真人 gold、圖片資產與 verified sale 仍為 0，估價維持 fail closed。
+
 ## 4.5.0-p3.3 — 2026-08-17
 
 - 新增 Days of Sunlight FAQ 1343 core-three 的可重播官方／vendor identity 與歷史成本證據。

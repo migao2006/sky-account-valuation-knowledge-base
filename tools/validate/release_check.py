@@ -24,8 +24,12 @@ from tools.modeling.publication_dataset import build as build_publication_datase
 from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
 from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation  # noqa: E402
+from tools.modeling.market_gold_evaluator import build as build_market_gold_evaluation  # noqa: E402
+from tools.modeling.visual_evidence_coverage import build as build_visual_evidence_coverage  # noqa: E402
 from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
 from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
+from tools.validate.catalog_completion import build as build_catalog_completion  # noqa: E402
+from tools.parser_review.onboarding import validate_manifest as validate_parser_review_manifest  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -314,6 +318,10 @@ def main() -> None:
     completion_status = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
     parser_knowledge_coverage = json.loads((root / "reports/parser-knowledge-coverage.json").read_text(encoding="utf-8"))
     parser_gold_evaluation = json.loads((root / "reports/parser-gold-evaluation.json").read_text(encoding="utf-8"))
+    market_gold_evaluation = json.loads((root / "reports/market-gold-evaluation.json").read_text(encoding="utf-8"))
+    catalog_completion = json.loads((root / "reports/catalog-completion.json").read_text(encoding="utf-8"))
+    visual_evidence_coverage = json.loads((root / "reports/coverage/visual-evidence-capability.json").read_text(encoding="utf-8"))
+    parser_review_manifest = json.loads((root / "data/review/parser-gold/review-queue-manifest.json").read_text(encoding="utf-8"))
     expected_publication_dataset, expected_publication_split = build_publication_dataset(root)
     publication_evaluation_replayed = publication_evaluation == build_publication_evaluation(root)
     authorized_market_errors = verify_authorized_market_intake(
@@ -415,7 +423,11 @@ def main() -> None:
                 or publication_evaluation.get("status") == "passed"
             )
         ),
-        "p3_2_completion_state_replayed": completion_status == build_completion_status(root),
+        "p3_2_completion_state_replayed": completion_status == build_completion_status(
+            root,
+            args.market_audit_authority_bundle,
+            args.market_audit_authority_bundle_sha256,
+        ),
         "p3_1_parser_knowledge_coverage_replayed_non_model": (
             parser_knowledge_coverage == build_parser_knowledge_coverage(root)
             and parser_knowledge_coverage.get("model_feature") is False
@@ -426,6 +438,20 @@ def main() -> None:
             and parser_gold_evaluation == build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
             and parser_gold_evaluation.get("model_feature") is False
         ),
+        "p3_4_market_gold_replayed_fail_closed": (
+            market_gold_evaluation == build_market_gold_evaluation(root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256)
+            and (market_gold_evaluation.get("publication_ready") is False or market_gold_evaluation.get("status") == "evaluated")
+        ),
+        "p3_4_catalog_completion_replayed": (
+            catalog_completion == build_catalog_completion(root)
+            and coverage.get("full_item_catalog_complete") is catalog_completion.get("complete")
+            and coverage.get("catalog_claim") == ("complete_verified_catalog" if catalog_completion.get("complete") else "partial_verified_catalog")
+        ),
+        "p3_4_visual_capability_replayed_non_model": (
+            visual_evidence_coverage == build_visual_evidence_coverage(root)
+            and visual_evidence_coverage.get("offline_only") is True
+        ),
+        "p3_4_parser_review_queue_replayed_private": not validate_parser_review_manifest(parser_review_manifest),
     }
     fresh_checkout = None
     if args.verify_fresh_lf_checkout:
@@ -438,7 +464,7 @@ def main() -> None:
         )
         checks["fresh_lf_checkout"] = fresh_checkout["valid"] is True
     report = {
-        "schema_version": "4.5-p3.3", "offline_only": True, "valid": all(checks.values()),
+        "schema_version": "4.6-p3.4", "offline_only": True, "valid": all(checks.values()),
         "checks": checks, "schema_records_checked": integrity["schema_records_checked"],
         "schema_errors": integrity["errors"], "schema_warnings": integrity["warnings"],
         "unit_tests": test_summary,

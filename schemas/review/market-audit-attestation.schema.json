@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review/market-audit-attestation.schema.json",
-  "description": "Detached OpenSSH signature binding one external authority to a complete anonymous market ledger row and its committed queue row.",
+  "description": "v1 completed-row receipts and v2 blinded-submission/adjudication detached OpenSSH receipts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["attestation_id", "ledger_kind", "ledger_id", "role", "authority_id", "fingerprint", "payload_sha256", "signature_file"],
   "properties": {
+    "schema_version": {"enum": ["sky-market-audit-attestation-v2"]},
     "attestation_id": {"type": "string", "pattern": "^market_audit_attestation_[0-9]{4}$"},
     "ledger_kind": {"enum": ["market_claim_gold", "market_near_miss_approved_evidence"]},
     "ledger_id": {"type": "string", "pattern": "^market_(claim_gold|near_miss_evidence)_[0-9]{4}$"},
@@ -13,6 +14,24 @@
     "authority_id": {"type": "string", "pattern": "^human_[a-z0-9_]+$"},
     "fingerprint": {"type": "string", "pattern": "^SHA256:[A-Za-z0-9+/]+$"},
     "payload_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
-    "signature_file": {"type": "string", "pattern": "^data/review/market-audit/signatures/[a-z0-9_./-]+\\.sig$"}
-  }
+    "signature_file": {"type": "string", "pattern": "^data/review/market-audit/signatures/[a-z0-9_./-]+\\.sig$"},
+    "receipt_type": {"enum": ["blinded_annotation_submission", "adjudication"]},
+    "review_id": {"type": "string", "pattern": "^market_claim_review_[0-9]{4}$"},
+    "submitted_at": {"type": "string", "format": "date-time"},
+    "adjudicated_at": {"type": "string", "format": "date-time"},
+    "queue_commitment_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotation_commitment_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotator_a_attestation_id": {"type": "string", "pattern": "^market_audit_attestation_[0-9]{4}$"},
+    "annotator_b_attestation_id": {"type": "string", "pattern": "^market_audit_attestation_[0-9]{4}$"},
+    "annotator_a_annotation_commitment_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotator_b_annotation_commitment_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotator_a_receipt_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "annotator_b_receipt_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"},
+    "final_adjudication_commitment_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schema_version": {"const": "sky-market-audit-attestation-v2"}}, "required": ["schema_version"]}, "then": {"required": ["receipt_type", "review_id", "queue_commitment_sha256"]}},
+    {"if": {"properties": {"receipt_type": {"const": "blinded_annotation_submission"}}, "required": ["receipt_type"]}, "then": {"required": ["submitted_at", "annotation_commitment_sha256"]}},
+    {"if": {"properties": {"receipt_type": {"const": "adjudication"}}, "required": ["receipt_type"]}, "then": {"required": ["adjudicated_at", "annotator_a_attestation_id", "annotator_b_attestation_id", "annotator_a_annotation_commitment_sha256", "annotator_b_annotation_commitment_sha256", "annotator_a_receipt_sha256", "annotator_b_receipt_sha256", "final_adjudication_commitment_sha256"]}}
+  ]
 }

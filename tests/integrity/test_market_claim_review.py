@@ -19,7 +19,7 @@ def human_labels() -> dict:
     return {
         "offer_kind": "seller_listing", "entity_kind": "single_account",
         "server": "international", "currency": "TWD", "price_type": "asking",
-        "price_twd": 1200, "status": "active", "date_verified": False,
+        "price_twd": 1200, "status": "active", "date_verified": False, "verified_sale": False,
     }
 
 

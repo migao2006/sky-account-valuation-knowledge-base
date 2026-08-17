@@ -44,10 +44,14 @@ from tools.modeling.publication_dataset import build as build_publication_datase
 from tools.modeling.publication_evaluator import build as build_publication_evaluation  # noqa: E402
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage  # noqa: E402
 from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation  # noqa: E402
+from tools.modeling.market_gold_evaluator import build as build_market_gold_evaluation  # noqa: E402
+from tools.modeling.visual_evidence_coverage import build as build_visual_evidence_coverage  # noqa: E402
 from tools.modeling.canonical_english_eligibility import evaluate as evaluate_exact_english_eligibility  # noqa: E402
 from tools.modeling.clean_prices import clean_authorized_with_verified_sales as clean_model_prices  # noqa: E402
 from tools.market_authorization import verify_authorized_market_intake  # noqa: E402
 from tools.validate.build_completion_status import build as build_completion_status  # noqa: E402
+from tools.validate.catalog_completion import build as build_catalog_completion  # noqa: E402
+from tools.parser_review.onboarding import validate_manifest as validate_parser_review_manifest  # noqa: E402
 
 CANONICAL_FILES = {
     "season": "knowledge/seasons/seasons.jsonl", "event": "knowledge/events/events.jsonl",
@@ -87,6 +91,7 @@ SCHEMA_FILES = {
     "data/review/skygame-data-1.3.4-crosswalk.jsonl": "schemas/review/vendor-catalog-crosswalk.schema.json",
     "data/review/skygame-data-1.3.4-item-evidence.jsonl": "schemas/review/vendor-catalog-item-evidence.schema.json",
     "data/review/catalog-universe.jsonl": "schemas/review/catalog-universe.schema.json",
+    "data/review/catalog-scope-decisions.jsonl": "schemas/review/catalog-scope-decision.schema.json",
     "data/review/item-evidence.jsonl": "schemas/review/item-evidence.schema.json",
     "data/review/item-promotion-ledger.jsonl": "schemas/review/item-promotion-ledger.schema.json",
     "data/review/canonical-evidence-cohorts.jsonl": "schemas/review/canonical-evidence-cohort.schema.json",
@@ -119,6 +124,10 @@ JSON_SCHEMA_FILES = {
     "reports/model-publication-evaluation.json": "schemas/modeling/publication-evaluation.schema.json",
     "reports/parser-knowledge-coverage.json": "schemas/modeling/parser-knowledge-coverage.schema.json",
     "reports/parser-gold-evaluation.json": "schemas/modeling/parser-gold-evaluation.schema.json",
+    "reports/market-gold-evaluation.json": "schemas/review/market-gold-evaluation.schema.json",
+    "reports/catalog-completion.json": "schemas/reports/catalog-completion.schema.json",
+    "reports/coverage/visual-evidence-capability.json": "schemas/reports/visual-evidence-capability.schema.json",
+    "data/review/parser-gold/review-queue-manifest.json": "schemas/review/parser-review-queue.schema.json",
     "reports/completion-status.json": "schemas/reports/completion-status.schema.json",
     "modeling/artifacts/elastic-net-normal_listing.json": "schemas/modeling/elastic-net-artifact.schema.json",
     "modeling/artifacts/elastic-net-urgent_sale.json": "schemas/modeling/elastic-net-artifact.schema.json",
@@ -143,6 +152,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1330-tournament-of-triumph-core-four.json": "schemas/knowledge/tournament-of-triumph-faq-1330-core-four-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1323-days-of-color-core-three.json": "schemas/knowledge/days-of-color-faq-1323-core-three-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1343-days-of-sunlight-core-three.json": "schemas/knowledge/days-of-sunlight-faq-1343-core-three-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1308-cinnamoroll-popup-cafe.json": "schemas/knowledge/cinnamoroll-popup-cafe-faq-1308-fact-snapshot.schema.json",
 }
 
 
@@ -631,7 +641,8 @@ def validate(
     universe = read_jsonl(root / "data/review/catalog-universe.jsonl")
     universe_summary = json.loads((root / "data/review/catalog-universe-summary.json").read_text(encoding="utf-8"))
     try:
-        expected_universe, expected_universe_summary = build_catalog_universe(vendor_snapshot, vendor_metadata, crosswalk)
+        scope_decisions = read_jsonl(root / "data/review/catalog-scope-decisions.jsonl")
+        expected_universe, expected_universe_summary = build_catalog_universe(vendor_snapshot, vendor_metadata, crosswalk, scope_decisions, root=root, sources=sources)
     except ValueError as exc:
         errors.append(f"catalog-universe: cannot reconcile snapshot/crosswalk: {exc}")
     else:
@@ -1082,9 +1093,29 @@ def validate(
             errors.append("parser gold evaluation differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"parser gold evaluation: {exc}")
+    for relative, builder, label in (
+        ("reports/market-gold-evaluation.json", lambda: build_market_gold_evaluation(root, market_audit_authority_bundle, market_audit_authority_bundle_sha256), "market gold evaluation"),
+        ("reports/catalog-completion.json", lambda: build_catalog_completion(root), "catalog completion"),
+        ("reports/coverage/visual-evidence-capability.json", lambda: build_visual_evidence_coverage(root), "visual evidence capability"),
+    ):
+        try:
+            actual = json.loads((root / relative).read_text(encoding="utf-8"))
+            if actual != builder():
+                errors.append(f"{label} differs from deterministic rebuild")
+        except (ValueError, json.JSONDecodeError, OSError) as exc:
+            errors.append(f"{label}: {exc}")
+    try:
+        parser_review_manifest = json.loads((root / "data/review/parser-gold/review-queue-manifest.json").read_text(encoding="utf-8"))
+        errors.extend(f"parser review queue: {error}" for error in validate_parser_review_manifest(parser_review_manifest))
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        errors.append(f"parser review queue: {exc}")
     try:
         actual_completion = json.loads((root / "reports/completion-status.json").read_text(encoding="utf-8"))
-        if actual_completion != build_completion_status(root):
+        if actual_completion != build_completion_status(
+            root,
+            market_audit_authority_bundle,
+            market_audit_authority_bundle_sha256,
+        ):
             errors.append("completion status differs from deterministic rebuild")
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         errors.append(f"completion status: {exc}")
@@ -1138,7 +1169,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "4.5-p3.3", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "4.6-p3.4", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,

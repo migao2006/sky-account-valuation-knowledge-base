@@ -18,6 +18,9 @@ from tools.modeling.publication_dataset import build as build_publication_datase
 from tools.modeling.publication_evaluator import build as build_publication_evaluation
 from tools.modeling.parser_knowledge_coverage import build as build_parser_knowledge_coverage
 from tools.modeling.parser_gold_evaluator import audit_gold as audit_parser_gold, build as build_parser_gold_evaluation
+from tools.modeling.market_gold_evaluator import build as build_market_gold_evaluation
+from tools.modeling.visual_evidence_coverage import build as build_visual_evidence_coverage
+from tools.validate.catalog_completion import build as build_catalog_completion
 from tools.validate.build_completion_status import build as build_completion_status
 
 BUILT_AT = "2026-08-17T00:00:00+08:00"
@@ -156,12 +159,20 @@ def main() -> None:
     publication_evaluation = build_publication_evaluation(root)
     parser_coverage = build_parser_knowledge_coverage(root)
     parser_gold_evaluation = build_parser_gold_evaluation(root, args.parser_gold_replay_inputs, args.parser_gold_replay_inputs_sha256, args.parser_gold_authority_bundle, args.parser_gold_authority_bundle_sha256)
+    market_gold_evaluation = build_market_gold_evaluation(
+        root, args.market_audit_authority_bundle, args.market_audit_authority_bundle_sha256,
+    )
+    catalog_completion = build_catalog_completion(root)
+    visual_evidence_coverage = build_visual_evidence_coverage(root)
     for relative, expected in (
         ("reports/model-publication-dataset-manifest.json", publication_dataset),
         ("reports/model-publication-split.json", publication_split),
         ("reports/model-publication-evaluation.json", publication_evaluation),
         ("reports/parser-knowledge-coverage.json", parser_coverage),
         ("reports/parser-gold-evaluation.json", parser_gold_evaluation),
+        ("reports/market-gold-evaluation.json", market_gold_evaluation),
+        ("reports/catalog-completion.json", catalog_completion),
+        ("reports/coverage/visual-evidence-capability.json", visual_evidence_coverage),
     ):
         actual = json.loads((root / relative).read_text(encoding="utf-8"))
         if actual != expected:
@@ -199,10 +210,10 @@ def main() -> None:
         for name in canonical_entities
     }
     coverage = {
-        "schema_version": "4.5-p3.3",
+        "schema_version": "4.6-p3.4",
         "as_of_date": "2026-08-17",
-        "catalog_claim": "partial_verified_catalog",
-        "full_item_catalog_complete": False,
+        "catalog_claim": "complete_verified_catalog" if catalog_completion["complete"] else "partial_verified_catalog",
+        "full_item_catalog_complete": catalog_completion["complete"],
         "counts": {name: len(rows[name]) for name in (
             "seasons", "events", "ancestors", "items", "sets", "aliases",
             "availability_events", "sources", "visual_references", "unresolved", "unmapped", "item_candidates", "alias_conflicts"
@@ -362,12 +373,22 @@ def main() -> None:
             "parser_known_states": parser_coverage["summary"]["known_state_count"],
             "parser_review_only_claims": parser_coverage["summary"]["review_only_positive_count"] + parser_coverage["summary"]["review_only_negative_count"] + parser_coverage["summary"]["review_only_conflict_count"],
         },
+        "p3_4_completion_evidence": {
+            "catalog_status": catalog_completion["catalog_status"],
+            "catalog_blocking_contracts": len(catalog_completion["blocking_contract_ids"]),
+            "market_gold_status": market_gold_evaluation["status"],
+            "market_gold_rows": market_gold_evaluation["gold_row_count"],
+            "parser_review_queue_status": json.loads((root / "data/review/parser-gold/review-queue-manifest.json").read_text(encoding="utf-8"))["status"],
+            "visual_actual_assets": visual_evidence_coverage["counts"]["all"]["actual_content_addressed_assets"],
+            "visual_approved_detections": visual_evidence_coverage["counts"]["all"]["approved_detections"],
+            "visual_source_descriptions": visual_evidence_coverage["counts"]["all"]["source_description_only_refs"],
+        },
         "known_limitations": [
             "全物品主檔尚未完成；未確認類別保留在 unresolved-items.jsonl，未逐項查證的列印頁候選隔離於 data/review/item-candidates.jsonl，不參與 canonical 辨識或估價。",
-            "P3.1 新增 Tournament of Triumph FAQ 1330 core-four 的受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
-            "物品圖示參考與真實圖片 evidence 目前為零，不宣稱具備圖示辨識準確率。",
+            "P3.4 新增 Cinnamoroll Pop-Up Cafe FAQ 1308 六項受限官方 identity 與歷史取得成本證據；所有 cohort 未證實的正式繁中名稱、目前供應、永久性、視覺身份與模型辨識仍維持 unknown／excluded。",
+            "真實圖片資產與核准 detection 目前為零；10 筆 visual reference 只是來源文字描述，不宣稱具備圖示辨識準確率。",
             "可驗證成交價與獲外部授權的市場訓練列均為零；正式估價器維持 fail closed，不輸出轉售價格。",
-            "P3.3 v2 外部授權 intake 已可綁定 price、account feature／Item Vector、catalog provenance 與 signed dedup cluster；正式 registry 仍為空。verified-sale metadata 因沒有可重播成交證據 archive，仍固定 fail closed。",
+            "P3.4 外部授權 intake 已可綁定 price、account feature／Item Vector、catalog provenance 與 signed dedup cluster；正式 registry 仍為空。verified-sale metadata 因沒有可重播成交證據 archive，仍固定 fail closed。",
             "部分季節節點的免費／季卡、成本及正式繁中名稱仍需逐頁查證。",
             "Vendored 社群資料只提供二級交叉證據；296 個候選名稱命中仍需獨立審核，沒有自動升級 canonical item。",
             "P2.1 封閉對帳 3,266 筆 vendor 宇宙；284 個候選只有單一獨立 vendor 對未驗證 template seed 的 correlation，canonical identity 與 season／取得／availability／成本／visual reference 仍未確認，且沒有 canonical write 或模型白名單提升。",
@@ -384,7 +405,11 @@ def main() -> None:
     }
     coverage_path = root / "reports/coverage/catalog-coverage.json"
     write_utf8_lf(coverage_path, json.dumps(coverage, ensure_ascii=False, indent=2) + "\n")
-    completion_status = build_completion_status(root)
+    completion_status = build_completion_status(
+        root,
+        args.market_audit_authority_bundle,
+        args.market_audit_authority_bundle_sha256,
+    )
     write_utf8_lf(root / "reports/completion-status.json", json.dumps(completion_status, ensure_ascii=False, indent=2) + "\n")
 
     migration_md = f"""# P0 遷移報告
@@ -438,13 +463,13 @@ def main() -> None:
     # a version bump is reproducible without hand-editing report numbers.
     validation_path = root / "reports/validation/p0-validation.json"
     previous_validation = json.loads(validation_path.read_text(encoding="utf-8"))
-    previous_validation["schema_version"] = "4.5-p3.3"
+    previous_validation["schema_version"] = "4.6-p3.4"
     write_utf8_lf(validation_path, json.dumps(previous_validation, ensure_ascii=False, indent=2) + "\n")
 
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_id"] = "sky-valuation-v4-p33"
-    manifest["package_version"] = "4.5.0-p3.3"
+    manifest["package_id"] = "sky-valuation-v4-p34"
+    manifest["package_version"] = "4.6.0-p3.4"
     manifest["research_cutoff_date"] = "2026-08-17"
     manifest["statistics"] = {
         "seasons": len(rows["seasons"]), "events": len(rows["events"]), "ancestors": len(rows["ancestors"]),
@@ -494,6 +519,10 @@ def main() -> None:
         "authorized_market_attestation_rows": len(rows["authorized_market_attestations"]),
         "frozen_publication_rows": publication_dataset["dataset_row_count"],
         "parser_known_states": parser_coverage["summary"]["known_state_count"],
+        "market_gold_rows": market_gold_evaluation["gold_row_count"],
+        "catalog_completion_blockers": len(catalog_completion["blocking_contract_ids"]),
+        "visual_actual_assets": visual_evidence_coverage["counts"]["all"]["actual_content_addressed_assets"],
+        "visual_approved_detections": visual_evidence_coverage["counts"]["all"]["approved_detections"],
     }
     manifest["derived_paths"] = [
         "data/comparables/histories.jsonl", "data/comparables/accounts.jsonl",
@@ -513,6 +542,9 @@ def main() -> None:
         "reports/coverage/catalog-coverage.json", "reports/model-publication-readiness.json",
         "reports/model-publication-dataset-manifest.json", "reports/model-publication-split.json",
         "reports/model-publication-evaluation.json",
+        "reports/catalog-completion.json",
+        "reports/market-gold-evaluation.json",
+        "reports/coverage/visual-evidence-capability.json",
         "reports/completion-status.json",
         "reports/parser-knowledge-coverage.json",
         "reports/validation/p0-validation.json",
@@ -526,7 +558,7 @@ def main() -> None:
         "data/review/market-authorization/attestations.jsonl",
     ]
     manifest["generated_at"] = BUILT_AT
-    manifest["catalog_status"] = "partial_verified_catalog"
+    manifest["catalog_status"] = coverage["catalog_claim"]
     manifest["hash_exclusions"] = sorted(HASH_EXCLUSIONS)
     manifest["file_hashes"] = {
         path.relative_to(root).as_posix(): sha256(path)

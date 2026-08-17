@@ -1,0 +1,1339 @@
+{
+  "blocking_contract_ids": [
+    "catalog.scope_review_zero",
+    "catalog.unresolved_zero",
+    "catalog.candidates_zero",
+    "catalog.unmapped_alias_zero",
+    "catalog.all_canonical_verified",
+    "catalog.required_field_evidence",
+    "catalog.independent_identity_evidence",
+    "catalog.visual_state_verified"
+  ],
+  "catalog_status": "partial",
+  "checks": [
+    {
+      "actual": {
+        "duplicate_ids": 0,
+        "expected": 3266,
+        "reconciliation_status": "reconciled",
+        "rows": 3266
+      },
+      "contract_id": "catalog.closed_universe",
+      "evidence_paths": [
+        "data/review/catalog-universe.jsonl",
+        "data/review/catalog-universe-summary.json"
+      ],
+      "passed": true,
+      "requirement": "a reconciled, duplicate-free universe accounts for every pinned source observation"
+    },
+    {
+      "actual": {
+        "needs_review": 3266,
+        "summary_needs_scope_review": 3266
+      },
+      "contract_id": "catalog.scope_review_zero",
+      "evidence_paths": [
+        "data/review/catalog-universe.jsonl",
+        "data/review/catalog-universe-summary.json"
+      ],
+      "passed": false,
+      "requirement": "every source-universe row has a final evidence-backed scope decision"
+    },
+    {
+      "actual": {
+        "review_scopes": 39,
+        "source_references": 1369
+      },
+      "contract_id": "catalog.unresolved_zero",
+      "evidence_paths": [
+        "reports/coverage/unresolved-items.jsonl",
+        "data/normalized/source-scoped-item-identities-summary.json"
+      ],
+      "passed": false,
+      "requirement": "no catalog review scope or source-scoped reference remains unresolved"
+    },
+    {
+      "actual": 622,
+      "contract_id": "catalog.candidates_zero",
+      "evidence_paths": [
+        "data/review/item-candidates.jsonl"
+      ],
+      "passed": false,
+      "requirement": "no candidate identity remains outside the canonical catalog"
+    },
+    {
+      "actual": {
+        "conflicts": 1,
+        "unmapped": 14
+      },
+      "contract_id": "catalog.unmapped_alias_zero",
+      "evidence_paths": [
+        "reports/coverage/unmapped-aliases.jsonl",
+        "data/review/alias-conflicts.jsonl"
+      ],
+      "passed": false,
+      "requirement": "no unmapped or conflicting alias remains"
+    },
+    {
+      "actual": {
+        "canonical_items": 118,
+        "non_verified_count": 79,
+        "non_verified_item_ids": [
+          "item_anniversary_bass",
+          "item_anniversary_fifth_stripe_cape",
+          "item_aurora_mindful_miner_cape",
+          "item_aurora_mindful_miner_hair",
+          "item_aurora_mindful_miner_mask",
+          "item_aurora_mindful_miner_outfit",
+          "item_aurora_runaway_music_sheet",
+          "item_aurora_running_wayfarer_cape",
+          "item_aurora_running_wayfarer_hair",
+          "item_aurora_running_wayfarer_mask",
+          "item_aurora_seed_of_hope_cape",
+          "item_aurora_seed_of_hope_hair",
+          "item_aurora_seed_of_hope_mask",
+          "item_aurora_the_seed_music_sheet",
+          "item_aurora_ultimate_cape",
+          "item_aurora_ultimate_hair",
+          "item_aurora_ultimate_outfit",
+          "item_aurora_warrior_music_sheet",
+          "item_aurora_warrior_of_love_cape",
+          "item_aurora_warrior_of_love_hair",
+          "item_aurora_warrior_of_love_mask",
+          "item_constellation_forest_elder_hair",
+          "item_constellation_prairie_elder_hair",
+          "item_constellation_second_tier_cape",
+          "item_days_bloom_cherry_teaset",
+          "item_days_feast_reindeer_antlers",
+          "item_days_feast_white_fuzzy_cape",
+          "item_days_mischief_bat_cape",
+          "item_days_mischief_bat_mask",
+          "item_days_mischief_cat_ears_tail",
+          "item_days_mischief_witch_hat",
+          "item_days_music_white_guitar",
+          "item_days_rainbow_double_flower",
+          "item_days_rainbow_earrings",
+          "item_days_rainbow_headphones",
+          "item_kizuna_ai_hair_bow",
+          "item_kizuna_ai_headphones",
+          "item_little_prince_asteroid_jacket",
+          "item_little_prince_fox_prop",
+          "item_little_prince_sword_outfit",
+          "item_nine_colored_deer_antlers",
+          "item_nine_colored_deer_cape",
+          "item_office_cape",
+          "item_permanent_blue_electric_guitar",
+          "item_permanent_fledgling_harp",
+          "item_permanent_fledgling_upright_piano",
+          "item_permanent_rhythm_guitar",
+          "item_regular_apologetic_lumberjack_face_accessory",
+          "item_regular_apologetic_lumberjack_hair",
+          "item_regular_applauding_bellmaker_hair",
+          "item_regular_bird_whisperer_hair",
+          "item_regular_blushing_prospector_hair",
+          "item_regular_confident_sightseer_hair",
+          "item_regular_confident_sightseer_outfit",
+          "item_regular_contrabass",
+          "item_regular_dismayed_hunter_cape",
+          "item_regular_dismayed_hunter_hair",
+          "item_regular_drum",
+          "item_regular_exhausted_dock_worker_face_accessory",
+          "item_regular_fireworks_staff",
+          "item_regular_frightened_refugee_hair",
+          "item_regular_harp",
+          "item_regular_horn",
+          "item_regular_leavitating_adept_face_accessory",
+          "item_regular_levitating_adept_hair",
+          "item_regular_meditating_monastic_hair",
+          "item_regular_piano",
+          "item_regular_pouty_porter_cape",
+          "item_regular_pouty_porter_hair",
+          "item_regular_rejecting_voyager_face_accessory",
+          "item_regular_rejecting_voyager_hair",
+          "item_regular_saluting_captain_hair",
+          "item_regular_slumbering_shipwright_hair",
+          "item_regular_table",
+          "item_regular_umbrella",
+          "item_regular_ushering_stargazer_hair",
+          "item_regular_ushering_stargazer_outfit",
+          "item_regular_waving_bellmaker_hair",
+          "item_regular_waving_bellmaker_mask"
+        ]
+      },
+      "contract_id": "catalog.all_canonical_verified",
+      "evidence_paths": [
+        "knowledge/items/items.jsonl"
+      ],
+      "passed": false,
+      "requirement": "every canonical item is independently verified"
+    },
+    {
+      "actual": {
+        "items_missing_required_fields": 118,
+        "missing_fields_by_item": {
+          "item_anniversary_bass": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_anniversary_fifth_stripe_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_cure_for_me_mask": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_cure_for_me_outfit": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_giving_in_cape": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_mindful_miner_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_mindful_miner_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_mindful_miner_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_mindful_miner_outfit": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_runaway_music_sheet": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_running_wayfarer_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_running_wayfarer_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_running_wayfarer_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_seed_of_hope_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_seed_of_hope_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_seed_of_hope_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_the_seed_music_sheet": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_to_the_love_outfit": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_ultimate_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_ultimate_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_ultimate_outfit": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_voice": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_warrior_music_sheet": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_warrior_of_love_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_warrior_of_love_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_warrior_of_love_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_aurora_wings": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_bowtie": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_cloud_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_cozy_cafe_table": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_cozy_teacup_headband": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_mini_companion": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_cinnamoroll_plush": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_constellation_forest_elder_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_constellation_prairie_elder_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_constellation_second_tier_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_bloom_cherry_teaset": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_feast_reindeer_antlers": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_feast_white_fuzzy_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_mischief_bat_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_mischief_bat_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_mischief_cat_ears_tail": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_mischief_witch_hat": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_music_white_guitar": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_color_color_bubble_machine": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_color_color_glam_cut": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_color_dark_rainbow_mask": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_sunlight_helios_hoops": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_sunlight_manta_float": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_of_sunlight_woven_wrap": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_rainbow_double_flower": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_rainbow_earrings": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_days_rainbow_headphones": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_journey_hair": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_journey_mask": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_journey_pack_cape": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_kizuna_ai_bow": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_kizuna_ai_cape": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_kizuna_ai_hair": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_kizuna_ai_hair_bow": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_kizuna_ai_headphones": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_little_prince_asteroid_jacket": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_little_prince_fox_prop": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_little_prince_sword_outfit": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_moomin_ears": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_moomin_tail": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nine_colored_deer_antlers": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nine_colored_deer_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nintendo_blue_cape": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nintendo_hair": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nintendo_red_cape": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_nintendo_vessel_flute": [
+            "availability_status",
+            "free_or_premium",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_office_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_permanent_blue_electric_guitar": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_permanent_fledgling_harp": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_permanent_fledgling_upright_piano": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_permanent_rhythm_guitar": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_apologetic_lumberjack_face_accessory": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_apologetic_lumberjack_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_applauding_bellmaker_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_bird_whisperer_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_blushing_prospector_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_confident_sightseer_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_confident_sightseer_outfit": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_contrabass": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_dismayed_hunter_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_dismayed_hunter_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_drum": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_exhausted_dock_worker_face_accessory": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_fireworks_staff": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_frightened_refugee_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_harp": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_horn": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_leavitating_adept_face_accessory": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_levitating_adept_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_meditating_monastic_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_piano": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_pouty_porter_cape": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_pouty_porter_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_rejecting_voyager_face_accessory": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_rejecting_voyager_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_saluting_captain_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_slumbering_shipwright_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_table": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_umbrella": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_ushering_stargazer_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_ushering_stargazer_outfit": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_waving_bellmaker_hair": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_regular_waving_bellmaker_mask": [
+            "availability_status",
+            "canonical_name_en",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_skyfest_5th_anniversary_tshirt": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_skyfest_jenova_fan": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_skyfest_oreo_headband": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_skyfest_star_jar": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_skyfest_wireframe_cape": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_tournament_of_triumph_curls": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_tournament_of_triumph_golden_garland": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_tournament_of_triumph_torch": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ],
+          "item_tournament_of_triumph_tunic": [
+            "availability_status",
+            "free_or_premium",
+            "item_category",
+            "permanent_account_item",
+            "source_type"
+          ]
+        },
+        "registry_replay_error_count": 0
+      },
+      "contract_id": "catalog.required_field_evidence",
+      "evidence_paths": [
+        "data/review/canonical-evidence-cohorts.jsonl"
+      ],
+      "passed": false,
+      "requirement": "every canonical item has approved evidence from a release-required cohort whose verifier replays successfully"
+    },
+    {
+      "actual": {
+        "item_ids": [
+          "item_anniversary_bass",
+          "item_anniversary_fifth_stripe_cape",
+          "item_aurora_mindful_miner_cape",
+          "item_aurora_mindful_miner_hair",
+          "item_aurora_mindful_miner_mask",
+          "item_aurora_mindful_miner_outfit",
+          "item_aurora_runaway_music_sheet",
+          "item_aurora_running_wayfarer_cape",
+          "item_aurora_running_wayfarer_hair",
+          "item_aurora_running_wayfarer_mask",
+          "item_aurora_seed_of_hope_cape",
+          "item_aurora_seed_of_hope_hair",
+          "item_aurora_seed_of_hope_mask",
+          "item_aurora_the_seed_music_sheet",
+          "item_aurora_ultimate_cape",
+          "item_aurora_ultimate_hair",
+          "item_aurora_ultimate_outfit",
+          "item_aurora_warrior_music_sheet",
+          "item_aurora_warrior_of_love_cape",
+          "item_aurora_warrior_of_love_hair",
+          "item_aurora_warrior_of_love_mask",
+          "item_cinnamoroll_bowtie",
+          "item_cinnamoroll_cloud_cape",
+          "item_cinnamoroll_cozy_cafe_table",
+          "item_cinnamoroll_cozy_teacup_headband",
+          "item_cinnamoroll_mini_companion",
+          "item_cinnamoroll_plush",
+          "item_constellation_forest_elder_hair",
+          "item_constellation_prairie_elder_hair",
+          "item_constellation_second_tier_cape",
+          "item_days_bloom_cherry_teaset",
+          "item_days_feast_reindeer_antlers",
+          "item_days_feast_white_fuzzy_cape",
+          "item_days_mischief_bat_cape",
+          "item_days_mischief_bat_mask",
+          "item_days_mischief_cat_ears_tail",
+          "item_days_mischief_witch_hat",
+          "item_days_music_white_guitar",
+          "item_days_rainbow_double_flower",
+          "item_days_rainbow_earrings",
+          "item_days_rainbow_headphones",
+          "item_journey_hair",
+          "item_journey_mask",
+          "item_journey_pack_cape",
+          "item_kizuna_ai_bow",
+          "item_kizuna_ai_cape",
+          "item_kizuna_ai_hair",
+          "item_kizuna_ai_hair_bow",
+          "item_kizuna_ai_headphones",
+          "item_little_prince_asteroid_jacket",
+          "item_little_prince_fox_prop",
+          "item_little_prince_sword_outfit",
+          "item_moomin_ears",
+          "item_moomin_tail",
+          "item_nine_colored_deer_antlers",
+          "item_nine_colored_deer_cape",
+          "item_nintendo_blue_cape",
+          "item_nintendo_hair",
+          "item_nintendo_red_cape",
+          "item_nintendo_vessel_flute",
+          "item_office_cape",
+          "item_permanent_blue_electric_guitar",
+          "item_permanent_fledgling_harp",
+          "item_permanent_fledgling_upright_piano",
+          "item_permanent_rhythm_guitar",
+          "item_regular_apologetic_lumberjack_face_accessory",
+          "item_regular_apologetic_lumberjack_hair",
+          "item_regular_applauding_bellmaker_hair",
+          "item_regular_bird_whisperer_hair",
+          "item_regular_blushing_prospector_hair",
+          "item_regular_confident_sightseer_hair",
+          "item_regular_confident_sightseer_outfit",
+          "item_regular_contrabass",
+          "item_regular_dismayed_hunter_cape",
+          "item_regular_dismayed_hunter_hair",
+          "item_regular_drum",
+          "item_regular_exhausted_dock_worker_face_accessory",
+          "item_regular_fireworks_staff",
+          "item_regular_frightened_refugee_hair",
+          "item_regular_harp",
+          "item_regular_horn",
+          "item_regular_leavitating_adept_face_accessory",
+          "item_regular_levitating_adept_hair",
+          "item_regular_meditating_monastic_hair",
+          "item_regular_piano",
+          "item_regular_pouty_porter_cape",
+          "item_regular_pouty_porter_hair",
+          "item_regular_rejecting_voyager_face_accessory",
+          "item_regular_rejecting_voyager_hair",
+          "item_regular_saluting_captain_hair",
+          "item_regular_slumbering_shipwright_hair",
+          "item_regular_table",
+          "item_regular_umbrella",
+          "item_regular_ushering_stargazer_hair",
+          "item_regular_ushering_stargazer_outfit",
+          "item_regular_waving_bellmaker_hair",
+          "item_regular_waving_bellmaker_mask"
+        ],
+        "items_missing_official_identity": 97
+      },
+      "contract_id": "catalog.independent_identity_evidence",
+      "evidence_paths": [
+        "data/review/canonical-evidence-cohorts.jsonl"
+      ],
+      "passed": false,
+      "requirement": "every canonical item has approved official item-specific independent identity evidence"
+    },
+    {
+      "actual": {
+        "item_ids": [
+          "item_anniversary_bass",
+          "item_anniversary_fifth_stripe_cape",
+          "item_aurora_cure_for_me_mask",
+          "item_aurora_cure_for_me_outfit",
+          "item_aurora_giving_in_cape",
+          "item_aurora_mindful_miner_cape",
+          "item_aurora_mindful_miner_hair",
+          "item_aurora_mindful_miner_mask",
+          "item_aurora_mindful_miner_outfit",
+          "item_aurora_runaway_music_sheet",
+          "item_aurora_running_wayfarer_cape",
+          "item_aurora_running_wayfarer_hair",
+          "item_aurora_running_wayfarer_mask",
+          "item_aurora_seed_of_hope_cape",
+          "item_aurora_seed_of_hope_hair",
+          "item_aurora_seed_of_hope_mask",
+          "item_aurora_the_seed_music_sheet",
+          "item_aurora_to_the_love_outfit",
+          "item_aurora_ultimate_cape",
+          "item_aurora_ultimate_hair",
+          "item_aurora_ultimate_outfit",
+          "item_aurora_voice",
+          "item_aurora_warrior_music_sheet",
+          "item_aurora_warrior_of_love_cape",
+          "item_aurora_warrior_of_love_hair",
+          "item_aurora_warrior_of_love_mask",
+          "item_aurora_wings",
+          "item_cinnamoroll_bowtie",
+          "item_cinnamoroll_cloud_cape",
+          "item_cinnamoroll_cozy_cafe_table",
+          "item_cinnamoroll_cozy_teacup_headband",
+          "item_cinnamoroll_mini_companion",
+          "item_cinnamoroll_plush",
+          "item_constellation_forest_elder_hair",
+          "item_constellation_prairie_elder_hair",
+          "item_constellation_second_tier_cape",
+          "item_days_bloom_cherry_teaset",
+          "item_days_feast_reindeer_antlers",
+          "item_days_feast_white_fuzzy_cape",
+          "item_days_mischief_bat_cape",
+          "item_days_mischief_bat_mask",
+          "item_days_mischief_cat_ears_tail",
+          "item_days_mischief_witch_hat",
+          "item_days_music_white_guitar",
+          "item_days_of_color_color_bubble_machine",
+          "item_days_of_color_color_glam_cut",
+          "item_days_of_color_dark_rainbow_mask",
+          "item_days_of_sunlight_helios_hoops",
+          "item_days_of_sunlight_manta_float",
+          "item_days_of_sunlight_woven_wrap",
+          "item_days_rainbow_double_flower",
+          "item_days_rainbow_earrings",
+          "item_days_rainbow_headphones",
+          "item_journey_hair",
+          "item_journey_mask",
+          "item_journey_pack_cape",
+          "item_kizuna_ai_bow",
+          "item_kizuna_ai_cape",
+          "item_kizuna_ai_hair",
+          "item_kizuna_ai_hair_bow",
+          "item_kizuna_ai_headphones",
+          "item_little_prince_asteroid_jacket",
+          "item_little_prince_fox_prop",
+          "item_little_prince_sword_outfit",
+          "item_moomin_ears",
+          "item_moomin_tail",
+          "item_nine_colored_deer_antlers",
+          "item_nine_colored_deer_cape",
+          "item_nintendo_blue_cape",
+          "item_nintendo_hair",
+          "item_nintendo_red_cape",
+          "item_nintendo_vessel_flute",
+          "item_office_cape",
+          "item_permanent_blue_electric_guitar",
+          "item_permanent_fledgling_harp",
+          "item_permanent_fledgling_upright_piano",
+          "item_permanent_rhythm_guitar",
+          "item_regular_apologetic_lumberjack_face_accessory",
+          "item_regular_apologetic_lumberjack_hair",
+          "item_regular_applauding_bellmaker_hair",
+          "item_regular_bird_whisperer_hair",
+          "item_regular_blushing_prospector_hair",
+          "item_regular_confident_sightseer_hair",
+          "item_regular_confident_sightseer_outfit",
+          "item_regular_contrabass",
+          "item_regular_dismayed_hunter_cape",
+          "item_regular_dismayed_hunter_hair",
+          "item_regular_drum",
+          "item_regular_exhausted_dock_worker_face_accessory",
+          "item_regular_fireworks_staff",
+          "item_regular_frightened_refugee_hair",
+          "item_regular_harp",
+          "item_regular_horn",
+          "item_regular_leavitating_adept_face_accessory",
+          "item_regular_levitating_adept_hair",
+          "item_regular_meditating_monastic_hair",
+          "item_regular_piano",
+          "item_regular_pouty_porter_cape",
+          "item_regular_pouty_porter_hair",
+          "item_regular_rejecting_voyager_face_accessory",
+          "item_regular_rejecting_voyager_hair",
+          "item_regular_saluting_captain_hair",
+          "item_regular_slumbering_shipwright_hair",
+          "item_regular_table",
+          "item_regular_umbrella",
+          "item_regular_ushering_stargazer_hair",
+          "item_regular_ushering_stargazer_outfit",
+          "item_regular_waving_bellmaker_hair",
+          "item_regular_waving_bellmaker_mask",
+          "item_skyfest_5th_anniversary_tshirt",
+          "item_skyfest_jenova_fan",
+          "item_skyfest_oreo_headband",
+          "item_skyfest_star_jar",
+          "item_skyfest_wireframe_cape",
+          "item_tournament_of_triumph_curls",
+          "item_tournament_of_triumph_golden_garland",
+          "item_tournament_of_triumph_torch",
+          "item_tournament_of_triumph_tunic"
+        ],
+        "items_without_actual_visual_evidence": 118,
+        "visual_input_error_count": 0
+      },
+      "contract_id": "catalog.visual_state_verified",
+      "evidence_paths": [
+        "knowledge/visual-references/manifest.jsonl",
+        "data/curated/visual-assets.jsonl",
+        "data/curated/image-evidence.jsonl"
+      ],
+      "passed": false,
+      "requirement": "every canonical item has a verified registered image asset or approved registry-backed detection; descriptions never satisfy this gate"
+    }
+  ],
+  "complete": false,
+  "counts": {
+    "alias_conflicts": 1,
+    "candidates": 622,
+    "canonical_items": 118,
+    "scope_review": 3266,
+    "source_scoped_unresolved": 1369,
+    "universe": 3266,
+    "unmapped_aliases": 14,
+    "unresolved_review_scopes": 39
+  },
+  "schema_version": "1.0-p3.4"
+}

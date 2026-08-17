@@ -5,6 +5,43 @@
   "required": ["visual_reference_id", "item_id", "reference_mode", "source_ids", "verification_status"],
   "properties": {
     "visual_reference_id": {"type": "string", "pattern": "^visual_[a-z0-9_]+$"}, "item_id": {"type": "string", "pattern": "^item_[a-z0-9_]+$"},
-    "reference_mode": {"enum": ["offline_asset", "source_description", "unavailable"]}, "asset_sha256": {"type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$"}, "description": {"type": "string"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
-  }
+    "reference_mode": {"enum": ["offline_asset", "source_description", "unavailable"]},
+    "asset_sha256": {"type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$"},
+    "asset_registry_id": {"type": ["string", "null"], "pattern": "^asset_[a-z0-9_]+$"},
+    "detection_ids": {"type": "array", "items": {"type": "string", "pattern": "^detection_[a-z0-9_]+$"}, "uniqueItems": true},
+    "description": {"type": "string"}, "source_ids": {"$ref": "common.schema.json#/$defs/sourceIds"}, "verification_status": {"$ref": "common.schema.json#/$defs/verificationStatus"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["reference_mode"], "properties": {"reference_mode": {"const": "offline_asset"}}},
+      "then": {
+        "required": ["asset_sha256", "asset_registry_id"],
+        "properties": {
+          "asset_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+          "asset_registry_id": {"type": "string", "pattern": "^asset_[a-z0-9_]+$"}
+        }
+      }
+    },
+    {
+      "if": {"required": ["reference_mode"], "properties": {"reference_mode": {"const": "source_description"}}},
+      "then": {
+        "required": ["asset_sha256"],
+        "properties": {
+          "asset_sha256": {"const": null},
+          "asset_registry_id": {"const": null},
+          "detection_ids": {"const": []}
+        }
+      }
+    },
+    {
+      "if": {"required": ["reference_mode"], "properties": {"reference_mode": {"const": "unavailable"}}},
+      "then": {
+        "properties": {
+          "asset_sha256": {"const": null},
+          "asset_registry_id": {"const": null},
+          "detection_ids": {"const": []}
+        }
+      }
+    }
+  ]
 }

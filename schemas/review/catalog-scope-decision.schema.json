@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review/catalog-scope-decision.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["vendor_item_id", "vendor_guid", "scope_disposition", "evidence_source_id", "evidence_snapshot_path", "evidence_snapshot_sha256", "evidence_locator", "review_status"],
+  "properties": {
+    "vendor_item_id": {"type": "integer", "minimum": 0}, "vendor_guid": {"type": "string", "minLength": 1},
+    "scope_disposition": {"enum": ["collectible_item", "progression_unlock", "consumable_effect", "quest_record", "vendor_special_needs_scope_review"]},
+    "evidence_source_id": {"type": "string", "pattern": "^source_[a-z0-9_]+$"},
+    "evidence_snapshot_path": {"type": "string", "pattern": "^data/source/research/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+\\.json$"},
+    "evidence_snapshot_sha256": {"type": "string", "pattern": "^[A-F0-9]{64}$"}, "evidence_locator": {"type": "string", "pattern": "^/"}, "review_status": {"const": "approved"}
+  }
+}

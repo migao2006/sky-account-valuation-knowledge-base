@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence/visual-asset-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_registry_id", "asset_sha256", "asset_path", "mime_type"],
+  "properties": {
+    "asset_registry_id": {"type": "string", "pattern": "^asset_[a-z0-9_]+$"},
+    "asset_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "asset_path": {"type": "string", "pattern": "^data/curated/visual-assets/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+\\.png$"},
+    "mime_type": {"const": "image/png"}
+  }
+}

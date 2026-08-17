@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "modeling"))
-from publication_dataset import PublicationDatasetError, freeze, freeze_synthetic_for_test, split  # noqa: E402
+from publication_dataset import PublicationDatasetError, freeze, freeze_synthetic_for_test, split, split_synthetic_for_test  # noqa: E402
 
 PROVENANCE = {"pinned_catalog_sha256": "A" * 64}
 SNAPSHOTS = [{"path": "x", "sha256": "B" * 64}]
@@ -41,6 +41,10 @@ def training_example(signed: dict) -> dict:
         "dedup_cluster_digest": signed["dedup_cluster_digest"],
         "account_id": signed["account_id"],
         "dedup_cluster_id": signed["cluster_id"],
+        "_registered_observation": {
+            "observation_id": "observation_fixture_0001", "price_twd": signed["selected_price_twd"],
+            "post_date": signed["post_date"], "price_line": "asking",
+        },
     }
 
 
@@ -50,12 +54,12 @@ class PublicationDatasetTests(unittest.TestCase):
         self.assertEqual(first, freeze([], [], PROVENANCE, SNAPSHOTS))
         self.assertEqual(first["status"], "not_ready")
         self.assertEqual(first["dataset_row_count"], 0)
-        self.assertEqual(split(first)["market_pools"], [])
+        self.assertEqual(split_synthetic_for_test(first)["market_pools"], [])
 
     def test_row_hash_dataset_hash_and_time_split_are_deterministic(self):
         rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
         manifest = freeze_synthetic_for_test(list(reversed(rows)), vectors(rows), PROVENANCE, SNAPSHOTS)
-        report = split(manifest)
+        report = split_synthetic_for_test(manifest)
         self.assertEqual(manifest["status"], "not_ready")
         self.assertEqual(manifest["dataset_row_count"], 400)
         self.assertTrue(all(item["row_sha256"] for item in manifest["dataset_rows"]))
@@ -80,16 +84,16 @@ class PublicationDatasetTests(unittest.TestCase):
         manifest = freeze_synthetic_for_test([sample], vectors([sample]), PROVENANCE, SNAPSHOTS)
         manifest["dataset_rows"][0]["selected_price_twd"] = 999
         with self.assertRaisesRegex(PublicationDatasetError, "dataset_manifest_hash_mismatch"):
-            split(manifest)
+            split_synthetic_for_test(manifest)
         first, second = row(1, "2025-01-01", cluster="cluster_same"), row(2, "2025-01-02", cluster="cluster_same")
         manifest = freeze_synthetic_for_test([first, second], vectors([first, second]), PROVENANCE, SNAPSHOTS)
         with self.assertRaisesRegex(PublicationDatasetError, "cluster_maps_to_multiple_accounts"):
-            split(manifest)
+            split_synthetic_for_test(manifest)
 
     def test_spanning_cluster_is_excluded_not_split(self):
         rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
         rows.append({**row(401, "2025-01-02", cluster="cluster_1"), "account_id": "account_1"})
-        pool = split(freeze_synthetic_for_test(rows, vectors(rows), PROVENANCE, SNAPSHOTS))["market_pools"][0]
+        pool = split_synthetic_for_test(freeze_synthetic_for_test(rows, vectors(rows), PROVENANCE, SNAPSHOTS))["market_pools"][0]
         self.assertIn("cluster_1", pool["excluded_spanning_cluster_ids"])
         self.assertFalse(pool["cluster_overlap"])
         self.assertFalse(pool["requirements_met"])
@@ -104,6 +108,18 @@ class PublicationDatasetTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationDatasetError, "signed_feature_payload_vector_mismatch"):
             freeze([signed], [forged], PROVENANCE, SNAPSHOTS, [training_example(signed)])
 
+    def test_frozen_signed_feature_payload_cannot_be_swapped_and_rehashed(self):
+        sample = row(1, cluster="cluster_signed_feature_replay")
+        vector = vectors([sample])[0]
+        signed = signed_row(sample, vector)
+        manifest = freeze([signed], [vector], PROVENANCE, SNAPSHOTS, [training_example(signed)])
+        manifest["dataset_rows"][0]["feature_payload"] = {**vector, "feature_groups": {"forged": 1}}
+        payload = {key: value for key, value in manifest["dataset_rows"][0].items() if key != "row_sha256"}
+        manifest["dataset_rows"][0]["row_sha256"] = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest().upper()
+        manifest["dataset_sha256"] = hashlib.sha256(json.dumps(manifest["dataset_rows"], ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest().upper()
+        with self.assertRaisesRegex(PublicationDatasetError, "dataset_feature_payload_hash_mismatch"):
+            split_synthetic_for_test(manifest)
+
     def test_unsigned_400_rows_are_excluded_and_cannot_ready(self):
         rows = [row(n, "2025-01-01" if n <= 300 else "2025-01-02") for n in range(1, 401)]
         manifest = freeze(rows, vectors(rows), PROVENANCE, SNAPSHOTS)
@@ -111,7 +127,7 @@ class PublicationDatasetTests(unittest.TestCase):
         self.assertEqual(manifest["rejected_clean_row_count"], 400)
         self.assertEqual(manifest["rejection_counts"], [{"reason": "unsigned_clean_row", "count": 400}])
         self.assertEqual(manifest["blockers"], [{"code": "unsigned_clean_rows_excluded", "count": 400}])
-        self.assertEqual(split(manifest)["status"], "not_ready")
+        self.assertEqual(split_synthetic_for_test(manifest)["status"], "not_ready")
 
     def test_partial_lineage_is_excluded_with_an_explicit_rejection(self):
         sample = {**row(1), "training_example_id": "training_example_partial"}
@@ -126,6 +142,11 @@ class PublicationDatasetTests(unittest.TestCase):
         example = training_example(signed)
         with self.assertRaisesRegex(PublicationDatasetError, "signed_training_example_commitment_mismatch"):
             freeze([{**signed, "training_example_digest": "B" * 64}], [vector], PROVENANCE, SNAPSHOTS, [example])
+
+    def test_direct_production_split_requires_deterministic_root_replay(self):
+        manifest = freeze_synthetic_for_test([row(1)], vectors([row(1)]), PROVENANCE, SNAPSHOTS)
+        with self.assertRaisesRegex(PublicationDatasetError, "production_split_requires_deterministic_root_replay"):
+            split(manifest)
 
 
 if __name__ == "__main__":

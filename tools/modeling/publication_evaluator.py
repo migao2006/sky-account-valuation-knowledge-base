@@ -4,7 +4,8 @@
 The evaluator owns the split: callers may *submit* a split for comparison,
 but it is never used to select training or holdout rows.  Likewise it never
 accepts a vector of claimed predictions.  The implemented scorer is a fixed,
-train-only verified-date linear regression with evaluator-owned model bytes.
+train-only signed-account-feature linear regression; dates are split evidence,
+not prediction features.
 """
 from __future__ import annotations
 
@@ -19,14 +20,15 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .publication_dataset import PublicationDatasetError, build as build_publication_dataset, split as derive_split
+    from .publication_dataset import PublicationDatasetError, _derive_split, build as build_publication_dataset, split_synthetic_for_test
 except ImportError:
-    from publication_dataset import PublicationDatasetError, build as build_publication_dataset, split as derive_split
+    from publication_dataset import PublicationDatasetError, _derive_split, build as build_publication_dataset, split_synthetic_for_test
 
 ROOT = Path(__file__).resolve().parents[2]
 TRAINING_CLUSTERS_REQUIRED = 300
 HOLDOUT_CLUSTERS_REQUIRED = 100
 MINIMUM_SUBGROUP_HOLDOUT_CASES = 30
+EVALUATION_SCHEMA_VERSION = "1.2-p3.4"
 
 
 class PublicationEvaluationError(ValueError):
@@ -89,32 +91,50 @@ def _submitted_split_reasons(manifest: dict[str, Any], submitted: dict[str, Any]
     return sorted(set(reasons))
 
 
-def _fit_date_trend(train: list[dict[str, Any]]) -> dict[str, float] | None:
-    """Fit a deterministic, train-only least-squares trend on verified dates."""
-    origin = min(date.fromisoformat(row["post_date"]).toordinal() for row in train)
-    points = [(date.fromisoformat(row["post_date"]).toordinal() - origin, float(row["selected_price_twd"])) for row in train]
-    mean_x = statistics.mean(point[0] for point in points)
-    mean_y = statistics.mean(point[1] for point in points)
-    denominator = sum((x - mean_x) ** 2 for x, _y in points)
+def _numeric_features(value: Any, prefix: str = "") -> dict[str, float]:
+    """Flatten numeric signed account attributes only; never dates or IDs."""
+    if isinstance(value, dict):
+        result: dict[str, float] = {}
+        for key in sorted(value):
+            if key in {"account_id", "vector_id", "source_listing_ids", "catalog_provenance"}:
+                continue
+            result.update(_numeric_features(value[key], f"{prefix}.{key}" if prefix else key))
+        return result
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)):
+        return {prefix: float(value)}
+    return {}
+
+
+def _fit_feature_linear(train: list[dict[str, Any]]) -> dict[str, Any] | None:
+    vectors = [_numeric_features(row.get("feature_payload", {}).get("feature_groups", {})) for row in train]
+    shared = sorted(set.intersection(*(set(vector) for vector in vectors))) if vectors else []
+    columns = [key for key in shared if len({vector[key] for vector in vectors}) > 1][:12]
+    if not columns:
+        return None
+    # A one-dimensional, train-only least-squares model gives a portable proof
+    # of feature use without pretending to be a runtime Elastic Net artifact.
+    key = columns[0]
+    xs, ys = [vector[key] for vector in vectors], [float(row["selected_price_twd"]) for row in train]
+    mean_x, mean_y = statistics.mean(xs), statistics.mean(ys)
+    denominator = sum((value - mean_x) ** 2 for value in xs)
     if denominator == 0:
         return None
-    slope = sum((x - mean_x) * (y - mean_y) for x, y in points) / denominator
-    return {"origin_ordinal": float(origin), "intercept": mean_y - slope * mean_x, "slope_per_day": slope}
+    slope = sum((value - mean_x) * (target - mean_y) for value, target in zip(xs, ys)) / denominator
+    return {"model_type": "publication_feature_linear_evaluator_only", "feature_source": "signed_feature_payload.feature_groups",
+            "feature_column": key, "intercept": mean_y - slope * mean_x, "slope": slope,
+            "training_range": [min(xs), max(xs)]}
 
 
-def _predict_date_trend(model: dict[str, float], row: dict[str, Any]) -> float:
-    x = date.fromisoformat(row["post_date"]).toordinal() - model["origin_ordinal"]
-    return max(1.0, model["intercept"] + model["slope_per_day"] * x)
+def _predict_feature_linear(model: dict[str, Any], row: dict[str, Any]) -> float:
+    vector = _numeric_features(row["feature_payload"].get("feature_groups", {}))
+    key = model["feature_column"]
+    if key not in vector:
+        raise PublicationEvaluationError(f"holdout_feature_missing:{key}")
+    return max(1.0, model["intercept"] + model["slope"] * vector[key])
 
 
 def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """Fit a fixed train-only date model and score the untouched holdout.
-
-    This minimal evaluator-owned model exists to prove the full data-to-metric
-    path.  It is intentionally narrow: it uses only the verified post date,
-    has no external model/prediction input, and can therefore be replayed from
-    the frozen manifest bytes alone.
-    """
+    """Fit signed account features on train rows and score untouched holdout."""
     train_ids = set(pool["training_cluster_ids"])
     holdout_ids = set(pool["holdout_cluster_ids"])
     train = [row for row in rows if row["cluster_id"] in train_ids]
@@ -123,12 +143,12 @@ def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[d
         raise PublicationEvaluationError("recomputed_split_has_no_train_or_holdout_rows")
     train_prices = [float(row["selected_price_twd"]) for row in train]
     median_point = statistics.median(train_prices)
-    model = _fit_date_trend(train)
+    model = _fit_feature_linear(train)
     if model is None:
-        return ({"scorer": "date_trend_unavailable", "training_row_count": len(train), "holdout_row_count": len(holdout)}, None)
-    train_residuals = [float(row["selected_price_twd"]) - _predict_date_trend(model, row) for row in train]
+        return ({"scorer": "feature_linear_unavailable", "training_row_count": len(train), "holdout_row_count": len(holdout)}, None)
+    train_residuals = [float(row["selected_price_twd"]) - _predict_feature_linear(model, row) for row in train]
     residual_low, residual_high = _percentile(train_residuals, 0.10), _percentile(train_residuals, 0.90)
-    predictions = [_predict_date_trend(model, row) for row in holdout]
+    predictions = [_predict_feature_linear(model, row) for row in holdout]
     apes = [_ape(float(row["selected_price_twd"]), prediction) for row, prediction in zip(holdout, predictions)]
     errors = [abs(float(row["selected_price_twd"]) - prediction) for row, prediction in zip(holdout, predictions)]
     baseline_errors = [abs(float(row["selected_price_twd"]) - median_point) for row in holdout]
@@ -150,7 +170,7 @@ def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[d
     underpowered = []
     for name in sorted(subgroup_rows):
         group = subgroup_rows[name]
-        group_apes = [_ape(float(row["selected_price_twd"]), _predict_date_trend(model, row)) for row in group]
+        group_apes = [_ape(float(row["selected_price_twd"]), _predict_feature_linear(model, row)) for row in group]
         subgroups.append({"name": name, "holdout_case_count": len(group), "mdape": statistics.median(group_apes)})
         if len(group) < MINIMUM_SUBGROUP_HOLDOUT_CASES:
             underpowered.append(name)
@@ -160,7 +180,7 @@ def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[d
     baseline_improvement = None if baseline_mae == 0 else 1 - candidate_mae / baseline_mae
     selector_improvement = None if selector_mae == 0 else 1 - candidate_mae / selector_mae
     metric = {
-        "scorer": "train_only_verified_date_linear_regression", "training_row_count": len(train), "holdout_row_count": len(holdout),
+        "scorer": "train_only_signed_account_feature_linear_regression", "training_row_count": len(train), "holdout_row_count": len(holdout),
         "model": model, "holdout_mdape": statistics.median(apes), "holdout_p90_ape": _percentile(apes, 0.90),
         "holdout_mae_twd": candidate_mae, "median_baseline_mae_twd": baseline_mae,
         "median_baseline_mae_improvement": baseline_improvement, "comparable_selector_mae_twd": selector_mae,
@@ -179,8 +199,8 @@ def _replay_metrics(rows: list[dict[str, Any]], pool: dict[str, Any]) -> tuple[d
 
 
 def _gate_reasons(metric: dict[str, Any]) -> list[str]:
-    if metric["scorer"] == "date_trend_unavailable":
-        return ["date_trend_requires_training_date_variation"]
+    if metric["scorer"] == "feature_linear_unavailable":
+        return ["signed_feature_linear_requires_varying_shared_numeric_features"]
     reasons = []
     if metric["holdout_mdape"] > 0.20:
         reasons.append("holdout_mdape_above_20_percent")
@@ -214,7 +234,7 @@ def evaluator_artifact_binding(price_line: str, model: dict[str, Any], dataset_s
     helper to bless a self-supplied artifact.
     """
     model_sha256 = _sha256(model)
-    artifact = {"schema_version": "1.1-p3.3", "model_type": "publication_date_linear_regression",
+    artifact = {"schema_version": EVALUATION_SCHEMA_VERSION, "model_type": "publication_feature_linear_evaluator_only",
                 "price_line": price_line, "model": model, "dataset_sha256": dataset_sha256,
                 "dataset_manifest_sha256": dataset_manifest_sha256, "split_sha256": split_sha256}
     return {"price_line": price_line, "model_type": artifact["model_type"], "dataset_sha256": dataset_sha256,
@@ -222,7 +242,8 @@ def evaluator_artifact_binding(price_line: str, model: dict[str, Any], dataset_s
             "model_sha256": model_sha256, "artifact_sha256": _sha256(artifact)}
 
 
-def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, artifact: Any = None, predictions: Any = None) -> dict[str, Any]:
+def _evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, artifact: Any = None,
+              predictions: Any = None, allow_test_synthetic: bool = False) -> dict[str, Any]:
     """Recompute a report from a frozen manifest and reject external claims.
 
     ``artifact`` and ``predictions`` exist solely to make the trust boundary
@@ -231,7 +252,7 @@ def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = 
     fitting contract inside this module (or an explicitly imported helper).
     """
     try:
-        replayed = derive_split(manifest)
+        replayed = split_synthetic_for_test(manifest) if allow_test_synthetic else _derive_split(manifest, allow_test_synthetic=False)
     except (PublicationDatasetError, KeyError, TypeError, ValueError) as error:
         raise PublicationEvaluationError(str(error)) from error
     submitted_reasons = _submitted_split_reasons(manifest, submitted_split, replayed) if submitted_split is not None else []
@@ -242,8 +263,14 @@ def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = 
         input_reasons.append("external_predictions_rejected")
     eligible = [pool for pool in replayed["market_pools"] if pool["requirements_met"] is True and pool["cluster_overlap"] is False]
     common = {
-        "schema_version": "1.1-p3.3", "publication_ready": False,
+        "schema_version": EVALUATION_SCHEMA_VERSION, "publication_ready": False,
         "artifact_publication_fields_consulted": False,
+        "feature_evaluator_contract": {
+            "schema_version": "publication-feature-evaluator-v1",
+            "feature_source": "signed_feature_payload.feature_groups",
+            "target": "selected_price_twd",
+            "dates_used_only_for": ["time_forward_split", "comparable_selector_baseline"],
+        },
         "dataset_sha256": manifest["dataset_sha256"], "dataset_manifest_sha256": _sha256(manifest),
         "split_sha256": _sha256(replayed),
         "artifact_bindings": [],
@@ -269,19 +296,44 @@ def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = 
                              "holdout_cluster_count": len(pool["holdout_cluster_ids"]), "cut_date": pool["cut_date"]})
     pool_reasons = {f"{metric['currency']}:{metric['server']}:{metric['price_line']}": _gate_reasons(metric) for metric in pool_metrics}
     failed = [f"{name}:{reason}" for name, reasons in pool_reasons.items() for reason in reasons]
-    metrics = {"replay_kind": "evaluator_owned_train_only_date_trend", "market_pools": pool_metrics}
+    metrics = {"replay_kind": "evaluator_owned_train_only_signed_account_feature_linear", "market_pools": pool_metrics}
     if failed:
         return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
                 "blocking_reasons": sorted(set(failed))}
-    bindings = [evaluator_artifact_binding(metric["price_line"], metric["model"], common["dataset_sha256"], common["dataset_manifest_sha256"], common["split_sha256"])
-                for metric in pool_metrics]
-    return {**common, "status": "passed", "publication_ready": True, "artifact_bindings": bindings,
-            "eligible_market_pools": pool_summary, "metrics": metrics, "blocking_reasons": []}
+    # This proves a replayable account-feature path, but it is not an Elastic
+    # Net/XGBoost runtime artifact.  Keep publication locked until that exact
+    # runtime contract is evaluated; never bless a date-only substitute.
+    return {**common, "status": "evaluation_required", "eligible_market_pools": pool_summary, "metrics": metrics,
+            "blocking_reasons": ["runtime_compatible_feature_artifact_required"]}
+
+
+def evaluate(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, root: Path | None = None,
+             artifact: Any = None, predictions: Any = None) -> dict[str, Any]:
+    """Evaluate a production-signed frozen manifest only.
+
+    This public entry point requires deterministic root replay. A caller cannot
+    alter targets/subgroups and replace enclosing hashes because the supplied
+    manifest must equal the freshly rebuilt production manifest.
+    """
+    if root is None:
+        raise PublicationEvaluationError("production_evaluation_requires_deterministic_root_replay")
+    expected_manifest, _split = build_publication_dataset(root.resolve())
+    if manifest != expected_manifest:
+        raise PublicationEvaluationError("dataset_manifest_differs_from_deterministic_root_replay")
+    return _evaluate(expected_manifest, submitted_split, artifact=artifact, predictions=predictions)
+
+
+def evaluate_synthetic_for_test(manifest: dict[str, Any], submitted_split: dict[str, Any] | None = None, *, artifact: Any = None,
+                                predictions: Any = None) -> dict[str, Any]:
+    """Test-only evaluator for manifests made by ``freeze_synthetic_for_test``."""
+    if manifest.get("lineage_mode") != "test_only_synthetic":
+        raise PublicationEvaluationError("synthetic_evaluator_requires_test_only_manifest")
+    return _evaluate(manifest, submitted_split, artifact=artifact, predictions=predictions, allow_test_synthetic=True)
 
 
 def build(root: Path) -> dict[str, Any]:
     manifest, _split = build_publication_dataset(root.resolve())
-    return evaluate(manifest)
+    return _evaluate(manifest)
 
 
 def main() -> None:

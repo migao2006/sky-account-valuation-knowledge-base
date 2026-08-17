@@ -21,15 +21,20 @@ but it cannot cryptographically prove that a pseudonym belongs to a human.
 For that reason a non-empty gold ledger now also requires a detached OpenSSH
 audit contract. The authority bundle is kept outside the release and its exact
 SHA-256 is injected at validation time; a repository-local bundle is rejected.
-Each gold row has exactly three attestations in
-`data/review/market-audit/attestations.jsonl`, one for `annotator_a`,
-`annotator_b`, and `adjudicator`. Their authority IDs must be the ledger IDs,
-their public-key fingerprints must differ, and their authorized roles must
-match. Each detached `.sig` is verified with `ssh-keygen -Y verify` over a
-canonical payload containing the complete ledger row, complete committed queue
-row, and attestation binding. A changed label, listing hash, queue field,
-signature reuse, wrong role, revoked fingerprint, absent external root, or
-tampered signature fails closed.
+For formal gold, each row has exactly three **v2** attestations in
+`data/review/market-audit/attestations.jsonl`: one detached blinded receipt for
+each annotator and one adjudication receipt. Each annotator signs only their
+own annotation commitment plus the committed anonymous queue hash; neither
+receipt signs the completed gold row. The adjudicator signs both verified
+annotator receipt IDs and commitments, the same queue commitment, and a final
+adjudication commitment. All three authorities must have distinct external
+public-key fingerprints and authorized roles, and both submission timestamps
+must precede the adjudication timestamp. This gives a replayable evidence
+chain for independently submitted blinded decisions. Legacy v1 completed-row
+signatures remain auditable for review ledgers but can never establish formal
+market gold. Changed labels, queue fields, commitment links, timestamp order,
+signature reuse, wrong role, revoked fingerprint, absent external root, or a
+tampered signature fail closed.
 
 The external JSON authority bundle has `schema_version`
 `sky-market-audit-authority-bundle-v1`, an `authorities` array with

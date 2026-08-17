@@ -1,0 +1,85 @@
+{
+  "schema_version": "market-gold-evaluation-v1",
+  "status": "not_ready",
+  "publication_ready": false,
+  "gold_row_count": 0,
+  "minimums": {
+    "gold_rows": 200,
+    "development_rows": 100,
+    "heldout_rows": 100,
+    "heldout_field_accuracy": 0.98,
+    "verified_sale_false_positive_count": 0
+  },
+  "partition_method": "opaque_bucket_review_id_alternating_v1",
+  "bucket_coverage": {},
+  "metrics": {
+    "development": {
+      "row_count": 0,
+      "annotator_metrics": {
+        "annotator_a": {
+          "field_accuracy": {
+            "offer_kind": null,
+            "entity_kind": null,
+            "price_type": null,
+            "currency": null,
+            "server": null
+          },
+          "verified_sale_false_positive_count": 0
+        },
+        "annotator_b": {
+          "field_accuracy": {
+            "offer_kind": null,
+            "entity_kind": null,
+            "price_type": null,
+            "currency": null,
+            "server": null
+          },
+          "verified_sale_false_positive_count": 0
+        }
+      }
+    },
+    "heldout": {
+      "row_count": 0,
+      "annotator_metrics": {
+        "annotator_a": {
+          "field_accuracy": {
+            "offer_kind": null,
+            "entity_kind": null,
+            "price_type": null,
+            "currency": null,
+            "server": null
+          },
+          "verified_sale_false_positive_count": 0
+        },
+        "annotator_b": {
+          "field_accuracy": {
+            "offer_kind": null,
+            "entity_kind": null,
+            "price_type": null,
+            "currency": null,
+            "server": null
+          },
+          "verified_sale_false_positive_count": 0
+        }
+      }
+    }
+  },
+  "heldout_minimum_annotator_field_accuracy": {
+    "offer_kind": null,
+    "entity_kind": null,
+    "price_type": null,
+    "currency": null,
+    "server": null
+  },
+  "heldout_verified_sale_false_positive_count": 0,
+  "independent_blinded_decisions_proven": false,
+  "audit_errors": [],
+  "independence_errors": [],
+  "linkage_errors": [],
+  "blocking_reasons": [
+    "requires all 20 opaque review buckets; found 0",
+    "requires externally signed blinded annotation-submission receipts before a formal market-gold ledger can be recognized",
+    "requires >=200 human-gold rows with >=100 development and >=100 held-out rows",
+    "requires every held-out offer/entity/price type/currency/server accuracy >=98% and verified-sale false-positive count 0"
+  ]
+}
