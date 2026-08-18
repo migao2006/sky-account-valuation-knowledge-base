@@ -44,7 +44,7 @@
     {
       "actual": {
         "review_scopes": 39,
-        "source_references": 1340
+        "source_references": 1336
       },
       "contract_id": "catalog.unresolved_zero",
       "evidence_paths": [
@@ -78,7 +78,7 @@
     },
     {
       "actual": {
-        "canonical_items": 155,
+        "canonical_items": 159,
         "non_verified_count": 78,
         "non_verified_item_ids": [
           "item_anniversary_bass",
@@ -170,7 +170,7 @@
     },
     {
       "actual": {
-        "items_missing_required_fields": 155,
+        "items_missing_required_fields": 159,
         "missing_fields_by_item": {
           "item_anniversary_bass": [
             "availability_as_of",
@@ -803,6 +803,54 @@
             "availability_history",
             "availability_status",
             "canonical_name_en",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_arum_petal_cape": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_arum_petal_hair": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_lilypad_umbrella": [
+            "availability_as_of",
+            "availability_status",
+            "first_release_date",
+            "free_or_premium",
+            "item_category",
+            "pass_required",
+            "permanent_account_item",
+            "set_membership",
+            "source_type",
+            "ultimate_reward"
+          ],
+          "item_days_of_bloom_spiky_sprig_hair": [
+            "availability_as_of",
+            "availability_status",
             "first_release_date",
             "free_or_premium",
             "item_category",
@@ -2290,7 +2338,7 @@
           "item_regular_waving_bellmaker_mask"
         ],
         "items_missing_independent_identity": 96,
-        "official_identity_count": 59,
+        "official_identity_count": 63,
         "two_secondary_identity_count": 0
       },
       "contract_id": "catalog.independent_identity_evidence",
@@ -2352,6 +2400,10 @@
           "item_days_mischief_cat_ears_tail",
           "item_days_mischief_witch_hat",
           "item_days_music_white_guitar",
+          "item_days_of_bloom_arum_petal_cape",
+          "item_days_of_bloom_arum_petal_hair",
+          "item_days_of_bloom_lilypad_umbrella",
+          "item_days_of_bloom_spiky_sprig_hair",
           "item_days_of_color_color_bubble_machine",
           "item_days_of_color_color_glam_cut",
           "item_days_of_color_dark_rainbow_loafers",
@@ -2460,7 +2512,7 @@
           "item_treasure_cavalier_boots",
           "item_treasure_shovel"
         ],
-        "items_without_complete_visual_state": 155,
+        "items_without_complete_visual_state": 159,
         "visual_input_error_count": 0
       },
       "contract_id": "catalog.visual_state_verified",
@@ -3237,17 +3289,17 @@
     "alias_conflicts": 1,
     "aliases": 320,
     "ancestors": 132,
-    "availability_events": 84,
+    "availability_events": 88,
     "candidates": 622,
-    "canonical_items": 155,
+    "canonical_items": 159,
     "events": 24,
     "scope_review": 3266,
     "seasons": 30,
     "sets": 10,
-    "source_scoped_unresolved": 1340,
+    "source_scoped_unresolved": 1336,
     "universe": 3266,
     "unmapped_aliases": 14,
     "unresolved_review_scopes": 39
   },
-  "schema_version": "1.4-p4.2"
+  "schema_version": "1.5-p4.3"
 }

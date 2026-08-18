@@ -1,5 +1,11 @@
 # 變更紀錄
 
+## 5.5.0-p4.3 — 2026-08-17
+
+- 新增 FAQ 1278 Days of Bloom 2024 bounded core-four，離線重播四件逐項定價物品的官方歷史成本與活動時窗；只接受官方與 pinned vendor 的逐字 identity，不推論目前 availability、永久性、視覺或轉售價。
+- 重建 vendor crosswalk、source-scoped identities、catalog query/universe、1,022 個 item vectors、歷史成本、fail-closed model artifacts、completion reports 與 package manifest。
+- 正式真人 gold、市場授權訓練、完整 knowledge entity／欄位／visual evidence 門檻仍未完成，production valuation 保持 not ready。
+
 ## 5.4.0-p4.2 — 2026-08-17
 
 - 新增 FAQ 1343 Days of Moonlight 2024 bounded core-three，離線重播三件物品的官方歷史價格與活動時窗；排除 bundle、同名類型衝突、目前 availability、視覺與轉售價推論。

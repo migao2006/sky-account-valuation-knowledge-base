@@ -180,6 +180,7 @@ JSON_SCHEMA_FILES = {
     "data/source/research/tgc-faq-1362-days-of-music-core-four.json": "schemas/knowledge/days-of-music-faq-1362-core-four-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1356-days-of-mischief-core-five.json": "schemas/knowledge/days-of-mischief-faq-1356-core-five-fact-snapshot.schema.json",
     "data/source/research/tgc-faq-1343-days-of-moonlight-core-three.json": "schemas/knowledge/days-of-moonlight-faq-1343-core-three-fact-snapshot.schema.json",
+    "data/source/research/tgc-faq-1278-days-of-bloom-core-four.json": "schemas/knowledge/days-of-bloom-faq-1278-core-four-fact-snapshot.schema.json",
     "data/review/shadow/days-of-love-faq1374-core-four.declaration.json": "schemas/review/canonical-evidence-declaration.schema.json",
 }
 
@@ -1273,7 +1274,7 @@ def validate(
         for number, line in enumerate(text.splitlines(), 1):
             if forbidden_terms.search(line):
                 errors.append(f"{path.relative_to(root)}:{number}: forbidden execution capability")
-    return {"schema_version": "5.4-p4.2", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
+    return {"schema_version": "5.5-p4.3", "offline_only": True, "valid": not errors, "errors": errors, "warnings": warnings,
             "schema_records_checked": schema_checked, "formal_jsonl_coverage": {rel: (root / rel).exists() for rel in sorted(REQUIRED_FORMAL_JSONL)},
             "date_flow": {"verified_normalized_dates": len(verified_normalized), "verified_history_dates": len(verified_histories), "expected_normalized_dates": 28, "expected_history_dates": 5},
             "formal_counts": formal_counts,
